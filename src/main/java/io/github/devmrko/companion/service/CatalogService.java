@@ -8,6 +8,7 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 @Service
 public class CatalogService {
+    private final Object[] refreshLocks=java.util.stream.IntStream.range(0,64).mapToObj(i -> new Object()).toArray();
     private final ResourceCatalog cloud;
     private final CatalogStore store;
     public CatalogService(ResourceCatalog cloud,CatalogStore store) { this.cloud=cloud; this.store=store; }
@@ -18,16 +19,27 @@ public class CatalogService {
         try { return new View(store.read(scope(c,region,compartment)).orElse(null),null); }
         catch (IllegalStateException e) { return new View(null,e.getMessage()); }
     }
-    public synchronized View refresh(Connection c,String region,String compartment) {
+    public View refresh(Connection c,String region,String compartment) {
+        synchronized(refreshLocks[Math.floorMod(scope(c,region,compartment).hashCode(),refreshLocks.length)]) {
         var previous=read(c,region,compartment);
         try {
-            var snapshot=new Snapshot(1,scope(c,region,compartment),Instant.now().toString(),List.copyOf(cloud.resources(c,region,compartment)));
+            var resources=List.copyOf(cloud.resources(c,region,compartment));
+            var snapshot=new Snapshot(1,scope(c,region,compartment),Instant.now().toString(),resources);
             store.write(snapshot); return new View(snapshot,null);
         } catch (RuntimeException e) {
             return new View(previous.snapshot(),"갱신 실패 · 이전 캐시 유지. 연결·권한·저장 경로 확인.");
         }
     }
-    public List<Source> sources(Connection c,String region,String compartment) { return store.sources(scope(c,region,compartment)).items(); }
+    }
+    private String externalScope(Connection c) {
+        return String.join("\n",c.demo()?"demo":"oci",c.profile(),c.tenancy(),c.user())+"\nexternal-git";
+    }
+    public List<Source> sources(Connection c,String region,String compartment) {
+        String destination=externalScope(c);
+        store.migrateExternalSources(destination.substring(0,destination.lastIndexOf('\n')+1),destination);
+        var result=new ArrayList<>(store.sources(scope(c,region,compartment)).items());
+        result.addAll(store.sources(destination).items());return List.copyOf(result);
+    }
     public void register(Connection c,String region,String compartment,String provider,String name,String url,String branch,String resourceId) {
         if (name==null || name.isBlank() || name.length()>128 || branch==null || branch.isBlank() || branch.length()>255 || branch.chars().anyMatch(Character::isISOControl)) throw Errors.INVALID.exception();
         if ("OCI".equals(provider)) {
@@ -45,7 +57,7 @@ public class CatalogService {
             } catch (IllegalArgumentException e) { throw Errors.INVALID.exception(); }
             resourceId="";
         }
-        store.saveSource(scope(c,region,compartment),new Source(UUID.randomUUID().toString(),provider,name,url,branch,resourceId));
+        store.saveSource(provider.equals("OCI")?scope(c,region,compartment):externalScope(c),new Source(UUID.randomUUID().toString(),provider,name,url,branch,resourceId));
     }
-    public void remove(Connection c,String region,String compartment,String id) { store.deleteSource(scope(c,region,compartment),id); }
+    public void remove(Connection c,String region,String compartment,String id) { store.deleteSource(scope(c,region,compartment),id); store.deleteSource(externalScope(c),id); }
 }

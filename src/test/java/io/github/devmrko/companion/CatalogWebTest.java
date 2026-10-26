@@ -34,10 +34,26 @@ class CatalogWebTest {
         mvc.perform(post("/sources").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy").param("provider","GITHUB").param("name","test-source").param("url","https://github.com/a/b").param("branch","main")).andExpect(redirectedUrl("/sources"));
         mvc.perform(get("/sources").session(session)).andExpect(content().string(containsString("test-source")));
         mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("interval","300")).andExpect(redirectedUrl("/"));
-        mvc.perform(get("/sources").session(session)).andExpect(status().isOk()).andExpect(content().string(not(containsString("test-source"))));
+        mvc.perform(get("/sources").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("test-source")));
         mvc.perform(post("/catalog/refresh").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy")).andExpect(status().isConflict());
         mvc.perform(get("/guides").session(session)).andExpect(status().isOk());
         mvc.perform(post("/disconnect").session(session).with(csrf())).andExpect(redirectedUrl("/login"));
         assertTrue(session.isInvalid());
+    }
+    @Test void expandedScopeAndRepositoryFiltersPreserveSourcePage() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/sources").session(session)).andExpect(status().isOk());
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy").param("mode","subtree").param("interval","60").param("back","/sources")).andExpect(redirectedUrl("/sources"));
+        mvc.perform(post("/catalog/refresh").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy").param("mode","subtree").param("back","/sources")).andExpect(redirectedUrl("/sources"));
+        var result=mvc.perform(get("/sources").session(session).param("q","companion-api").param("project","demo-project").param("state","ACTIVE")).andExpect(status().isOk()).andReturn();
+        var model=result.getModelAndView().getModel();
+        assertEquals(2,((java.util.List<?>)model.get("rows")).size());
+        assertEquals(2,((java.util.List<?>)model.get("scopeResults")).size());
+        assertEquals(0,((io.github.devmrko.companion.web.CatalogPages.Selection)model.get("selection")).interval());
+        mvc.perform(post("/catalog/refresh-one").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy").param("mode","subtree").param("target","foreign")).andExpect(status().isBadRequest());
+        mvc.perform(post("/catalog/refresh-one").session(session).with(csrf()).param("region","ap-seoul-1").param("compartment","demo-tenancy").param("mode","subtree").param("target","demo-development")).andExpect(status().isOk()).andExpect(jsonPath("$.compartment.id").value("demo-development")).andExpect(jsonPath("$.error").isEmpty());
+
+        result=mvc.perform(get("/sources").session(session).param("q","nonexistent")).andExpect(status().isOk()).andReturn();
+        assertTrue(((java.util.List<?>)result.getModelAndView().getModel().get("rows")).isEmpty());
     }
 }

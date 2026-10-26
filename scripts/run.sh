@@ -7,4 +7,7 @@ if [[ ! -f target/oci-companion-0.1.0-SNAPSHOT.jar ]]; then
   echo 'Run ./scripts/build.sh first.' >&2
   exit 1
 fi
-exec java -jar target/oci-companion-0.1.0-SNAPSHOT.jar "$@"
+mkdir -p .tools/runtime
+runtime_dir=$(mktemp -d "$PWD/.tools/runtime/run.XXXXXX")
+cp target/oci-companion-0.1.0-SNAPSHOT.jar "$runtime_dir/app.jar"
+exec java -jar "$runtime_dir/app.jar" "$@"

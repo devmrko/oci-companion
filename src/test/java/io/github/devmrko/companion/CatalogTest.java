@@ -60,8 +60,30 @@ class CatalogTest {
         service.register(c,c.region(),"one","GITHUB","test","https://github.com/a/b","develop","");
         assertEquals(2,service.sources(c,c.region(),"one").size());
         service.refresh(c,c.region(),"one");assertEquals(2,service.sources(c,c.region(),"one").size());
-        assertTrue(service.sources(c,c.region(),"two").isEmpty());
+        assertEquals(1,service.sources(c,"us-ashburn-1","two").size());
+        assertEquals("GITHUB",service.sources(c,"us-ashburn-1","two").getFirst().provider());
         var restarted=new CatalogService(new DemoResourceCatalog(),new JsonCatalogStore(directory.toString()));
         assertEquals(2,restarted.sources(c,c.region(),"one").size());
+    }
+    @Test void migratesLegacyExternalSourcesAcrossRegionsWithoutCrossingIdentity() {
+        var store=new JsonCatalogStore(directory.toString());var service=new CatalogService(new DemoResourceCatalog(),store);
+        var git=new Source("old-git","GITHUB","old","https://github.com/a/old","main","");
+        var oci=new Source("old-oci","OCI","oci","https://example.com/oci","main","repository");
+        store.saveSource(service.scope(c,"old-region","old-compartment"),git);
+        store.saveSource(service.scope(c,"old-region","old-compartment"),oci);
+        var other=new Connection("OTHER",c.tenancy(),c.user(),c.region(),"other",true);
+        assertTrue(service.sources(other,"new-region","new-compartment").isEmpty());
+        assertEquals(List.of(git),service.sources(c,"new-region","new-compartment"));
+        assertEquals(List.of(oci),store.sources(service.scope(c,"old-region","old-compartment")).items());
+        assertEquals(List.of(git),service.sources(c,"new-region","new-compartment"));
+        service.remove(c,"new-region","new-compartment",git.id());
+        assertTrue(service.sources(c,"new-region","new-compartment").isEmpty());
+    }
+    @Test void selectsOnlyRequestedSubtreeAndRejectsUnknownScope() {
+        var choices=List.of(new Choice("root","root"),new Choice("a","a","root"),new Choice("b","b","a"),new Choice("c","c","root"));
+        assertEquals(List.of("a","b"),io.github.devmrko.companion.service.CompartmentScopes.targets(choices,"a","subtree").stream().map(Choice::id).toList());
+        assertEquals(4,io.github.devmrko.companion.service.CompartmentScopes.targets(choices,"a","all").size());
+        assertEquals(1,io.github.devmrko.companion.service.CompartmentScopes.targets(choices,"a","selected").size());
+        assertThrows(RuntimeException.class,()->io.github.devmrko.companion.service.CompartmentScopes.targets(choices,"foreign","all"));
     }
 }

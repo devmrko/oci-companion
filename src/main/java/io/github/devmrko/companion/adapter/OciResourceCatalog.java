@@ -36,7 +36,7 @@ public class OciResourceCatalog implements ResourceCatalog {
             for (var item:client.getPaginators().listCompartmentsRecordIterator(ListCompartmentsRequest.builder().compartmentId(c.tenancy())
                 .compartmentIdInSubtree(true).accessLevel(ListCompartmentsRequest.AccessLevel.Accessible).build())) {
                 if (item.getLifecycleState()==com.oracle.bmc.identity.model.Compartment.LifecycleState.Active)
-                    result.add(new Choice(item.getId(),item.getName()));
+                    result.add(new Choice(item.getId(),item.getName(),item.getCompartmentId()));
             }
             return result;
         } catch (Exception e) { throw Errors.CLOUD.exception(); }
@@ -48,11 +48,11 @@ public class OciResourceCatalog implements ResourceCatalog {
             for (var r:client.getPaginators().listProjectsRecordIterator(ListProjectsRequest.builder().compartmentId(compartment).build()))
                 result.add(new Resource(r.getId(),r.getName(),"PROJECT",String.valueOf(r.getLifecycleState()),""));
             for (var r:client.getPaginators().listRepositoriesRecordIterator(ListRepositoriesRequest.builder().compartmentId(compartment).build()))
-                result.add(new Resource(r.getId(),r.getName(),"REPOSITORY",String.valueOf(r.getLifecycleState()),r.getHttpUrl()));
+                result.add(new Resource(r.getId(),r.getName(),"REPOSITORY",String.valueOf(r.getLifecycleState()),r.getHttpUrl(),r.getProjectId()));
             for (var r:client.getPaginators().listBuildPipelinesRecordIterator(ListBuildPipelinesRequest.builder().compartmentId(compartment).build()))
-                result.add(new Resource(r.getId(),r.getDisplayName(),"BUILD",String.valueOf(r.getLifecycleState()),""));
+                result.add(new Resource(r.getId(),r.getDisplayName(),"BUILD",String.valueOf(r.getLifecycleState()),"",r.getProjectId()));
             for (var r:client.getPaginators().listDeployPipelinesRecordIterator(ListDeployPipelinesRequest.builder().compartmentId(compartment).build()))
-                result.add(new Resource(r.getId(),r.getDisplayName(),"DEPLOY",String.valueOf(r.getLifecycleState()),""));
+                result.add(new Resource(r.getId(),r.getDisplayName(),"DEPLOY",String.valueOf(r.getLifecycleState()),"",r.getProjectId()));
             return result;
         } catch (Exception e) { throw Errors.CLOUD.exception(); }
     }

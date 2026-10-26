@@ -1,3 +1,30 @@
+# 범위·필터 검증 — 2026-10-26
+
+Redmine #983. 자동 테스트 18개 통과.
+
+- 하위 구획 계산과 임의 범위 거절.
+- 소스 화면 유지, 프로젝트·이름·상태 필터, 확장 범위의 자동 갱신 해제.
+- 구획별 갱신 API 대상 검증, 실패 시 이전 캐시 유지.
+- 외부 Git의 리전 독립성, 프로파일 격리, 기존 파일 이전·중복 방지·삭제.
+- 기존 인증·CSRF·legacy 회귀 검증.
+
+실행 JAR를 재빌드가 덮어써 클래스 로딩이 실패하는 문제를 확인했다.
+run.sh에서 실행용 고유 복사본을 사용하도록 수정했다. 실제 서비스 검증은 수정 후 재실행해 통과했다.
+
+DEFAULT/us-ashburn-1 실제 전체 조회: 접근 가능한 구획 307개, 프로젝트 3개, 저장소 5개.
+307개 캐시가 이번 조회 시각으로 갱신됨. 클라우드 생성·변경 없음.
+Chromium 전체 조회·이름/프로젝트 필터·메뉴·모바일 검증 통과.
+다른 리전 및 빌드·배포 실행은 이번 검증에 포함하지 않음.
+
+```sh
+# 기본: 선택 구획 갱신 + 캐시 기반 전체 목록/필터 확인
+COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-smoke.cjs
+# 명시적으로 전체 구획 갱신까지 수행
+COMPANION_TEST_PROFILE=DEFAULT COMPANION_TEST_ALL_SCOPES=1 node scripts/browser-smoke.cjs
+```
+
+---
+
 # 실제 서비스·메뉴 검증 — 2026-10-26
 
 Redmine #982. DEFAULT 프로파일로 실제 OCI SDK 인증·리전·구획·DevOps 조회 성공.
