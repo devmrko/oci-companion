@@ -8,6 +8,7 @@ const assert=require('node:assert/strict');
   for(const width of [320,390,768,1024,1440,2048]){
    await page.setViewportSize({width,height:950});await page.waitForTimeout(100);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,path+' overflow '+width);
+   const inline=await page.locator('.global-scope .form-field--inline').evaluateAll(es=>es.map(e=>{const label=e.querySelector('span').getBoundingClientRect(),control=e.querySelector('select').getBoundingClientRect();return label.right<=control.left&&Math.abs(label.y+label.height/2-control.y-control.height/2)<1;}));assert.ok(inline.length===2&&inline.every(Boolean),'labels before selects on same line');
    const boxes=await page.locator('.global-scope select,.global-scope > button,.connection-summary').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}));
    assert.ok(boxes.every(r=>r.w>=40&&r.x>=0&&r.x+r.w<=width+1),path+' controls '+width);
    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];assert.ok(!(a.x<b.x+b.w-1&&a.x+a.w>b.x+1&&a.y<b.y+b.h-1&&a.y+a.h>b.y+1),path+' overlap '+width);}

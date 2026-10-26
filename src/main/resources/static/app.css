@@ -594,6 +594,13 @@ details>summary {
   font-size: 11px;
   gap: 3px;
 }
+.form-field--inline {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 .ui-control--compact {
   height: 34px;
   padding: 4px 8px;
@@ -628,7 +635,7 @@ details>summary {
 }
 /* Application shell */
 body:has(.app-chrome) {
-  --chrome-height: 78px;
+  --chrome-height: 60px;
   --sidebar-width: 216px;
   --bg: #f1efed;
   --ink: #161513;
@@ -724,7 +731,7 @@ body:has(.app-chrome) {
   display: grid;
   grid-template-columns: auto minmax(0,1fr) auto;
   grid-template-areas: 'toggle scope identity';
-  align-items: end;
+  align-items: center;
   height: var(--chrome-height);
   min-height: var(--chrome-height);
   margin-left: var(--sidebar-width);
@@ -802,7 +809,7 @@ a:focus-visible, .ui-button:focus-visible {
 }
 @media (max-width: 1100px) {
   body:has(.app-chrome) {
-    --chrome-height: 126px;
+    --chrome-height: 104px;
   }
   .app-topbar {
     grid-template-columns: auto minmax(0,1fr);
@@ -837,7 +844,7 @@ a:focus-visible, .ui-button:focus-visible {
 }
 @media (max-width: 440px) {
   body:has(.app-chrome) {
-    --chrome-height: 174px;
+    --chrome-height: 148px;
   }
   .global-scope {
     grid-template-columns: minmax(0,1fr) minmax(0,1fr);

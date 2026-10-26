@@ -8,7 +8,7 @@
 |---|---|
 | 버튼 | `ui-button`, `ui-button--inverse` |
 | 입력·선택 | `ui-control`, `ui-control--compact` |
-| 필드 | `form-field`, `form-field--compact` |
+| 필드 | `form-field`, `form-field--compact`, `form-field--inline` |
 | 폼 도구 모음 | `form-toolbar` |
 | 표 | `data-table`, `table-heading`, `table-cell`, `table-scroll` |
 | 코드 | `code-block` |
@@ -26,3 +26,5 @@
 
 헤더와 로고는 `--chrome-height`를 공유한다. 상단 선택 영역의 최대 너비는620px,
 일반 필터의 기준 너비는240px이며 작은 화면에서는 줄바꿈한다.
+상단 리전·구획은 `form-field--inline`으로 라벨을 선택 상자 왼쪽에 둔다.
+데스크톱 헤더 높이는60px이며, 좁은 화면에서도 각 라벨과 선택 상자는 같은 줄을 유지한다.
