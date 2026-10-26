@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 public class OciBuildHistory implements BuildHistory {
     private final String path;
     public OciBuildHistory(@Value("${companion.oci-config}") String path) { this.path=path; }
-    private DevopsClient client(Connection c,String region) throws java.io.IOException {
+    DevopsClient client(Connection c,String region) throws java.io.IOException {
         var auth=new ConfigFileAuthenticationDetailsProvider(path,c.profile());
         if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user())) throw Errors.SCOPE.exception();
         var client=DevopsClient.builder().configuration(ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000)

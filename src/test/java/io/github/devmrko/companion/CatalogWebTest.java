@@ -21,6 +21,27 @@ class CatalogWebTest {
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void buildExecutionUsesSingleTicketAndRejectsStaleScope() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p1","pipeline","ACTIVE")));
+        org.mockito.Mockito.when(control.settings(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p1")))
+            .thenReturn(new io.github.devmrko.companion.port.BuildControl.Settings("etag",java.util.List.of()));
+        org.mockito.Mockito.when(control.start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p1"),org.mockito.ArgumentMatchers.eq("etag"),org.mockito.ArgumentMatchers.eq("test"),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString())).thenReturn("run1");
+        var result=mvc.perform(get("/builds").session(session).param("tab","execute")).andExpect(status().isOk()).andExpect(content().string(containsString("프리셋 저장"))).andReturn();
+        String ticket=(String)result.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/builds/action").session(session).param("ticket",ticket).param("action","run")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run").param("runName","test")).andExpect(redirectedUrl("/builds?pipeline=p1&run=run1"));
+        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run")).andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(control,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString());
+        result=mvc.perform(get("/builds").session(session).param("tab","execute")).andReturn();
+        ticket=(String)result.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(control,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString());
+    }
+
     @org.junit.jupiter.api.BeforeEach void clearSelections() throws Exception {
         var settings=DIRECTORY.resolve("settings");
         if(Files.exists(settings)) try(var files=Files.list(settings)) { for(var file:files.toList()) Files.delete(file); }

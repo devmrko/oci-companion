@@ -25,8 +25,10 @@ public class CatalogPages {
     private final GuideCatalog guides;
     private final BuildHistory builds;
     private final SelectionStore selections;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections) {
-        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;
+    private final BuildControl control;
+    private final BuildPresetStore presets;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets) {
+        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
@@ -141,9 +143,10 @@ public class CatalogPages {
         return "redirect:"+destination;
     }
     @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
-        @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run) {
+        @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,
+        @RequestParam(defaultValue="history") String tab,@RequestParam(defaultValue="") String preset) {
         var c=SecurityConfig.connection(auth);
-        model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());
+        model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
@@ -151,8 +154,26 @@ public class CatalogPages {
             String selected=pipeline.isEmpty() && !list.isEmpty()?list.getFirst().id():pipeline;
             model.addAttribute("pipeline",selected);
             model.addAttribute("buildCli","oci devops build-pipeline list --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment())+" --all");
+            model.addAttribute("runCli","oci devops build-run create --profile "+quote(c.profile())+" --region "+quote(s.region())+" --build-pipeline-id "+quote(selected)+" --build-run-arguments file://arguments.json");
+            model.addAttribute("defaultsCli","oci devops build-pipeline update --profile "+quote(c.profile())+" --region "+quote(s.region())+" --build-pipeline-id "+quote(selected)+" --build-pipeline-parameters file://parameters.json");
             if(!selected.isEmpty()) {
                 if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
+                if(tab.equals("execute")) {
+                    var settings=control.settings(c,s.region(),s.compartment(),selected);
+                    var saved=presets.list(c,s.region(),s.compartment(),selected);
+                    var parameters=settings.parameters();
+                    if(!preset.isEmpty()) parameters=saved.stream().filter(v->v.name().equals(preset)).findFirst().orElseThrow(Errors.MISSING::exception).parameters();
+                    model.addAttribute("parameters",parameters);model.addAttribute("presets",saved);
+                    model.addAttribute("presetName",preset);
+                    String ticket=UUID.randomUUID().toString();
+                    synchronized(session) {
+                        var tickets=tickets(session);
+                        if(tickets.size()>=32) tickets.remove(tickets.keySet().iterator().next());
+                        tickets.put(ticket,new BuildTicket(s.region(),s.compartment(),selected,settings.etag()));
+                    }
+                    model.addAttribute("ticket",ticket);
+                    return "builds";
+                }
                 var runs=builds.runs(c,s.region(),s.compartment(),selected);model.addAttribute("runs",runs);
                 String selectedRun=run.isEmpty() && !runs.isEmpty()?runs.getFirst().id():run;
                 if(!selectedRun.isEmpty()) {
@@ -160,8 +181,63 @@ public class CatalogPages {
                     model.addAttribute("detail",builds.detail(c,s.region(),s.compartment(),selected,selectedRun));
                 }
             }
-        } catch(BusinessException e) { model.addAttribute("message",e.getMessage()); }
+        } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
         return "builds";
+    }
+    record BuildTicket(String region,String compartment,String pipeline,String etag) {}
+    @SuppressWarnings("unchecked")
+    private Map<String,BuildTicket> tickets(HttpSession session) {
+        var value=(Map<String,BuildTicket>)session.getAttribute("buildTickets");
+        if(value==null) { value=new LinkedHashMap<>();session.setAttribute("buildTickets",value); }
+        return value;
+    }
+    @PostMapping("/builds/action")
+    String buildAction(Authentication auth,HttpSession session,RedirectAttributes flash,
+        @RequestParam String ticket,@RequestParam String action,
+        @RequestParam(defaultValue="") String presetName,@RequestParam(defaultValue="") String runName,
+        @RequestParam(required=false) List<String> parameterName,@RequestParam(required=false) List<String> parameterValue,
+        @RequestParam(required=false) List<String> parameterDescription) {
+        var c=SecurityConfig.connection(auth);
+        BuildTicket t;
+        synchronized(session) { t=tickets(session).remove(ticket); }
+        if(t==null) throw Errors.CONFLICT.exception();
+        String destination="/builds?tab=execute&pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);
+        try {
+            checkScope(selection(c,session),t.region(),t.compartment());
+            if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
+            if(!Set.of("run","defaults","preset","delete").contains(action)) throw Errors.BUILD_PARAMETERS.exception();
+            var values=new ArrayList<BuildControl.Parameter>();var names=new HashSet<String>();
+            if(parameterName!=null) {
+                if(parameterName.size()>100 || parameterValue==null || parameterDescription==null ||
+                    parameterName.size()!=parameterValue.size() || parameterName.size()!=parameterDescription.size()) throw Errors.BUILD_PARAMETERS.exception();
+                for(int i=0;i<parameterName.size();i++) {
+                    String n=parameterName.get(i).trim(),v=parameterValue.get(i),d=parameterDescription.get(i);
+                    if(n.isEmpty() && v.isEmpty() && d.isEmpty()) continue;
+                    if(!n.matches("[a-zA-Z_][a-zA-Z0-9_]{0,254}") || !names.add(n) || v.length()>4096 || d.length()>1024) throw Errors.BUILD_PARAMETERS.exception();
+                    values.add(new BuildControl.Parameter(n,v,d));
+                }
+            }
+            if(runName.length()>255 || presetName.length()>100) throw Errors.BUILD_PARAMETERS.exception();
+            switch(action) {
+                case "preset","delete" -> {
+                    if(presetName.isBlank()) throw Errors.BUILD_PARAMETERS.exception();
+                    if(action.equals("preset")) presets.save(c,t.region(),t.compartment(),t.pipeline(),new BuildPresetStore.Preset(presetName.trim(),values));
+                    else presets.delete(c,t.region(),t.compartment(),t.pipeline(),presetName.trim());
+                    flash.addFlashAttribute("message",action.equals("preset")?"프리셋 저장 완료":"프리셋 삭제 완료");
+                }
+                case "defaults" -> {
+                    control.defaults(c,t.region(),t.compartment(),t.pipeline(),t.etag(),values);
+                    flash.addFlashAttribute("message","OCI 기본값 저장 완료");
+                }
+                case "run" -> {
+                    String run=control.start(c,t.region(),t.compartment(),t.pipeline(),t.etag(),runName,values,ticket);
+                    destination="/builds?pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8)+"&run="+java.net.URLEncoder.encode(run,java.nio.charset.StandardCharsets.UTF_8);
+                    flash.addFlashAttribute("message","빌드 실행 요청 완료");
+                }
+                default -> throw Errors.BUILD_PARAMETERS.exception();
+            }
+        } catch(BusinessException | IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage()); }
+        return "redirect:"+destination;
     }
     @PostMapping("/catalog/refresh") String refresh(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam(defaultValue="selected") String mode,@RequestParam(defaultValue="/") String back) {
         var c=SecurityConfig.connection(auth); var s=selection(c,session);

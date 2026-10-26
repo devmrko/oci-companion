@@ -1,18 +1,46 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
 <h1>빌드</h1>
+<nav class="build-tabs" aria-label="빌드 메뉴"><a class="build-tab" th:classappend="${tab == 'execute'} ? 'is-active'" th:href="@{/builds(tab='execute',pipeline=${pipeline})}">빌드 실행</a><a class="build-tab" th:classappend="${tab != 'execute'} ? 'is-active'" th:href="@{/builds(pipeline=${pipeline})}">실행 이력</a></nav>
 
 <section class="card"><h2>파이프라인</h2>
 <p th:if="${pipelines.isEmpty()}">파이프라인 없음 · 리전과 구획을 확인하세요.</p>
-<form th:if="${!pipelines.isEmpty()}" action="/builds" method="get" class="scope-bar"><label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button class="ui-button">조회</button></form>
+<form th:if="${!pipelines.isEmpty()}" action="/builds" method="get" class="scope-bar"><input type="hidden" name="tab" th:value="${tab}"><label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button class="ui-button">조회</button></form>
 </section>
-<section class="card"><h2>실행 이력</h2><p th:if="${runs.isEmpty()}">실행 이력 없음</p>
+<section class="card" th:if="${tab != 'execute'}"><h2>실행 이력</h2><p th:if="${runs.isEmpty()}">실행 이력 없음</p>
 <div class="table-scroll" th:if="${!runs.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">실행</th><th class="table-heading">상태</th><th class="table-heading">시작 요청 (UTC)</th></tr></thead><tbody><tr th:each="r : ${runs}"><td class="table-cell"><a th:href="@{/builds(pipeline=${pipeline},run=${r.id()})}" th:text="${r.name()}"></a><details><summary>OCID</summary><code th:text="${r.id()}"></code></details></td><td th:text="${r.state()}" class="table-cell"></td><td th:text="${r.createdAt()}" class="table-cell"></td></tr></tbody></table></div>
 </section>
 <section class="card" th:if="${detail != null}"><h2>실행 상세</h2><p><strong th:text="${detail.name()}"></strong> · <span th:text="${detail.state()}"></span></p>
 <p th:if="${detail.message() != null and !detail.message().isEmpty()}" th:text="${detail.message()}"></p>
 <p th:if="${detail.steps().isEmpty()}">단계 진행 기록 없음 · 빌드 산출물 생성 여부를 확인하세요.</p>
 <div class="table-scroll" th:if="${!detail.steps().isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">단계</th><th class="table-heading">상태</th></tr></thead><tbody><tr th:each="s : ${detail.steps()}"><td th:text="${s.name()}" class="table-cell"></td><td th:text="${s.state()}" class="table-cell"></td></tr></tbody></table></div>
-<p class="small muted">로그 본문·Registry 저장·실행 버튼은 아직 지원하지 않습니다.</p></section>
-<details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}" class="code-block"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
+<p class="small muted">로그 본문·Registry 저장은 아직 지원하지 않습니다.</p></section>
+<section class="card" th:if="${tab == 'execute' and ticket != null}">
+<h2>빌드 실행</h2>
+<form action="/builds" method="get" class="form-toolbar">
+<input type="hidden" name="tab" value="execute"><input type="hidden" name="pipeline" th:value="${pipeline}">
+<label class="form-field">프리셋<select name="preset" class="ui-control"><option value="">OCI 기본값</option><option th:each="p : ${presets}" th:value="${p.name()}" th:text="${p.name()}" th:selected="${p.name() == presetName}"></option></select></label><button class="ui-button">불러오기</button>
+</form>
+<form th:action="@{/builds/action}" method="post" class="build-execution">
+<input type="hidden" name="ticket" th:value="${ticket}">
+<label class="form-field">실행 이름<input class="ui-control" name="runName" maxlength="255" placeholder="생략 시 OCI 자동 생성"></label>
+<h3>파라미터</h3>
+<p class="small muted">빌드 설정에서 참조하는 값만 적용됩니다. 새 이름은 OCI에 먼저 저장하세요. 비밀값은 입력하지 말고 Vault를 사용하세요.</p>
+<div class="table-scroll"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">값</th><th class="table-heading">설명</th><th class="table-heading">삭제</th></tr></thead>
+<tbody id="parameter-rows"><tr th:each="p : ${parameters}">
+<td class="table-cell"><input class="ui-control" name="parameterName" th:value="${p.name()}" aria-label="파라미터 이름"></td>
+<td class="table-cell"><input class="ui-control" name="parameterValue" th:value="${p.value()}" aria-label="파라미터 값"></td>
+<td class="table-cell"><input class="ui-control" name="parameterDescription" th:value="${p.description()}" aria-label="파라미터 설명"></td>
+<td class="table-cell"><button class="ui-button remove-parameter" type="button">삭제</button></td></tr></tbody></table></div>
+<button class="ui-button" id="add-parameter" type="button">파라미터 추가</button>
+<p class="small muted">실행: 입력값을 이번 빌드에 적용 · OCI에 저장: 파이프라인 기본값 전체 교체</p>
+<p class="small muted">소스·브랜치·빌드 사양은 OCI 파이프라인 설정을 사용합니다.</p>
+<div class="form-toolbar"><button class="ui-button primary" name="action" value="run">빌드 실행</button><button class="ui-button" name="action" value="defaults">OCI에 저장</button></div>
+<h3>로컬 프리셋</h3>
+<div class="form-toolbar"><label class="form-field">프리셋 이름<input class="ui-control" name="presetName" th:value="${presetName}" maxlength="100"></label><button class="ui-button" name="action" value="preset">프리셋 저장</button><button class="ui-button" name="action" value="delete">프리셋 삭제</button></div>
+<p class="small muted">현재 프로파일·리전·구획·파이프라인별 JSON 저장. 같은 이름은 덮어씁니다.</p>
+</form>
+</section>
+<script src="/builds.js" defer></script>
+<details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}" class="code-block"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>실행 · arguments.json: {"items":[{"name":"이름","value":"값"}]}</p><pre class="code-block" th:text="${runCli}"></pre><p>기본값 저장: OCI 콘솔 → 빌드 파이프라인 → 파라미터. </p><p>parameters.json: {"items":[{"name":"이름","defaultValue":"값","description":"설명"}]}</p><pre class="code-block" th:text="${defaultsCli}"></pre><p>실행·저장에는 DevOps 빌드 실행 생성 및 파이프라인 수정 권한이 필요합니다.</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
 </main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

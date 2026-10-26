@@ -856,3 +856,10 @@ a:focus-visible, .ui-button:focus-visible {
     flex-basis: 100%;
   }
 }
+
+.build-tabs { display:flex; gap:8px; margin:16px 0; border-bottom:1px solid var(--border,#ddd); }
+.build-tab { display:block; padding:10px 18px; text-decoration:none; border-bottom:3px solid transparent; }
+.build-tab.is-active { border-bottom-color:var(--primary,#00758f); font-weight:700; }
+.build-execution { display:grid; gap:12px; margin-top:20px; }
+.build-execution > .form-field { max-width:560px; }
+.build-execution[aria-busy="true"] { opacity:.65; pointer-events:none; }
