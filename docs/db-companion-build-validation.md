@@ -120,7 +120,8 @@ Registry 영구 저장과 배포는 이번 검증에 포함하지 않는다.
 실제 main 브랜치와 커밋 목록 조회, 확인 화면, 390px 표시 검증.
 GUI 제출 후 OCI 응답에서 repositoryBranch=main,
 commitHash=0a24065d170ca4414bbf2216e7546627196b0257 일치 확인.
-실행명 db-companion-selected-source-1792993056387은 기록 시 명령 단계 실행 중이다.
+실행명 db-companion-selected-source-1792993056387은 최종 SUCCEEDED.
+Java/Maven/Node 명령 및 SAVE_OUTPUT_ARTIFACTS 단계 모두 SUCCEEDED 확인.
 이전 실행 db-companion-gui-1792991931154의 최종 상태는 SUCCEEDED 확인.
 
 재현: db-companion 예제 파이프라인이 선택 범위에 있어야 한다.
