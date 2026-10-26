@@ -158,8 +158,7 @@ Registry · db-companion-jar 전달 단계를 GUI로 생성했다.
 두 번째 실행에는 BUILD와 DELIVER_ARTIFACT 단계가 모두 포함됐다.
 BUILD는 SUCCEEDED, DELIVER_ARTIFACT는 FAILED.
 실제 OCI 로그: Unable to access deploy-artifact due to NotAuthorizedOrNotFound.
-따라서 Registry 저장 성공은 아직 검증하지 못했다.
-사용자가 콘솔에서 파이프라인의 DevOps 산출물 읽기 및 Registry 접근 정책을 적용해야 한다.
+당시 Registry 저장 성공은 검증하지 못했으며, 파이프라인의 산출물 읽기·Registry 접근 정책이 필요했다.
 광범위한 tenancy 관리 권한을 자동 부여하지 않았다.
 
 기존 성공 빌드의 실제 로그 약 4,000건에서 Maven BUILD SUCCESS 및 페이지 이동·검색을 확인했다.
@@ -173,3 +172,47 @@ Maven 전용 Goals/JDK 입력, 빌드 사양 본문 편집, 구독 생성, 로�
 - 실제 생성/제출: scripts/browser-build-delivery.cjs (COMPANION_TEST_SETUP=1 명시 필요).
 - 저장소·참조·전달 단계는 이름으로 기존 항목을 재사용. 버전은 실행마다 새 값.
 - 실제 클라우드 실패를 테스트 mock이나 성공 표시로 대체하지 않는다.
+
+## 2026-10-26 Registry 실행 권한 재검증 (#993)
+
+사용자의 권한 추가 요청에 따라 DEFAULT로 홈 리전의 전용 db-companion-build 정책을 수정했다.
+기존 코드 저장소·알림 주제 정책은 보존하고 ETag로 충돌을 방지했다.
+추가 정책 모두 request.principal.id를 db-companion-maven 파이프라인으로 한정했다.
+
+- DevOps 산출물 읽기: 선택 구획 한정. 최초 target.artifact.id 조건으로는 같은 접근 오류가 재현되어 해당 조건을 제거하고 재검증했다.
+- Artifact Registry 저장소·파일 읽기: 선택 구획 한정.
+- 파일 업로드: 선택 구획의 generic-artifacts에 GENERIC_ARTIFACT_CREATE만 허용.
+- Registry 읽기·생성 범위는 구획 전체이며 특정 저장소만으로 제한한 정책은 아니다. 삭제·수정 권한은 추가하지 않았다.
+
+근거: [DevOps IAM](https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm),
+[Artifact Registry 권한](https://docs.oracle.com/en-us/iaas/Content/artifacts/iam-policies-permissions.htm).
+앱 자체의 IAM 자동 변경 기능은 추가하지 않았다.
+기존 산출물 참조가 생성·수정 선택 목록에 동시에 표시될 때 재현 스크립트가 실패하는 문제를 수정했다.
+동일 ID는 재사용하고 서로 다른 ID가 같은 이름이면 중단한다.
+
+산출물 ID 조건을 제거한 재실행에서는 GetDeployArtifact 접근 오류가 사라졌다.
+버전 누락 실행은 최종 FAILED로 종료됐고 업로드 성공 근거에서 제외했다.
+감사 로그의 실패 주체도 해당 빌드 파이프라인으로 확인했다.
+후속 전달에서 COMPANION_VERSION 미치환을 발견했다. 재현 스크립트가 브라우저 confirm을 기본 취소해
+OCI 기본값을 저장하지 않은 것이 원인이다. 확인창 승인, 저장 완료 메시지, 저장값 및 실행 입력값 검사를 추가했다.
+앞선 스크립트의 기본값 저장 성공 주장은 이 확인으로 정정한다.
+
+최종 실제 실행: db-companion-registry-1793006204452 / SUCCEEDED.
+Managed Build와 Deliver Artifacts 모두 SUCCEEDED이며 OCI Logging에 업로드 완료가 기록됐다.
+Registry GetGenericArtifactByPath로 아래 파일을 별도 조회했다.
+
+- 저장소: db-companion-builds
+- 경로: db-companion/app.jar
+- 버전: gui-1793006202881
+- 상태: AVAILABLE
+- 크기: 61,111,725 bytes
+- SHA256: 3d6af1a596ff00140e5af39cc061c0e4333f55a0a30eacf178efabdcbb20d906
+
+전달 단계의 파일 ID·경로·버전이 Registry 조회 결과와 일치한다.
+최종 정책은 해당 파이프라인·구획의 산출물/저장소 읽기 및 일반 산출물 생성이며, 삭제·수정 권한은 없다.
+프로파일은 DEFAULT를 유지했다.
+
+실제 Chromium 검증 통과: 빌드·Registry SUCCEEDED, 파일 ID·경로·버전 대조,
+Maven BUILD SUCCESS 로그 페이지 조회·검색·자동 갱신·중지, 1440/390/320px 표시.
+실행: COMPANION_TEST_STORAGE_SUCCESS=1 및 해당 RUN_ID로 browser-build-flow.cjs.
+이번 변경은 재현 스크립트·검증 문서이며, 앱 코드 변경은 없다. 이전 Maven verify 44개 통과 결과를 유지한다.

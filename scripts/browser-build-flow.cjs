@@ -47,6 +47,18 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
    if(await facts.locator('div').filter({has:page.locator('dt').filter({hasText:'Registry 전달'})}).locator('dd').innerText()!=='FAILED')throw Error('Storage failure hidden');
    if(await facts.locator('div').filter({has:page.locator('dt').filter({hasText:'빌드·테스트'})}).locator('dd').innerText()!=='SUCCEEDED')throw Error('Build result incorrect');
   }
+  if(process.env.COMPANION_TEST_STORAGE_SUCCESS==='1'){
+   const facts=page.locator('dl.build-facts');
+   for(const label of ['Registry 전달','빌드·테스트']){
+    if(await facts.locator('div').filter({has:page.locator('dt').filter({hasText:label})}).locator('dd').innerText()!=='SUCCEEDED')throw Error(label+' did not succeed');
+   }
+   const expected=JSON.parse(fs.readFileSync('.tools/build-flow-run.json','utf8'));
+   if(process.env.COMPANION_TEST_RUN_ID!==expected.run||pipeline!==expected.pipeline)throw Error('Artifact evidence belongs to another run');
+   const artifact=page.locator('table.data-table tbody tr').filter({hasText:'db-companion/app.jar'}).filter({hasText:expected.version});
+   if(await artifact.count()!==1)throw Error('Delivered artifact path/version missing');
+   const text=await artifact.innerText();
+   if(!expected.storedArtifact?.id||!text.includes(expected.storedArtifact.id))throw Error('Delivered artifact does not match Registry ID');
+  }
   await page.screenshot({path:'.tools/build-flow-history.png',fullPage:true});
   for(const width of [1440,390,320]){
    await page.setViewportSize({width,height:1000});

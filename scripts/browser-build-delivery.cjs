@@ -34,7 +34,9 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
    console.log('Artifact reference create submitted');
    artifact=page.locator('select[name=artifact] option').filter({hasText:'db-companion-jar-delivery'});await artifact.waitFor({state:'attached'});
   }
-  const artifactId=await artifact.getAttribute('value');
+  const artifactIds=await artifact.evaluateAll(options=>[...new Set(options.map(option=>option.value))]);
+  if(artifactIds.length!==1)throw Error('Ambiguous artifact references');
+  const artifactId=artifactIds[0];
   if(!(await page.locator('.pipeline-definition').innerText()).includes('Registry · db-companion-jar')){
    const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'3. Registry 전달 단계 추가'})}).first();
    await section.locator('[name=stage]').selectOption({index:1});await section.locator('[name=output]').fill('db-companion-jar');
@@ -49,7 +51,13 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
   if(!await row.count()){await advanced.getByRole('button',{name:'파라미터 추가'}).click();row=advanced.locator('#parameter-rows tr').last();await row.locator('[name=parameterName]').fill('COMPANION_VERSION');}
   const version='gui-'+Date.now();
   await row.locator('[name=parameterValue]').fill(version);await row.locator('[name=parameterDescription]').fill('Registry version; use a new value for each build');
+  page.once('dialog',dialog=>dialog.type()==='confirm'&&dialog.message().includes('OCI 파이프라인 기본 파라미터 전체를 교체')?dialog.accept():dialog.dismiss());
   await advanced.getByRole('button',{name:'OCI에 저장'}).click();await page.waitForLoadState('load');
+  await page.getByText('OCI 기본값 저장 완료',{exact:true}).waitFor();
+  const saved=page.locator('.build-defaults tr').filter({has:page.locator('[name=parameterName][value=COMPANION_VERSION]')});
+  if(await saved.locator('[name=parameterValue]').inputValue()!==version)throw Error('Registry version was not saved');
+  const execution=page.locator('.build-execution .build-parameter').filter({has:page.locator('[name=parameterName][value=COMPANION_VERSION]')});
+  if(await execution.locator('[name=parameterValue]').inputValue()!==version)throw Error('Registry version missing from run arguments');
   await page.locator('[name=runName]').fill('db-companion-registry-'+Date.now());
   await page.getByRole('button',{name:'실행 설정 확인',exact:true}).click();
   await page.locator('#build-review').getByRole('button',{name:'빌드 실행',exact:true}).click();await page.waitForLoadState('load');
