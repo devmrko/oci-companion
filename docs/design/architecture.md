@@ -1,5 +1,7 @@
 # OCI Companion — initial design
 
+> 이전 설계. 현재 기본 흐름과 저장 방식은 [리소스 중심 개편](resource-catalog.md)을 따른다.
+
 2026-10-21. Local single-operator web application. Delivery order: VM, Functions, OKE.
 
 ## Decisions

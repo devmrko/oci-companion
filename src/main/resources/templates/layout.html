@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:fragment="head(title)"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title th:text="${title} + ' · OCI Companion'">OCI Companion</title><link rel="stylesheet" href="/app.css"></head>
 <body>
-<header th:fragment="header"><a class="brand" href="/">◈ <span>OCI Companion</span></a><nav><a href="/">프로젝트</a><a href="/guides">OCI 사용 안내</a></nav><div class="identity" th:if="${connection != null}"><span th:text="${connection.profile()}"></span><span class="muted" th:text="${connection.region()}"></span><form th:action="@{/disconnect}" method="post"><button class="link" type="submit">연결 해제</button></form></div></header>
+<header th:fragment="header"><a class="brand" href="/">◈ <span>OCI Companion</span></a><nav><a href="/" th:text="${legacyView == true ? '프로젝트' : '리소스'}">리소스</a><a href="/sources" th:unless="${legacyView == true}">소스</a><a href="/guides">OCI 사용 안내</a></nav><div class="identity" th:if="${connection != null}"><span th:text="${connection.profile()}"></span><span class="muted" th:text="${selection != null ? selection.region() : connection.region()}"></span><form th:action="@{/disconnect}" method="post"><button class="link" type="submit">연결 해제</button></form></div></header>
 <div th:fragment="notice"><div class="banner demo" th:if="${connection != null and connection.demo()}">데모 모드 · 샘플 응답입니다. 실제 OCI 연결·빌드·배포는 실행하지 않습니다.</div><div class="banner" role="alert" th:if="${message}" th:text="${message}"></div></div>
-<footer th:fragment="footer">로컬 작업 공간 · SQLite 저장 · VM 우선 지원 <span>Functions → OKE 예정</span></footer>
+<footer th:fragment="footer">OCI Companion</footer>
 </body></html>

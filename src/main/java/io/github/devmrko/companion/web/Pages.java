@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
+@org.springframework.context.annotation.Profile("legacy")
 public class Pages {
     private final CloudConnection cloud;
     private final WorkspaceService service;
@@ -28,6 +29,7 @@ public class Pages {
         this.cloud=cloud; this.service=service; this.recipes=recipes; this.guides=guides; this.contexts=contexts;
     }
     @ModelAttribute("connection") Connection connection(Authentication auth) { return auth!=null && auth.getPrincipal() instanceof Connection c?c:null; }
+    @ModelAttribute("legacyView") boolean legacyView() { return true; }
     @ModelAttribute("recipes") List<BuildRecipe> recipes() { return recipes; }
     @GetMapping("/login") String login(Model model) { model.addAttribute("profiles",cloud.profiles()); return "login"; }
     @PostMapping("/connect") String connect(@RequestParam String profile,HttpServletRequest req,HttpServletResponse res,RedirectAttributes flash) {

@@ -1,3 +1,28 @@
+# 검증 — 2026-10-26
+
+리소스 개편: `./scripts/build.sh` 통과. 테스트 15개(기존 10 + 신규 5).
+
+- 기본 모드 DataSource 빈 없음. legacy SQLite 회귀 테스트 통과.
+- 프로파일·사용자·리전·구획별 캐시 분리와 재시작 후 읽기.
+- 조회 실패 시 이전 스냅샷·시각 유지. 캐시 손상 복구.
+- 소스 파일 손상 시 덮어쓰기 차단. 소스 등록 검증·중복 처리·캐시와 분리 저장.
+- CSRF·세션 종료·이전 화면 범위 불일치 차단.
+
+Playwright Chromium: 연결 → 조회 → OCI/GitHub 소스 등록 → 리전 전환 → 도움말 → 연결 해제 통과.
+1440px/390px 확인. 모바일 문서 가로 넘침·JS 오류 없음.
+
+```sh
+PORT=8092 COMPANION_DATA_DIR=.tools/catalog-smoke ./scripts/run.sh --spring.profiles.active=demo
+COMPANION_TEST_URL=http://127.0.0.1:8092 node scripts/browser-smoke.cjs
+```
+
+브라우저 의존성 설치는 아래 이전 검증 명령 참조. 스크린샷은 `.tools`에 저장.
+실제 OCI 연결·권한·페이지네이션 응답·빌드·배포는 미검증.
+주기 갱신은 화면 타이머 구현이며, 실제 주기를 기다리는 장시간 검증은 하지 않음.
+후속: 지정 프로파일의 읽기 전용 조회를 콘솔과 대조하고, Git 인증·빌드·VM 배포를 별도로 검증.
+
+---
+
 # Validation — 2026-10-21
 
 `./scripts/build.sh`: passed, Java 21, pinned Foundation source built locally,

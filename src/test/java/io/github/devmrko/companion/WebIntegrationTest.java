@@ -15,7 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 
-@SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
+@SpringBootTest @ActiveProfiles({"demo","legacy"}) @AutoConfigureMockMvc
 class WebIntegrationTest {
     private static final Path DB;
     static { try { DB=Files.createTempFile("companion-web-",".db"); DB.toFile().deleteOnExit(); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }
