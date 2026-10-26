@@ -21,6 +21,27 @@ class CatalogWebTest {
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
+    @org.junit.jupiter.api.BeforeEach void clearSelections() throws Exception {
+        var settings=DIRECTORY.resolve("settings");
+        if(Files.exists(settings)) try(var files=Files.list(settings)) { for(var file:files.toList()) Files.delete(file); }
+    }
+    @Test void globalSelectionRestoresAfterReconnectAndAppearsOnGuides() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/guides")).andExpect(redirectedUrl("/guides"));
+        mvc.perform(get("/guides").session(session)).andExpect(content().string(containsString("global-scope")));
+        mvc.perform(post("/disconnect").session(session).with(csrf()));
+        session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var model=mvc.perform(get("/sources").session(session)).andExpect(status().isOk()).andReturn().getModelAndView().getModel();
+        var selection=(io.github.devmrko.companion.web.CatalogPages.Selection)model.get("navSelection");
+        assertEquals("us-ashburn-1",selection.region());assertEquals("demo-development",selection.compartment());
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","foreign").param("compartment","demo-development")).andExpect(status().isBadRequest());
+        var cloud=context.getBean(io.github.devmrko.companion.port.CloudConnection.class);
+        context.getBean(io.github.devmrko.companion.port.SelectionStore.class).write(cloud.connect("DEMO"),"unsubscribed","missing");
+        mvc.perform(post("/disconnect").session(session).with(csrf()));
+        session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds").session(session)).andExpect(content().string(containsString("저장한 리전·구획에 접근할 수 없습니다")));
+        org.mockito.Mockito.verifyNoInteractions(builds);
+    }
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     io.github.devmrko.companion.port.BuildHistory builds;
     @Test void buildPageUsesSelectedRegionAndRejectsUnlistedRuns() throws Exception {

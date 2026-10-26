@@ -24,8 +24,18 @@ public class CatalogPages {
     private final SecurityContextRepository contexts;
     private final GuideCatalog guides;
     private final BuildHistory builds;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds) {
-        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;
+    private final SelectionStore selections;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections) {
+        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;
+    }
+    @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
+        if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
+            try {
+                model.addAttribute("navSelection",selection(c,request.getSession()));
+                model.addAttribute("scopeMessage",request.getSession().getAttribute("scopeInvalid"));
+            } catch(BusinessException | IllegalStateException e) { model.addAttribute("scopeMessage","범위 조회 실패 · 연결과 권한을 확인하세요."); }
+            model.addAttribute("scopeBack",Set.of("/sources","/builds","/guides").contains(request.getRequestURI())?request.getRequestURI():"/");
+        }
     }
     @ModelAttribute("connection") Connection connection(Authentication auth) { return auth!=null && auth.getPrincipal() instanceof Connection c?c:null; }
     @GetMapping("/login") String login(Model model) { model.addAttribute("profiles",cloud.profiles()); return "login"; }
@@ -55,6 +65,18 @@ public class CatalogPages {
             if (regions.isEmpty() || compartments.isEmpty()) throw Errors.MISSING.exception();
             session.setAttribute("regions",regions); session.setAttribute("compartments",compartments);
         }
+        if(session.getAttribute("scopeLoaded")==null) {
+            try {
+                var saved=selections.read(c);
+                if(saved.isPresent()) {
+                    var value=saved.get();
+                    if(regions.stream().anyMatch(r->r.id().equals(value.region())) && compartments.stream().anyMatch(t->t.id().equals(value.compartment()))) {
+                        session.setAttribute("region",value.region());session.setAttribute("compartment",value.compartment());
+                    } else session.setAttribute("scopeInvalid","저장한 리전·구획에 접근할 수 없습니다. 다시 선택하세요.");
+                }
+            } catch(IllegalStateException e) { session.setAttribute("scopeInvalid",e.getMessage()); }
+            session.setAttribute("scopeLoaded",true);
+        }
         String region=(String)session.getAttribute("region");
         if (region==null) region=regions.stream().anyMatch(r->r.id().equals(c.region()))?c.region():regions.getFirst().id();
         String compartment=(String)session.getAttribute("compartment");
@@ -80,6 +102,7 @@ public class CatalogPages {
         model.addAttribute("sourcePage",sourcePage);model.addAttribute("q",q);model.addAttribute("project",project);model.addAttribute("state",state);
         try {
             var s=selection(c,session); model.addAttribute("selection",s);
+            if(session.getAttribute("scopeInvalid")!=null) { model.addAttribute("selection",null);return "catalog"; }
             var reports=(Map<String,Report>)session.getAttribute("scopeReports");
             var results=new ArrayList<ScopeResult>();
             var registrations=new LinkedHashMap<String,Registration>();
@@ -105,12 +128,17 @@ public class CatalogPages {
           catch (IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
         return "catalog";
     }
-    @PostMapping("/scope") String scope(Authentication auth,HttpSession session,@RequestParam String region,@RequestParam String compartment,@RequestParam(defaultValue="0") int interval,@RequestParam(defaultValue="selected") String mode,@RequestParam(defaultValue="/") String back) {
+    @PostMapping("/scope") String scope(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam(defaultValue="0") int interval,@RequestParam(defaultValue="selected") String mode,@RequestParam(defaultValue="/") String back) {
         var s=selection(SecurityConfig.connection(auth),session);
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
+        String destination=Set.of("/sources","/builds","/guides").contains(back)?back:"/";
+        try { selections.write(SecurityConfig.connection(auth),region,compartment); }
+        catch(IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage());return "redirect:"+destination; }
+        if(!s.region().equals(region) || !s.compartment().equals(compartment)) session.removeAttribute("scopeReports");
+        session.removeAttribute("scopeInvalid");
         session.setAttribute("region",region); session.setAttribute("compartment",compartment); session.setAttribute("interval",mode.equals("selected")?interval:0);session.setAttribute("scopeMode",mode);
-        return "redirect:"+(Set.of("/sources","/builds").contains(back)?back:"/");
+        return "redirect:"+destination;
     }
     @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
         @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run) {
@@ -118,6 +146,7 @@ public class CatalogPages {
         model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
+            if(session.getAttribute("scopeInvalid")!=null) return "builds";
             var list=builds.pipelines(c,s.region(),s.compartment());model.addAttribute("pipelines",list);
             String selected=pipeline.isEmpty() && !list.isEmpty()?list.getFirst().id():pipeline;
             model.addAttribute("pipeline",selected);
@@ -165,7 +194,7 @@ public class CatalogPages {
         return new ScopeResult(choice,view.snapshot()==null?null:view.snapshot().updatedAt(),view.error(),elapsed);
     }
     @PostMapping("/catalog/scopes") String reload(HttpSession session) {
-        for (String key:List.of("regions","compartments","region","compartment","scopeMode","scopeReports")) session.removeAttribute(key);
+        for (String key:List.of("regions","compartments","region","compartment","scopeMode","scopeReports","scopeLoaded","scopeInvalid")) session.removeAttribute(key);
         return "redirect:/";
     }
     @PostMapping("/sources") String source(Authentication auth,HttpSession session,@RequestParam String region,@RequestParam String compartment,@RequestParam String provider,@RequestParam String name,@RequestParam(defaultValue="") String url,@RequestParam String branch,@RequestParam(defaultValue="") String resourceId,RedirectAttributes flash) {

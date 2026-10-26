@@ -1,12 +1,7 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell"><div th:replace="~{layout :: notice}"></div>
 <h1>빌드</h1>
-<section class="card" th:if="${selection != null}">
-<form class="scope-bar" th:action="@{/scope}" method="post"><input type="hidden" name="back" value="/builds"><input type="hidden" name="mode" value="selected">
-<label>리전<select name="region"><option th:each="r : ${selection.regions()}" th:value="${r.id()}" th:text="${r.name()}" th:selected="${r.id() == selection.region()}"></option></select></label>
-<label>구획<select name="compartment"><option th:each="c : ${selection.compartments()}" th:value="${c.id()}" th:text="${c.name()}" th:selected="${c.id() == selection.compartment()}"></option></select></label><button>적용</button></form>
-<p class="small muted">선택 구획 · OCI 실시간 조회</p>
-</section>
+
 <section class="card"><h2>파이프라인</h2>
 <p th:if="${pipelines.isEmpty()}">파이프라인 없음 · 리전과 구획을 확인하세요.</p>
 <form th:if="${!pipelines.isEmpty()}" action="/builds" method="get" class="scope-bar"><label>파이프라인<select name="pipeline"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button>조회</button></form>

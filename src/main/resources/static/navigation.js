@@ -29,3 +29,14 @@ sidebar?.querySelectorAll('a[data-nav-path]').forEach(link => {
   }
 });
 if (toggle) renderNavigation();
+
+const globalScope = document.querySelector('.global-scope');
+const sourceForms = [...document.querySelectorAll('form[action="/sources"]')];
+const modifiedForms = new Set();
+for (const form of sourceForms) {
+  form.addEventListener('input', () => modifiedForms.add(form));
+  form.addEventListener('change', () => modifiedForms.add(form));
+}
+globalScope?.addEventListener('submit', event => {
+  if (modifiedForms.size && !window.confirm('작성 중인 소스 입력이 있습니다. 범위를 변경할까요?')) event.preventDefault();
+});
