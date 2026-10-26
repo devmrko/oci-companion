@@ -22,4 +22,7 @@
 
 검증: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-layout-smoke.cjs`.
 실제 OCI 읽기 요청이 발생한다. 리소스·소스·빌드·도움말을
-320/390/768/1024/1440px에서 확인한다. 스크린샷은 `.tools`에만 저장한다.
+320/390/768/1024/1440/2048px에서 확인한다. 스크린샷은 `.tools`에만 저장한다.
+
+헤더와 로고는 `--chrome-height`를 공유한다. 상단 선택 영역의 최대 너비는620px,
+일반 필터의 기준 너비는240px이며 작은 화면에서는 줄바꿈한다.
