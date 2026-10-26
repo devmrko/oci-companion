@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('연결')}"></head><body>
+<main class="login-shell">
+<section class="card login-card"><div class="eyebrow">OCI COMPANION</div><h2>OCI 연결</h2><p class="muted">~/.oci/config 프로파일 선택</p><div th:replace="~{layout :: notice}"></div>
+<form th:action="@{/connect}" method="post" th:if="${!profiles.isEmpty()}"><label>OCI 프로파일<select name="profile" required><option th:each="profile : ${profiles}" th:value="${profile}" th:text="${profile}"></option></select></label><button class="primary full" type="submit">연결</button></form>
+<div class="empty" th:if="${profiles.isEmpty()}"><strong>프로파일을 찾지 못했습니다.</strong><p><code>~/.oci/config</code>에 프로파일을 추가하세요. 별도 경로: <code>OCI_CONFIG_FILE</code></p></div>
+<p class="small muted">API 키 인증 · tenancy 조회 권한 필요</p><a href="https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm" target="_blank" rel="noopener noreferrer">OCI 프로파일 설정 안내 ↗</a></section></main>
+</body></html>
