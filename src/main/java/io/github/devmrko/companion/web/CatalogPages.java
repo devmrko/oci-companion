@@ -26,9 +26,11 @@ public class CatalogPages {
     private final BuildHistory builds;
     private final SelectionStore selections;
     private final BuildControl control;
+    private final BuildDefinition definitions;
+    private final BuildInputStore inputRules;
     private final BuildPresetStore presets;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets) {
-        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules) {
+        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
@@ -144,13 +146,17 @@ public class CatalogPages {
     }
     @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
         @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,
-        @RequestParam(defaultValue="history") String tab,@RequestParam(defaultValue="") String preset) {
+        @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project) {
         var c=SecurityConfig.connection(auth);
+        if(tab.isEmpty()) tab=run.isEmpty()?"execute":"history";
         model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
-            var list=builds.pipelines(c,s.region(),s.compartment());model.addAttribute("pipelines",list);
+            var all=builds.pipelines(c,s.region(),s.compartment());
+            var projects=new LinkedHashMap<String,String>();all.forEach(p->projects.put(p.projectId(),p.projectName()));
+            model.addAttribute("projects",projects);model.addAttribute("project",project);
+            var list=all.stream().filter(p->project.isEmpty() || project.equals(p.projectId())).toList();model.addAttribute("pipelines",list);
             String selected=pipeline.isEmpty() && !list.isEmpty()?list.getFirst().id():pipeline;
             model.addAttribute("pipeline",selected);
             model.addAttribute("buildCli","oci devops build-pipeline list --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment())+" --all");
@@ -160,16 +166,31 @@ public class CatalogPages {
                 if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
                 if(tab.equals("execute")) {
                     var settings=control.settings(c,s.region(),s.compartment(),selected);
+                    var definition=definitions.read(c,s.region(),s.compartment(),selected);
+                    model.addAttribute("definition",definition);
+                    var specs=new LinkedHashMap<String,BuildDefinition.Specification>();
+                    for(var stage:definition.stages()) if(!stage.spec().isEmpty()) {
+                        var primary=stage.sources().stream().filter(BuildDefinition.Source::primary).findFirst();
+                        if(primary.isEmpty() && stage.sources().size()==1) primary=Optional.of(stage.sources().getFirst());
+                        if(primary.isPresent()) specs.put(stage.id(),definitions.specification(c,s.region(),primary.get(),stage.spec()));
+                    }
+                    model.addAttribute("specifications",specs);
                     var saved=presets.list(c,s.region(),s.compartment(),selected);
                     var parameters=settings.parameters();
-                    if(!preset.isEmpty()) parameters=saved.stream().filter(v->v.name().equals(preset)).findFirst().orElseThrow(Errors.MISSING::exception).parameters();
+                    var loaded=new BuildPresetStore.Preset("",parameters);
+                    if(!preset.isEmpty()) loaded=saved.stream().filter(v->v.name().equals(preset)).findFirst().orElseThrow(Errors.MISSING::exception);
+                    parameters=loaded.parameters();
+                    final String savedSource=loaded.source().source();
+                    if(!savedSource.isEmpty() && definition.sources().stream().noneMatch(v->v.key().equals(savedSource))) throw Errors.BUILD_PRESET.exception();
+                    model.addAttribute("runName",loaded.runName());model.addAttribute("sourceOverride",loaded.source());
+                    model.addAttribute("fields",BuildInputs.fields(settings.parameters(),parameters,inputRules.read(c,s.region(),s.compartment(),selected)));
                     model.addAttribute("parameters",parameters);model.addAttribute("presets",saved);
                     model.addAttribute("presetName",preset);
                     String ticket=UUID.randomUUID().toString();
                     synchronized(session) {
                         var tickets=tickets(session);
                         if(tickets.size()>=32) tickets.remove(tickets.keySet().iterator().next());
-                        tickets.put(ticket,new BuildTicket(s.region(),s.compartment(),selected,settings.etag()));
+                        tickets.put(ticket,new BuildTicket(s.region(),s.compartment(),selected,settings.etag(),definition.revision()));
                     }
                     model.addAttribute("ticket",ticket);
                     return "builds";
@@ -184,19 +205,38 @@ public class CatalogPages {
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
         return "builds";
     }
-    record BuildTicket(String region,String compartment,String pipeline,String etag) {}
+    record BuildTicket(String region,String compartment,String pipeline,String etag,String revision) {}
     @SuppressWarnings("unchecked")
     private Map<String,BuildTicket> tickets(HttpSession session) {
         var value=(Map<String,BuildTicket>)session.getAttribute("buildTickets");
         if(value==null) { value=new LinkedHashMap<>();session.setAttribute("buildTickets",value); }
         return value;
     }
+    @GetMapping("/builds/source-options") @ResponseBody
+    Map<String,Object> buildSourceOptions(Authentication auth,HttpSession session,@RequestParam String ticket,@RequestParam String source,
+        @RequestParam(defaultValue="") String branch) {
+        var c=SecurityConfig.connection(auth);BuildTicket t;
+        synchronized(session) { t=tickets(session).get(ticket); }
+        if(t==null) throw Errors.CONFLICT.exception();
+        checkScope(selection(c,session),t.region(),t.compartment());
+        if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
+        var definition=definitions.read(c,t.region(),t.compartment(),t.pipeline());
+        if(!definition.revision().equals(t.revision())) throw Errors.BUILD_CHANGED.exception();
+        var chosen=definition.sources().stream().filter(v->v.key().equals(source)).findFirst().orElseThrow(Errors.BUILD_PARAMETERS::exception);
+        var branches=definitions.branches(c,t.region(),chosen);
+        String requestedBranch=branch.isEmpty()?chosen.branch():branch;
+        String selected=branches.stream().anyMatch(v->v.value().equals(requestedBranch))?requestedBranch:branches.isEmpty()?"":branches.getFirst().value();
+        var commits=selected.isEmpty()?List.<BuildDefinition.Choice>of():definitions.commits(c,t.region(),chosen,selected);
+        return Map.of("branches",branches,"branch",selected,"commits",commits,"external",chosen.repositoryId().isEmpty());
+    }
     @PostMapping("/builds/action")
     String buildAction(Authentication auth,HttpSession session,RedirectAttributes flash,
         @RequestParam String ticket,@RequestParam String action,
         @RequestParam(defaultValue="") String presetName,@RequestParam(defaultValue="") String runName,
-        @RequestParam(required=false) List<String> parameterName,@RequestParam(required=false) List<String> parameterValue,
-        @RequestParam(required=false) List<String> parameterDescription) {
+        @RequestParam(defaultValue="") String source,@RequestParam(defaultValue="") String branch,@RequestParam(defaultValue="") String commit,
+        @RequestParam org.springframework.util.MultiValueMap<String,String> input) {
+        var parameterName=input.get("parameterName");var parameterValue=input.get("parameterValue");var parameterDescription=input.get("parameterDescription");
+        var ruleName=input.get("ruleName");var ruleType=input.get("ruleType");var ruleRequirement=input.get("ruleRequirement");var ruleChoices=input.get("ruleChoices");
         var c=SecurityConfig.connection(auth);
         BuildTicket t;
         synchronized(session) { t=tickets(session).remove(ticket); }
@@ -205,7 +245,7 @@ public class CatalogPages {
         try {
             checkScope(selection(c,session),t.region(),t.compartment());
             if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
-            if(!Set.of("run","defaults","preset","delete").contains(action)) throw Errors.BUILD_PARAMETERS.exception();
+            if(!Set.of("run","defaults","preset","delete","rules").contains(action)) throw Errors.BUILD_PARAMETERS.exception();
             var values=new ArrayList<BuildControl.Parameter>();var names=new HashSet<String>();
             if(parameterName!=null) {
                 if(parameterName.size()>100 || parameterValue==null || parameterDescription==null ||
@@ -218,19 +258,28 @@ public class CatalogPages {
                 }
             }
             if(runName.length()>255 || presetName.length()>100) throw Errors.BUILD_PARAMETERS.exception();
+            var override=new BuildDefinition.SourceOverride(source,branch,commit);
             switch(action) {
                 case "preset","delete" -> {
                     if(presetName.isBlank()) throw Errors.BUILD_PARAMETERS.exception();
-                    if(action.equals("preset")) presets.save(c,t.region(),t.compartment(),t.pipeline(),new BuildPresetStore.Preset(presetName.trim(),values));
+                    if(action.equals("preset")) presets.save(c,t.region(),t.compartment(),t.pipeline(),new BuildPresetStore.Preset(presetName.trim(),values,runName,override));
                     else presets.delete(c,t.region(),t.compartment(),t.pipeline(),presetName.trim());
                     flash.addFlashAttribute("message",action.equals("preset")?"프리셋 저장 완료":"프리셋 삭제 완료");
+                }
+                case "rules" -> {
+                    var current=control.settings(c,t.region(),t.compartment(),t.pipeline());
+                    if(!current.etag().equals(t.etag())) throw Errors.BUILD_CHANGED.exception();
+                    inputRules.write(c,t.region(),t.compartment(),t.pipeline(),BuildInputs.rules(current.parameters(),ruleName,ruleType,ruleRequirement,ruleChoices));
+                    flash.addFlashAttribute("message","입력 규칙 저장 완료");
                 }
                 case "defaults" -> {
                     control.defaults(c,t.region(),t.compartment(),t.pipeline(),t.etag(),values);
                     flash.addFlashAttribute("message","OCI 기본값 저장 완료");
                 }
                 case "run" -> {
-                    String run=control.start(c,t.region(),t.compartment(),t.pipeline(),t.etag(),runName,values,ticket);
+                    var current=control.settings(c,t.region(),t.compartment(),t.pipeline());
+                    BuildInputs.validate(BuildInputs.fields(current.parameters(),values,inputRules.read(c,t.region(),t.compartment(),t.pipeline())));
+                    String run=control.start(c,t.region(),t.compartment(),t.pipeline(),t.etag(),runName,values,ticket,override,t.revision());
                     destination="/builds?pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8)+"&run="+java.net.URLEncoder.encode(run,java.nio.charset.StandardCharsets.UTF_8);
                     flash.addFlashAttribute("message","빌드 실행 요청 완료");
                 }

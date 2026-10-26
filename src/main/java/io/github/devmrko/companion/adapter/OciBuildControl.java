@@ -3,6 +3,7 @@ import com.oracle.bmc.devops.model.*;
 import com.oracle.bmc.devops.requests.*;
 import io.github.devmrko.companion.domain.Models.Connection;
 import io.github.devmrko.companion.port.BuildControl;
+import io.github.devmrko.companion.port.BuildDefinition;
 import io.github.devmrko.companion.service.Errors;
 import io.github.devmrko.foundation.core.error.BusinessException;
 import java.util.*;
@@ -11,7 +12,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class OciBuildControl implements BuildControl {
     private final OciBuildHistory clients;
-    public OciBuildControl(OciBuildHistory clients) { this.clients=clients; }
+    private final BuildDefinition definitions;
+    public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions) { this.clients=clients;this.definitions=definitions; }
     public Settings settings(Connection c,String region,String compartment,String pipeline) {
         try(var client=clients.client(c,region)) {
             var response=client.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(pipeline).build());
@@ -36,13 +38,23 @@ public class OciBuildControl implements BuildControl {
                         .name(v.name()).defaultValue(v.value()).description(v.description()).build()).toList()).build()).build()).build());
         } catch(Exception e) { throw Errors.BUILD_CHANGED.exception(); }
     }
-    public String start(Connection c,String r,String compartment,String pipeline,String etag,String name,List<Parameter> parameters,String token) {
+    public String start(Connection c,String r,String compartment,String pipeline,String etag,String name,List<Parameter> parameters,String token,BuildDefinition.SourceOverride override,String revision) {
         var current=current(c,r,compartment,pipeline,etag);
         var expected=current.parameters().stream().map(Parameter::name).collect(java.util.stream.Collectors.toSet());
         if(!expected.equals(parameters.stream().map(Parameter::name).collect(java.util.stream.Collectors.toSet()))) throw Errors.BUILD_PARAMETERS.exception();
+        var definition=definitions.read(c,r,compartment,pipeline);
+        if(!definition.runnable() || (revision!=null && !revision.equals(definition.revision()))) throw Errors.BUILD_CHANGED.exception();
+        CommitInfo commit=null;
+        if(!override.source().isEmpty()) {
+            var source=definition.sources().stream().filter(v->v.key().equals(override.source())).findFirst().orElseThrow(Errors.BUILD_PARAMETERS::exception);
+            if(override.branch().isBlank() || override.branch().length()>255) throw Errors.BUILD_PARAMETERS.exception();
+            if(definitions.branches(c,r,source).stream().noneMatch(v->v.value().equals(override.branch()))) throw Errors.BUILD_PARAMETERS.exception();
+            if(!override.commit().isEmpty() && definitions.commits(c,r,source,override.branch()).stream().noneMatch(v->v.value().equals(override.commit()))) throw Errors.BUILD_PARAMETERS.exception();
+            commit=CommitInfo.builder().repositoryUrl(source.url()).repositoryBranch(override.branch()).commitHash(override.commit().isEmpty()?null:override.commit()).build();
+        } else if(!override.branch().isEmpty() || !override.commit().isEmpty()) throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,r)) {
             return client.createBuildRun(CreateBuildRunRequest.builder().opcRetryToken(token)
-                .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(pipeline).displayName(name.isBlank()?null:name)
+                .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(pipeline).commitInfo(commit).displayName(name.isBlank()?null:name)
                     .buildRunArguments(BuildRunArgumentCollection.builder().items(parameters.stream()
                         .map(v->BuildRunArgument.builder().name(v.name()).value(v.value()).build()).toList()).build()).build()).build()).getBuildRun().getId();
         } catch(Exception e) { throw Errors.BUILD_UNKNOWN.exception(); }

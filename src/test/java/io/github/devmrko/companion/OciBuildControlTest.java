@@ -17,7 +17,7 @@ class OciBuildControlTest {
         when(clients.client(c,"region")).thenReturn(client);
         when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().etag("new")
             .buildPipeline(BuildPipeline.builder().id("p").compartmentId("comp").build()).build());
-        var adapter=new OciBuildControl(clients);
+        var adapter=new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class));
         assertThrows(RuntimeException.class,()->adapter.defaults(c,"region","comp","p","old",List.of()));
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","foreign","p","new","run",List.of(),"token"));
         verify(client,never()).updateBuildPipeline(any()); verify(client,never()).createBuildRun(any());
@@ -27,10 +27,34 @@ class OciBuildControlTest {
         when(clients.client(c,"region")).thenReturn(client);
         when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().etag("etag")
             .buildPipeline(BuildPipeline.builder().id("p").compartmentId("comp").build()).build());
-        new OciBuildControl(clients).defaults(c,"region","comp","p","etag",List.of(new BuildControl.Parameter("VERSION","1","release")));
+        new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class)).defaults(c,"region","comp","p","etag",List.of(new BuildControl.Parameter("VERSION","1","release")));
         var captor=org.mockito.ArgumentCaptor.forClass(UpdateBuildPipelineRequest.class);
         verify(client).updateBuildPipeline(captor.capture());
         assertEquals("etag",captor.getValue().getIfMatch());
         assertEquals("release",captor.getValue().getUpdateBuildPipelineDetails().getBuildPipelineParameters().getItems().getFirst().getDescription());
+    }
+
+    @Test void sourceOverrideIsScopedAndSerializedIntoActualRunRequest() throws Exception {
+        var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);
+        var definitions=mock(io.github.devmrko.companion.port.BuildDefinition.class);
+        when(clients.client(c,"region")).thenReturn(client);
+        when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().etag("etag")
+            .buildPipeline(BuildPipeline.builder().id("p").compartmentId("comp").build()).build());
+        var source=new io.github.devmrko.companion.port.BuildDefinition.Source("stage::source","source","OCI","repo","https://example.com/repo","main",true);
+        var stage=new io.github.devmrko.companion.port.BuildDefinition.Stage("stage","build","빌드","ACTIVE",List.of("시작"),"image","build_spec.yaml",3600,List.of(source),List.of());
+        when(definitions.read(c,"region","comp","p")).thenReturn(new io.github.devmrko.companion.port.BuildDefinition.Definition("pipeline","project","ACTIVE","","rev",List.of(stage)));
+        when(definitions.branches(c,"region",source)).thenReturn(List.of(new io.github.devmrko.companion.port.BuildDefinition.Choice("main","main")));
+        when(definitions.commits(c,"region",source,"main")).thenReturn(List.of(new io.github.devmrko.companion.port.BuildDefinition.Choice("hash","hash")));
+        when(client.createBuildRun(any())).thenReturn(CreateBuildRunResponse.builder().buildRun(BuildRun.builder().id("run").build()).build());
+        var adapter=new OciBuildControl(clients,definitions);
+        assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("foreign","main","hash"),"rev"));
+        assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","unlisted"),"rev"));
+        assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"stale-stage-revision"));
+        verify(client,never()).createBuildRun(any());
+        assertEquals("run",adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"rev"));
+        var capture=org.mockito.ArgumentCaptor.forClass(CreateBuildRunRequest.class);verify(client).createBuildRun(capture.capture());
+        assertEquals("https://example.com/repo",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getRepositoryUrl());
+        assertEquals("hash",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getCommitHash());
+        assertEquals("token",capture.getValue().getOpcRetryToken());
     }
 }

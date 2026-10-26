@@ -6,5 +6,8 @@ public interface BuildControl {
     record Settings(String etag,List<Parameter> parameters) {}
     Settings settings(Connection c,String region,String compartment,String pipeline);
     void defaults(Connection c,String region,String compartment,String pipeline,String etag,List<Parameter> parameters);
-    String start(Connection c,String region,String compartment,String pipeline,String etag,String name,List<Parameter> parameters,String token);
+    default String start(Connection c,String region,String compartment,String pipeline,String etag,String name,List<Parameter> parameters,String token) {
+        return start(c,region,compartment,pipeline,etag,name,parameters,token,BuildDefinition.SourceOverride.none(),null);
+    }
+    String start(Connection c,String region,String compartment,String pipeline,String etag,String name,List<Parameter> parameters,String token,BuildDefinition.SourceOverride source,String revision);
 }
