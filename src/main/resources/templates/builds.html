@@ -1,18 +1,18 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
-<header th:replace="~{layout :: header}"></header><main class="catalog-shell"><div th:replace="~{layout :: notice}"></div>
+<header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
 <h1>빌드</h1>
 
 <section class="card"><h2>파이프라인</h2>
 <p th:if="${pipelines.isEmpty()}">파이프라인 없음 · 리전과 구획을 확인하세요.</p>
-<form th:if="${!pipelines.isEmpty()}" action="/builds" method="get" class="scope-bar"><label>파이프라인<select name="pipeline"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button>조회</button></form>
+<form th:if="${!pipelines.isEmpty()}" action="/builds" method="get" class="scope-bar"><label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button class="ui-button">조회</button></form>
 </section>
 <section class="card"><h2>실행 이력</h2><p th:if="${runs.isEmpty()}">실행 이력 없음</p>
-<div class="table-scroll" th:if="${!runs.isEmpty()}"><table><thead><tr><th>실행</th><th>상태</th><th>시작 요청 (UTC)</th></tr></thead><tbody><tr th:each="r : ${runs}"><td><a th:href="@{/builds(pipeline=${pipeline},run=${r.id()})}" th:text="${r.name()}"></a><details><summary>OCID</summary><code th:text="${r.id()}"></code></details></td><td th:text="${r.state()}"></td><td th:text="${r.createdAt()}"></td></tr></tbody></table></div>
+<div class="table-scroll" th:if="${!runs.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">실행</th><th class="table-heading">상태</th><th class="table-heading">시작 요청 (UTC)</th></tr></thead><tbody><tr th:each="r : ${runs}"><td class="table-cell"><a th:href="@{/builds(pipeline=${pipeline},run=${r.id()})}" th:text="${r.name()}"></a><details><summary>OCID</summary><code th:text="${r.id()}"></code></details></td><td th:text="${r.state()}" class="table-cell"></td><td th:text="${r.createdAt()}" class="table-cell"></td></tr></tbody></table></div>
 </section>
 <section class="card" th:if="${detail != null}"><h2>실행 상세</h2><p><strong th:text="${detail.name()}"></strong> · <span th:text="${detail.state()}"></span></p>
 <p th:if="${detail.message() != null and !detail.message().isEmpty()}" th:text="${detail.message()}"></p>
 <p th:if="${detail.steps().isEmpty()}">단계 진행 기록 없음 · 빌드 산출물 생성 여부를 확인하세요.</p>
-<div class="table-scroll" th:if="${!detail.steps().isEmpty()}"><table><thead><tr><th>단계</th><th>상태</th></tr></thead><tbody><tr th:each="s : ${detail.steps()}"><td th:text="${s.name()}"></td><td th:text="${s.state()}"></td></tr></tbody></table></div>
+<div class="table-scroll" th:if="${!detail.steps().isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">단계</th><th class="table-heading">상태</th></tr></thead><tbody><tr th:each="s : ${detail.steps()}"><td th:text="${s.name()}" class="table-cell"></td><td th:text="${s.state()}" class="table-cell"></td></tr></tbody></table></div>
 <p class="small muted">로그 본문·Registry 저장·실행 버튼은 아직 지원하지 않습니다.</p></section>
-<details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
-</main><footer th:replace="~{layout :: footer}"></footer></body></html>
+<details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}" class="code-block"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
+</main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

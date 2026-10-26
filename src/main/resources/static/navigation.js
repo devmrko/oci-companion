@@ -30,6 +30,13 @@ sidebar?.querySelectorAll('a[data-nav-path]').forEach(link => {
 });
 if (toggle) renderNavigation();
 
+const topbar = document.querySelector('.app-topbar');
+if (topbar) {
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--topbar-height', `${topbar.getBoundingClientRect().height}px`);
+  }).observe(topbar);
+}
+
 const globalScope = document.querySelector('.global-scope');
 const sourceForms = [...document.querySelectorAll('form[action="/sources"]')];
 const modifiedForms = new Set();
