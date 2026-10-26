@@ -20,10 +20,47 @@ class CatalogWebTest {
     static { try { DIRECTORY=Files.createTempDirectory("catalog-web-"); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildAdministration administration;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildSetup setup;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildLogs logs;
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void setupWritesUseServerEtagsAndSingleUseScopedTicket() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p","pipeline","ACTIVE","project","project")));
+        org.mockito.Mockito.when(definitions.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p")))
+            .thenReturn(new io.github.devmrko.companion.port.BuildDefinition.Definition("pipeline","project","ACTIVE","","revision",java.util.List.of()));
+        org.mockito.Mockito.when(setup.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p")))
+            .thenReturn(new io.github.devmrko.companion.port.BuildSetup.Settings("server-etag","pipeline","",java.util.List.of(),java.util.List.of(),java.util.List.of(),java.util.List.of()));
+        var page=mvc.perform(get("/builds").session(session).param("tab","pipelines").param("pipeline","p")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("파이프라인 저장"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("setupTicket");
+        mvc.perform(post("/builds/setup").session(session).param("ticket",ticket).param("action","pipeline").param("name","new")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/setup").session(session).with(csrf()).param("ticket",ticket).param("action","pipeline").param("name","new").param("etag","forged"))
+            .andExpect(redirectedUrl("/builds?tab=pipelines&pipeline=p"));
+        org.mockito.Mockito.verify(setup).rename(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("server-etag"),org.mockito.ArgumentMatchers.eq("new"),org.mockito.ArgumentMatchers.eq(""));
+        mvc.perform(post("/builds/setup").session(session).with(csrf()).param("ticket",ticket).param("action","pipeline").param("name","new")).andExpect(status().isBadRequest());
+        page=mvc.perform(get("/builds").session(session).param("tab","pipelines").param("pipeline","p")).andReturn();
+        ticket=(String)page.getModelAndView().getModel().get("setupTicket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/setup").session(session).with(csrf()).param("ticket",ticket).param("action","pipeline").param("name","new")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(setup,org.mockito.Mockito.times(2)).read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"));
+        org.mockito.Mockito.verifyNoMoreInteractions(setup);
+    }
+    @Test void logsRequireCurrentScopeAndExposePermissions() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var page=mvc.perform(get("/builds").session(session).param("tab","topics")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("권한 설정 · OCI 콘솔"))).andExpect(content().string(containsString("ONS_TOPIC_CREATE"))).andReturn();
+        var selection=(io.github.devmrko.companion.web.CatalogPages.Selection)page.getModelAndView().getModel().get("selection");
+        org.mockito.Mockito.when(logs.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq(selection.region()),org.mockito.ArgumentMatchers.eq(selection.compartment()),org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("r"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq("")))
+            .thenReturn(new io.github.devmrko.companion.port.BuildLogs.Page("READY","",java.util.List.of(new io.github.devmrko.companion.port.BuildLogs.Line("time","stage","actual log")),"",""));
+        mvc.perform(get("/builds/logs").session(session).param("region",selection.region()).param("compartment",selection.compartment()).param("pipeline","p").param("run","r"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.lines[0].message").value("actual log"));
+        mvc.perform(get("/builds/logs").session(session).param("region","foreign").param("compartment",selection.compartment()).param("pipeline","p").param("run","r")).andExpect(status().isConflict());
+    }
     @Test void topicTabSupportsEmptyEnvironmentCreationAndScopeProtection() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var page=mvc.perform(get("/builds").session(session).param("tab","topics")).andExpect(status().isOk())

@@ -21,6 +21,7 @@
 <label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
 <button class="ui-button">다시 조회</button></form>
 </section>
+<div th:replace="~{build-setup :: form}"></div>
 <section class="card pipeline-definition" th:if="${definition != null}">
 <div class="section-title"><h2 th:text="${definition.name()}"></h2><span class="field-badge" th:text="${definition.state()}"></span></div>
 <p class="small muted" th:text="${definition.project()}"></p><p th:if="${!definition.description().isEmpty()}" th:text="${definition.description()}"></p>
@@ -58,7 +59,20 @@
 <p th:if="${detail.message() != null and !detail.message().isEmpty()}" th:text="${detail.message()}"></p>
 <p th:if="${detail.steps().isEmpty()}">단계 진행 기록 없음 · 빌드 산출물 생성 여부를 확인하세요.</p>
 <div class="table-scroll" th:if="${!detail.steps().isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">단계</th><th class="table-heading">상태</th></tr></thead><tbody><tr th:each="s : ${detail.steps()}"><td th:text="${s.name()}" class="table-cell"></td><td th:text="${s.state()}" class="table-cell"></td></tr></tbody></table></div>
-<p class="small muted">로그 본문·Registry 저장은 아직 지원하지 않습니다.</p></section>
+<dl class="build-facts"><div><dt>빌드·테스트</dt><dd th:text="${detail.buildState()}"></dd></div><div><dt>Registry 전달</dt><dd th:text="${detail.storageState()}"></dd></div></dl>
+<p class="small muted">빌드 성공과 Registry 저장은 별도 단계입니다. 전달 기록이 없으면 저장 성공으로 표시하지 않습니다.</p>
+<h3>전달된 산출물</h3><p th:if="${detail.artifacts().isEmpty()}">전달된 산출물 기록 없음</p>
+<div class="table-scroll" th:if="${!detail.artifacts().isEmpty()}"><table class="data-table"><thead><tr><th>이름</th><th>저장소</th><th>경로·버전</th><th>식별자</th></tr></thead><tbody><tr th:each="a : ${detail.artifacts()}"><td th:text="${a.name()}"></td><td th:text="${a.kind()}"></td><td><span th:text="${a.location()}"></span><br><span th:text="${a.version()}"></span></td><td><code th:text="${a.id()}"></code></td></tr></tbody></table></div>
+<details open id="build-logs" th:attr="data-region=${selection.region()},data-compartment=${selection.compartment()},data-pipeline=${pipeline},data-run=${detail.id()}">
+<summary>로그</summary><div class="form-toolbar">
+<label class="form-field">자동 갱신<select class="ui-control" id="log-interval"><option value="0" th:selected="${detail.state() != 'IN_PROGRESS' and detail.state() != 'ACCEPTED'}">중지</option><option value="10000" th:selected="${detail.state() == 'IN_PROGRESS' or detail.state() == 'ACCEPTED'}">10초</option><option value="30000">30초</option></select></label>
+<label class="form-field">단계<select class="ui-control" id="log-stage"><option value="">전체</option></select></label>
+<label class="form-field">현재 조회 로그 검색<input class="ui-control" id="log-search" placeholder="오류·메시지"></label>
+<button type="button" class="ui-button" id="log-refresh">새로 고침</button><button type="button" class="ui-button" id="log-older" disabled>이전 로그</button>
+</div><p id="log-status" role="status"></p><pre class="code-block build-log-output" id="log-output"></pre>
+<p class="small muted">최근 1,000건부터 조회합니다. 이전 로그 조회 시 자동 갱신은 중지됩니다. 로그 미표시는 빌드 성공을 뜻하지 않습니다.</p>
+<p>로그 활성화: OCI 콘솔 → DevOps → 프로젝트 → 로그 → 로그 사용. <a href="#permissions">권한 설정</a></p>
+</details><script src="/build-logs.js" defer></script></section>
 <section class="card" th:if="${tab == 'execute' and ticket != null}">
 <h2>실행 설정</h2>
 <p th:if="${!definition.runnable()}" class="notice">실행 가능한 ACTIVE 단계가 필요합니다. 파이프라인 상태를 확인하세요.</p>
@@ -122,4 +136,4 @@
 </section>
 <script src="/builds.js" defer></script>
 <details class="card"><summary>OCI에서 확인</summary><p>파이프라인 추가: DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 파이프라인 생성. 단계 추가: 파이프라인 → 단계 추가 → 관리형 빌드.</p><pre class="code-block">oci devops build-pipeline create --project-id &lt;프로젝트 OCID&gt; --display-name &lt;이름&gt;</pre><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}" class="code-block"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>실행 · arguments.json: {"items":[{"name":"이름","value":"값"}]}</p><pre class="code-block" th:text="${runCli}"></pre><p>기본값 저장: OCI 콘솔 → 빌드 파이프라인 → 파라미터. </p><p>parameters.json: {"items":[{"name":"이름","defaultValue":"값","description":"설명"}]}</p><pre class="code-block" th:text="${defaultsCli}"></pre><p>특정 소스 버전: 콘솔 → Start Manual Run → Show advanced options → 저장소·브랜치·커밋. CLI에는 --commit-info file://commit.json을 추가합니다.</p><p>commit.json: {"repositoryUrl":"선택 저장소 URL","repositoryBranch":"브랜치","commitHash":"커밋 SHA"}</p><p>실행·저장에는 DevOps 빌드 실행 생성 및 파이프라인 수정 권한이 필요합니다.</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
-</main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>
+<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

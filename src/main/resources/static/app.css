@@ -868,7 +868,7 @@ a:focus-visible, .ui-button:focus-visible {
 .section-title h2, .section-title h3 { margin:0; }
 .field-badge { display:inline-block; font-size:12px; font-weight:normal; background:#edf2f3; border:1px solid #d6dfe1; border-radius:4px; padding:2px 7px; }
 .pipeline-stages { display:grid; gap:16px; padding-left:24px; }
-.pipeline-stage { padding:16px; border:1px solid var(--border,#ddd); border-radius:4px; min-width:0; }
+.pipeline-stage { overflow-wrap:anywhere; padding:16px; border:1px solid var(--border,#ddd); border-radius:4px; min-width:0; }
 .build-facts { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr)); margin:14px 0; }
 .build-facts dt { font-size:12px; color:#555; }
 .build-facts dd { margin:4px 0 0; overflow-wrap:anywhere; }
@@ -884,3 +884,4 @@ a:focus-visible, .ui-button:focus-visible {
 .pipeline-definition .code-block { max-height:320px; overflow:auto; }
 .build-source-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
 @media(max-width:700px) { .build-source-fields { grid-template-columns:1fr; } }
+.build-log-output { max-height:560px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }

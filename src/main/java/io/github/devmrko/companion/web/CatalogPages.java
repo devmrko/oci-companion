@@ -24,14 +24,16 @@ public class CatalogPages {
     private final SecurityContextRepository contexts;
     private final GuideCatalog guides;
     private final BuildHistory builds;
+    private final BuildLogs logs;
+    private final BuildSetup setup;
     private final BuildAdministration administration;
     private final SelectionStore selections;
     private final BuildControl control;
     private final BuildDefinition definitions;
     private final BuildInputStore inputRules;
     private final BuildPresetStore presets;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration) {
-        this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup) {
+        this.setup=setup;this.logs=logs;this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
@@ -39,6 +41,9 @@ public class CatalogPages {
                 model.addAttribute("navSelection",selection(c,request.getSession()));
                 model.addAttribute("scopeMessage",request.getSession().getAttribute("scopeInvalid"));
             } catch(BusinessException | IllegalStateException e) { model.addAttribute("scopeMessage","범위 조회 실패 · 연결과 권한을 확인하세요."); }
+            String menu=request.getRequestURI().equals("/builds")?Objects.toString(request.getParameter("tab"),"execute"):request.getRequestURI().equals("/guides")?"guides":"catalog";
+            var nav=(Selection)model.getAttribute("navSelection");
+            model.addAttribute("permissionRules",PermissionHelp.rules(menu,nav==null?null:nav.compartment()));
             model.addAttribute("scopeBack",Set.of("/sources","/builds","/guides").contains(request.getRequestURI())?request.getRequestURI():"/");
         }
     }
@@ -192,6 +197,7 @@ public class CatalogPages {
             model.addAttribute("defaultsCli","oci devops build-pipeline update --profile "+quote(c.profile())+" --region "+quote(s.region())+" --build-pipeline-id "+quote(selected)+" --build-pipeline-parameters file://parameters.json");
             if(!selected.isEmpty()) {
                 if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
+                model.addAttribute("pipelineRule","ALL {resource.type = 'devopsbuildpipeline', resource.id = '"+selected+"'}");
                 if(tab.equals("execute") || tab.equals("pipelines")) {
                     var definition=definitions.read(c,s.region(),s.compartment(),selected);
                     model.addAttribute("definition",definition);
@@ -202,7 +208,20 @@ public class CatalogPages {
                         if(primary.isPresent()) specs.put(stage.id(),definitions.specification(c,s.region(),primary.get(),stage.spec()));
                     }
                     model.addAttribute("specifications",specs);
-                    if(tab.equals("pipelines")) return "builds";
+                    if(tab.equals("pipelines")) {
+                        var value=setup.read(c,s.region(),s.compartment(),selected);
+                        model.addAttribute("setup",value);
+                        if(value!=null) {
+                            var token=UUID.randomUUID().toString();
+                            synchronized(session) {
+                                var map=setupTickets(session);
+                                if(map.size()>=32)map.remove(map.keySet().iterator().next());
+                                map.put(token,new SetupTicket(s.region(),s.compartment(),selected,definition.revision(),value));
+                            }
+                            model.addAttribute("setupTicket",token);
+                        }
+                        return "builds";
+                    }
                     var settings=control.settings(c,s.region(),s.compartment(),selected);
                     var saved=presets.list(c,s.region(),s.compartment(),selected);
                     var parameters=settings.parameters();
@@ -235,6 +254,51 @@ public class CatalogPages {
         return tab.equals("topics")?"build-topics":tab.equals("projects")?"build-projects":"builds";
     }
 
+    @GetMapping("/builds/logs") @ResponseBody
+    BuildLogs.Page buildLogs(Authentication auth,HttpSession session,@RequestParam String region,@RequestParam String compartment,
+        @RequestParam String pipeline,@RequestParam String run,@RequestParam(defaultValue="") String page,@RequestParam(defaultValue="") String until) {
+        var c=SecurityConfig.connection(auth);
+        checkScope(selection(c,session),region,compartment);
+        if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
+        return logs.read(c,region,compartment,pipeline,run,page,until);
+    }
+    record SetupTicket(String region,String compartment,String pipeline,String revision,BuildSetup.Settings settings) {}
+    @SuppressWarnings("unchecked")
+    private Map<String,SetupTicket> setupTickets(HttpSession session) {
+        var map=(Map<String,SetupTicket>)session.getAttribute("setupTickets");
+        if(map==null) { map=new LinkedHashMap<>();session.setAttribute("setupTickets",map); }return map;
+    }
+    @PostMapping("/builds/setup")
+    String setupBuild(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String ticket,@RequestParam String action,
+        @RequestParam(defaultValue="") String name,@RequestParam(defaultValue="") String description,@RequestParam(defaultValue="") String stage,
+        @RequestParam(defaultValue="") String spec,@RequestParam(defaultValue="3600") int timeout,@RequestParam(defaultValue="") String branch,
+        @RequestParam(defaultValue="") String type,@RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String path,
+        @RequestParam(defaultValue="") String version,@RequestParam(defaultValue="") String output,@RequestParam(defaultValue="") String artifact) {
+        var c=SecurityConfig.connection(auth);SetupTicket t;
+        synchronized(session) { t=setupTickets(session).remove(ticket); }
+        if(t==null)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        checkScope(selection(c,session),t.region(),t.compartment());
+        if(session.getAttribute("scopeInvalid")!=null)throw Errors.SCOPE.exception();
+        try {
+            switch(action) {
+                case "pipeline" -> setup.rename(c,t.region(),t.compartment(),t.pipeline(),t.settings().etag(),name,description);
+                case "stage" -> {
+                    var saved=t.settings().stages().stream().filter(v->v.id().equals(stage)).findFirst().orElseThrow(Errors.SCOPE::exception);
+                    setup.updateBuild(c,t.region(),t.compartment(),t.pipeline(),stage,saved.etag(),name,spec,timeout,branch);
+                }
+                case "delivery" -> {
+                    var saved=t.settings().deliveries().stream().filter(v->v.id().equals(stage)).findFirst().orElseThrow(Errors.SCOPE::exception);
+                    setup.updateDelivery(c,t.region(),t.compartment(),t.pipeline(),stage,saved.etag(),output,artifact);
+                }
+                case "repository" -> setup.createRepository(c,t.region(),t.compartment(),name,ticket);
+                case "artifact" -> setup.createArtifact(c,t.region(),t.compartment(),t.pipeline(),name,type,repository,path,version,ticket);
+                case "deliver" -> setup.deliver(c,t.region(),t.compartment(),t.pipeline(),t.revision(),stage,output,artifact,ticket);
+                default -> throw Errors.BUILD_PARAMETERS.exception();
+            }
+            flash.addFlashAttribute("message","OCI 설정 저장 완료 · 실행 중인 빌드에는 적용되지 않습니다.");
+        } catch(BusinessException e) { flash.addFlashAttribute("message",e.getMessage()); }
+        return "redirect:/builds?tab=pipelines&pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);
+    }
     record AdminTicket(String region,String compartment,String tab) {}
     @SuppressWarnings("unchecked")
     private Map<String,AdminTicket> adminTickets(HttpSession session) {

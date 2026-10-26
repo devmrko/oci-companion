@@ -49,14 +49,22 @@ public class OciBuildHistory implements BuildHistory {
         try(var client=client(c,region)) {
             var r=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build()).getBuildRun();
             if(!compartment.equals(r.getCompartmentId()) || !pipeline.equals(r.getBuildPipelineId())) throw Errors.SCOPE.exception();
-            var steps=new ArrayList<Step>();
+            var steps=new ArrayList<Step>();var artifacts=new ArrayList<StoredArtifact>();
             if(r.getBuildRunProgress()!=null && r.getBuildRunProgress().getBuildPipelineStageRunProgress()!=null)
                 for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values()) {
-                    steps.add(new Step(stage.getStageDisplayName(),stage.getStatus()==null?"—":stage.getStatus().getValue()));
+                    steps.add(new Step(stage.getStageDisplayName(),stage.getStatus()==null?"—":stage.getStatus().getValue(),
+                        stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress?"BUILD":stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress?"DELIVER":"OTHER"));
+                    if(stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress delivery && delivery.getDeliveredArtifacts()!=null)
+                        for(var artifact:delivery.getDeliveredArtifacts().getItems()) {
+                            if(artifact instanceof com.oracle.bmc.devops.model.GenericDeliveredArtifact a)
+                                artifacts.add(new StoredArtifact(a.getOutputArtifactName(),"Artifact Registry",a.getPath(),a.getVersion(),a.getDeliveredArtifactId()));
+                            else if(artifact instanceof com.oracle.bmc.devops.model.ContainerRegistryDeliveredArtifact a)
+                                artifacts.add(new StoredArtifact(a.getOutputArtifactName(),"Container Registry",a.getImageUri(),a.getDeliveredArtifactHash(),a.getDeployArtifactId()));
+                        }
                     if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress build && build.getSteps()!=null)
                         for(var step:build.getSteps()) steps.add(new Step(step.getName(),step.getState()==null?"—":step.getState().getValue()));
                 }
-            return new Detail(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),r.getLifecycleDetails(),steps);
+            return new Detail(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),r.getLifecycleDetails(),steps,artifacts);
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
 }

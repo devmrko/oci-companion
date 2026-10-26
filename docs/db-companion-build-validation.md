@@ -133,3 +133,43 @@ COMPANION_TEST_PROFILE=DEFAULT COMPANION_TEST_PIPELINE='<pipeline OCID>' node sc
 한계: 이미지/제한시간/buildspec 편집은 포함하지 않는다. db-companion의 실제 GitHub
 소스 커밋은 build.sh에 고정되어 있으며 실행 폼의 커밋 선택은 build-config 저장소에 적용된다.
 스크립트 소스 추출은 정적 탐지이며 동적 셸 명령을 완전히 해석하지 않는다.
+
+## 2026-10-26 파이프라인 수정·Registry·로그 (#993)
+
+- BuildSetup 인터페이스: 파이프라인 이름/설명, 관리형 빌드 단계 이름/기본 브랜치/빌드 사양 경로/제한 시간 수정.
+- ETag 및 서버 세션의 일회성 티켓으로 오래된 화면·다른 범위·중복 저장 차단.
+- Artifact Registry 저장소 생성, 파일/컨테이너 DevOps 산출물 참조 등록, Deliver Artifacts 단계 추가.
+- 기존 전달 단계는 출력별 저장 위치를 교체하며 다른 출력과 선행 단계는 유지.
+- 빌드 사양에서 확인한 outputArtifacts 이름·유형과 참조를 연결. 외부 소스 사양을 읽을 수 없으면 콘솔 안내.
+- 뒤에 다른 단계가 없는 관리형 빌드 단계에만 전달 단계 추가. 기존 테스트·승인·배포 순서를 임의로 우회하지 않음.
+- 실행 이력의 빌드 상태/Registry 전달 상태/전달된 산출물 기록 분리. 기록 부재는 저장 성공이 아님.
+- BuildLogs 인터페이스: 실제 OCI Logging, 실행 소속 검증, 1,000건 페이지, 시간순 표시, 단계/메시지 필터, 자동 갱신/중지.
+- 메뉴별 IAM 도움말: 사용자와 실행 파이프라인 권한 구분, 구획 반영 정책 예제, 콘솔 수동 편집 절차. IAM 정책 자동 수정 없음.
+
+검증: 44개 테스트 통과. 실제 DEFAULT/서울/Joungmin.Ko에서 저장소
+db-companion-builds, 참조 db-companion-jar-delivery,
+Registry · db-companion-jar 전달 단계를 GUI로 생성했다.
+실제 단계 수정 요청(기존 값 유지), OCI 기본 파라미터 저장, 빌드 제출을 확인했다.
+파일 경로는 db-companion/app.jar, 버전은 ${COMPANION_VERSION}.
+매 실행 시 고유 값을 입력해야 한다.
+
+첫 실행은 신규 전달 단계가 진행 기록에 없었으며 Registry 파일도 0건이었다.
+빌드 성공을 저장 성공으로 간주하지 않고, ACTIVE/연결 확인 후 다른 고유 버전으로 재실행했다.
+두 번째 실행에는 BUILD와 DELIVER_ARTIFACT 단계가 모두 포함됐다.
+BUILD는 SUCCEEDED, DELIVER_ARTIFACT는 FAILED.
+실제 OCI 로그: Unable to access deploy-artifact due to NotAuthorizedOrNotFound.
+따라서 Registry 저장 성공은 아직 검증하지 못했다.
+사용자가 콘솔에서 파이프라인의 DevOps 산출물 읽기 및 Registry 접근 정책을 적용해야 한다.
+광범위한 tenancy 관리 권한을 자동 부여하지 않았다.
+
+기존 성공 빌드의 실제 로그 약 4,000건에서 Maven BUILD SUCCESS 및 페이지 이동·검색을 확인했다.
+1440/390/320px 화면과 자동 갱신/중지 검증 통과. 긴 산출물 OCID는 공통 CSS에서 줄바꿈한다.
+실행 로그는 영속 캐시에 저장하지 않는다.
+GitHub 원본과 OCI build-config의 빌드 명령은 이번에 변경하지 않았다.
+Maven 전용 Goals/JDK 입력, 빌드 사양 본문 편집, 구독 생성, 로그 자동 활성화는 별도 작업이다.
+
+재현:
+- 읽기 검증: scripts/browser-build-flow.cjs (DEFAULT 및 예제 pipeline 환경 변수 필요).
+- 실제 생성/제출: scripts/browser-build-delivery.cjs (COMPANION_TEST_SETUP=1 명시 필요).
+- 저장소·참조·전달 단계는 이름으로 기존 항목을 재사용. 버전은 실행마다 새 값.
+- 실제 클라우드 실패를 테스트 mock이나 성공 표시로 대체하지 않는다.
