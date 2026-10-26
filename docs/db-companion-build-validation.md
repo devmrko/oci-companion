@@ -41,6 +41,13 @@ Managed Build의 명령 실행과 `SAVE_OUTPUT_ARTIFACTS` 단계 모두 `SUCCEED
 출력: `db-companion.jar`, `test-reports.tar.gz`.
 빌드 설정 커밋: `0a24065d170ca4414bbf2216e7546627196b0257`.
 
+로그 반영 후 최종 결과를 대조했다.
+
+- Java: 1,444개 통과, 실패·건너뜀 0.
+- PMD: 통과.
+- JavaScript: 700개 중 699개 통과, 1개 건너뜀, 실패 0.
+- Publication 검사: 1,084개 파일, 발견 사항 0.
+
 ## 범위
 
 전용 알림 토픽(구독 없음), 프로젝트, 코드 저장소, 파이프라인, 로그 그룹/서비스 로그를 생성했다.
