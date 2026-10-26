@@ -23,8 +23,9 @@ public class CatalogPages {
     private final CatalogService service;
     private final SecurityContextRepository contexts;
     private final GuideCatalog guides;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides) {
-        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;
+    private final BuildHistory builds;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds) {
+        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;
     }
     @ModelAttribute("connection") Connection connection(Authentication auth) { return auth!=null && auth.getPrincipal() instanceof Connection c?c:null; }
     @GetMapping("/login") String login(Model model) { model.addAttribute("profiles",cloud.profiles()); return "login"; }
@@ -109,7 +110,29 @@ public class CatalogPages {
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
         session.setAttribute("region",region); session.setAttribute("compartment",compartment); session.setAttribute("interval",mode.equals("selected")?interval:0);session.setAttribute("scopeMode",mode);
-        return "redirect:"+(back.equals("/sources")?"/sources":"/");
+        return "redirect:"+(Set.of("/sources","/builds").contains(back)?back:"/");
+    }
+    @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
+        @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run) {
+        var c=SecurityConfig.connection(auth);
+        model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());
+        try {
+            var s=selection(c,session);model.addAttribute("selection",s);
+            var list=builds.pipelines(c,s.region(),s.compartment());model.addAttribute("pipelines",list);
+            String selected=pipeline.isEmpty() && !list.isEmpty()?list.getFirst().id():pipeline;
+            model.addAttribute("pipeline",selected);
+            model.addAttribute("buildCli","oci devops build-pipeline list --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment())+" --all");
+            if(!selected.isEmpty()) {
+                if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
+                var runs=builds.runs(c,s.region(),s.compartment(),selected);model.addAttribute("runs",runs);
+                String selectedRun=run.isEmpty() && !runs.isEmpty()?runs.getFirst().id():run;
+                if(!selectedRun.isEmpty()) {
+                    if(runs.stream().noneMatch(r->r.id().equals(selectedRun))) throw Errors.MISSING.exception();
+                    model.addAttribute("detail",builds.detail(c,s.region(),s.compartment(),selected,selectedRun));
+                }
+            }
+        } catch(BusinessException e) { model.addAttribute("message",e.getMessage()); }
+        return "builds";
     }
     @PostMapping("/catalog/refresh") String refresh(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam(defaultValue="selected") String mode,@RequestParam(defaultValue="/") String back) {
         var c=SecurityConfig.connection(auth); var s=selection(c,session);

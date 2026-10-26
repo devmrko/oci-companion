@@ -21,6 +21,22 @@ class CatalogWebTest {
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    io.github.devmrko.companion.port.BuildHistory builds;
+    @Test void buildPageUsesSelectedRegionAndRejectsUnlistedRuns() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds")).andExpect(redirectedUrl("/login"));
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/builds")).andExpect(redirectedUrl("/builds"));
+        org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq("us-ashburn-1"),org.mockito.ArgumentMatchers.eq("demo-development")))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p1","real-pipeline","ACTIVE")));
+        org.mockito.Mockito.when(builds.runs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq("us-ashburn-1"),org.mockito.ArgumentMatchers.eq("demo-development"),org.mockito.ArgumentMatchers.eq("p1")))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Run("r1","run-one","SUCCEEDED","2026-10-26T00:00:00Z")));
+        org.mockito.Mockito.when(builds.detail(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq("us-ashburn-1"),org.mockito.ArgumentMatchers.eq("demo-development"),org.mockito.ArgumentMatchers.eq("p1"),org.mockito.ArgumentMatchers.eq("r1")))
+            .thenReturn(new io.github.devmrko.companion.port.BuildHistory.Detail("r1","run-one","SUCCEEDED","",java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Step("SAVE_OUTPUT_ARTIFACTS","SUCCEEDED"))));
+        mvc.perform(get("/builds").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("SAVE_OUTPUT_ARTIFACTS")));
+        mvc.perform(get("/builds").session(session).param("pipeline","p1").param("run","foreign-run")).andExpect(status().isOk()).andExpect(content().string(containsString("현재 연결에서 찾을 수 없는 항목")));
+        org.mockito.Mockito.verify(builds,org.mockito.Mockito.never()).detail(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("foreign-run"));
+    }
     @Test void resourceWorkflowNeedsNoDatabaseAndIsolatesScopes() throws Exception {
         assertTrue(context.getBeansOfType(DataSource.class).isEmpty());
         mvc.perform(get("/")).andExpect(redirectedUrl("/login"));
