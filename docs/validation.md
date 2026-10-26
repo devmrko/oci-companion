@@ -1,3 +1,23 @@
+# 실제 서비스·메뉴 검증 — 2026-10-26
+
+Redmine #982. DEFAULT 프로파일로 실제 OCI SDK 인증·리전·구획·DevOps 조회 성공.
+범위: us-ashburn-1, 루트 구획. DevOps 결과 0건. 클라우드 생성·변경 없음.
+데모 어댑터는 src/test로 이동. 배포 JAR에 DemoCloud/DemoResourceCatalog 없음.
+자동 테스트 15개 통과. 아래 이전 데모 검증은 당시 기록이며 현재 실행 방법이 아님.
+
+```sh
+./scripts/build.sh
+./scripts/run.sh
+COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-smoke.cjs
+```
+
+실제 서비스 브라우저 검증: 인증·목록 갱신, 좌측 그룹 메뉴, 접기/펼치기,
+소스·도움말 이동, 모바일 메뉴, 로그아웃. 소스 등록·클라우드 쓰기는 수행하지 않음.
+프로파일 변수를 생략하면 로그인 화면만 검증한다.
+스크린샷과 실제 리소스 캐시는 Git에서 제외한다.
+
+---
+
 # 검증 — 2026-10-26
 
 리소스 개편: `./scripts/build.sh` 통과. 테스트 15개(기존 10 + 신규 5).

@@ -8,11 +8,11 @@ JDK 21+, GitHub CLI 필요. Maven Wrapper 포함.
 
 ```sh
 ./scripts/build.sh
-./scripts/run.sh --spring.profiles.active=demo
+./scripts/run.sh
 ```
 
-<http://127.0.0.1:8091> → DEMO → 리전·구획 선택 → 새로 고침 → 소스 등록.
-실제 OCI 연결은 `demo` 옵션 없이 실행합니다.
+<http://127.0.0.1:8091> → OCI 프로파일 선택 → 리전·구획 선택 → 새로 고침.
+배포 JAR에는 샘플 응답 어댑터를 포함하지 않습니다.
 
 ```sh
 ./scripts/run.sh
@@ -30,7 +30,14 @@ OCI_CONFIG_FILE=/absolute/path/config PORT=8092 ./scripts/run.sh
 - 루프백 바인딩, CSRF, 세션 분리, 이전 화면의 범위 변경 감지.
 
 소스 등록은 로컬 참조 저장입니다. 외부 Git 인증·연결 검증·브랜치 조회는 후속 범위입니다.
-실제 OCI 조회는 아직 검증하지 않았습니다. 데모는 OCI를 호출하지 않습니다.
+DEFAULT 프로파일의 실제 인증·리전·구획·DevOps 목록 조회를 검증했습니다.
+검증 범위: us-ashburn-1 루트 구획. 빌드·배포 실행은 미검증입니다.
+
+## 메뉴
+
+DB Companion과 같은 좌측 그룹 메뉴·접기/펼치기·상단 연결 정보 구조입니다.
+워크스페이스 / 빌드·배포 / 인프라·운영 / 관리로 구분합니다.
+미구현 메뉴는 `예정`으로 표시하며 실행되지 않습니다.
 
 ## 저장
 
@@ -51,7 +58,7 @@ OCI_CONFIG_FILE=/absolute/path/config PORT=8092 ./scripts/run.sh
 기존 프로젝트·파이프라인 실행 화면은 명시적 `legacy` 모드에서 실행합니다.
 
 ```sh
-./scripts/run.sh --spring.profiles.active=demo,legacy
+./scripts/run.sh --spring.profiles.active=legacy
 ```
 
 기본 모드는 DB를 생성·연결하지 않습니다. 기존 SQLite 의존성은 legacy 실행용으로만 남아 있습니다.

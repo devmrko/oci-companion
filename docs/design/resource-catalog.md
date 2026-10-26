@@ -31,7 +31,7 @@ Java Foundation을 유지한다. 이번 범위에서 Python 재작성은 이점�
 ## 경계
 
 - `CloudConnection`: 프로파일 목록과 인증.
-- `ResourceCatalog`: 리전·구획·리소스 조회. OCI SDK / Demo 어댑터.
+- `ResourceCatalog`: 리전·구획·리소스 조회. OCI SDK 어댑터. 샘플 어댑터는 테스트 전용.
 - `CatalogStore`: 캐시와 소스 저장. 현재 JSON 어댑터.
 - `CatalogService`: 범위 분리, 갱신, 소스 검증.
 - `PipelineGateway`, `DeploymentTarget`, `BuildRecipe`: 기존 계약. 후속 확장.
@@ -74,3 +74,12 @@ JSON에는 schema version, 범위, 성공 조회 시각, 최소 리소스 정보
 
 Redmine은 요구사항·완료 기준·검증, GitHub는 소스·설계·PR·CI·릴리스에 사용한다.
 둘 다 앱 실행에 필요한 종속성으로 추가하지 않는다.
+
+## 메뉴 개편 — #982
+
+DB Companion의 common.html/common.css 구조 확인 후 적용.
+좌측 그룹 메뉴와 접기/펼치기, 선택 메뉴 강조, 상단 프로파일·리전·연결 해제.
+그룹: 워크스페이스 / 빌드·배포 / 인프라·운영 / 관리.
+미구현 메뉴는 비활성·예정 표시. 모바일은 펼침 메뉴와 Escape 닫기.
+배포 JAR에서 데모 어댑터 제외. 실제 SDK로만 서비스하며 실패/0건을 샘플로 대체하지 않음.
+참고: https://github.com/devmrko/db-companion/blob/main/src/main/resources/templates/fragments/common.html
