@@ -1,6 +1,8 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    ADMIN_INPUT(ErrorCategory.VALIDATION, "이름(1–255자)과 설명(400자 이하)을 확인하세요."),
+    ADMIN_UNKNOWN(ErrorCategory.UNAVAILABLE, "생성 결과를 확인하지 못했습니다. 재생성 전에 목록과 OCI 콘솔을 확인하세요."),
     BUILD_REQUIRED(ErrorCategory.VALIDATION, "필수 파라미터 값을 입력하세요."),
     BUILD_PRESET(ErrorCategory.CONFLICT, "프리셋과 현재 OCI 파라미터가 다릅니다. OCI 기본값을 불러와 다시 저장하세요."),
     BUILD_PARAMETERS(ErrorCategory.VALIDATION, "파라미터 이름·값을 확인하세요. 새 이름은 OCI에 먼저 저장하세요."),

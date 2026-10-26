@@ -24,13 +24,14 @@ public class CatalogPages {
     private final SecurityContextRepository contexts;
     private final GuideCatalog guides;
     private final BuildHistory builds;
+    private final BuildAdministration administration;
     private final SelectionStore selections;
     private final BuildControl control;
     private final BuildDefinition definitions;
     private final BuildInputStore inputRules;
     private final BuildPresetStore presets;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules) {
-        this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration) {
+        this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
@@ -149,12 +150,28 @@ public class CatalogPages {
         @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project) {
         var c=SecurityConfig.connection(auth);
         if(tab.isEmpty()) tab=run.isEmpty()?"execute":"history";
-        model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
+        if(!Set.of("projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
+            if(tab.equals("projects") || tab.equals("pipelines")) {
+                model.addAttribute("projectItems",administration.projects(c,s.region(),s.compartment()));
+                model.addAttribute("adminTicket",adminTicket(session,s,tab));
+                if(tab.equals("projects")) {
+                    model.addAttribute("topics",List.of());
+                    try { model.addAttribute("topics",administration.topics(c,s.region(),s.compartment())); }
+                    catch(BusinessException e) { model.addAttribute("topicError","알림 주제 조회 실패 · Notifications 읽기 권한을 확인하세요."); }
+                    return "build-projects";
+                }
+            }
             var all=builds.pipelines(c,s.region(),s.compartment());
             var projects=new LinkedHashMap<String,String>();all.forEach(p->projects.put(p.projectId(),p.projectName()));
+            if(tab.equals("pipelines")) {
+                projects.clear();
+                @SuppressWarnings("unchecked") var items=(List<BuildAdministration.Project>)model.getAttribute("projectItems");
+                items.forEach(p->projects.put(p.id(),p.name()));
+            }
             model.addAttribute("projects",projects);model.addAttribute("project",project);
             var list=all.stream().filter(p->project.isEmpty() || project.equals(p.projectId())).toList();model.addAttribute("pipelines",list);
             String selected=pipeline.isEmpty() && !list.isEmpty()?list.getFirst().id():pipeline;
@@ -164,8 +181,7 @@ public class CatalogPages {
             model.addAttribute("defaultsCli","oci devops build-pipeline update --profile "+quote(c.profile())+" --region "+quote(s.region())+" --build-pipeline-id "+quote(selected)+" --build-pipeline-parameters file://parameters.json");
             if(!selected.isEmpty()) {
                 if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
-                if(tab.equals("execute")) {
-                    var settings=control.settings(c,s.region(),s.compartment(),selected);
+                if(tab.equals("execute") || tab.equals("pipelines")) {
                     var definition=definitions.read(c,s.region(),s.compartment(),selected);
                     model.addAttribute("definition",definition);
                     var specs=new LinkedHashMap<String,BuildDefinition.Specification>();
@@ -175,6 +191,8 @@ public class CatalogPages {
                         if(primary.isPresent()) specs.put(stage.id(),definitions.specification(c,s.region(),primary.get(),stage.spec()));
                     }
                     model.addAttribute("specifications",specs);
+                    if(tab.equals("pipelines")) return "builds";
+                    var settings=control.settings(c,s.region(),s.compartment(),selected);
                     var saved=presets.list(c,s.region(),s.compartment(),selected);
                     var parameters=settings.parameters();
                     var loaded=new BuildPresetStore.Preset("",parameters);
@@ -203,7 +221,45 @@ public class CatalogPages {
                 }
             }
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
-        return "builds";
+        return tab.equals("projects")?"build-projects":"builds";
+    }
+
+    record AdminTicket(String region,String compartment,String tab) {}
+    @SuppressWarnings("unchecked")
+    private Map<String,AdminTicket> adminTickets(HttpSession session) {
+        var map=(Map<String,AdminTicket>)session.getAttribute("adminTickets");
+        if(map==null) { map=new LinkedHashMap<>();session.setAttribute("adminTickets",map); }
+        return map;
+    }
+    private String adminTicket(HttpSession session,Selection s,String tab) {
+        synchronized(session) {
+            var map=adminTickets(session);
+            if(map.size()>=32) map.remove(map.keySet().iterator().next());
+            var token=UUID.randomUUID().toString();map.put(token,new AdminTicket(s.region(),s.compartment(),tab));return token;
+        }
+    }
+    @PostMapping("/builds/create")
+    String createBuildResource(Authentication auth,HttpSession session,RedirectAttributes flash,
+        @RequestParam String ticket,@RequestParam String name,@RequestParam(defaultValue="") String description,
+        @RequestParam(defaultValue="") String topic,@RequestParam(defaultValue="") String project) {
+        var c=SecurityConfig.connection(auth);AdminTicket t;
+        synchronized(session) { t=adminTickets(session).remove(ticket); }
+        if(t==null) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        checkScope(selection(c,session),t.region(),t.compartment());
+        if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
+        String destination="/builds?tab="+t.tab();
+        try {
+            if(t.tab().equals("projects")) {
+                String id=administration.createProject(c,t.region(),t.compartment(),name,description,topic,ticket);
+                flash.addFlashAttribute("message","프로젝트 생성 완료 · 실행 전 프로젝트 로그를 활성화하세요.");
+                destination="/builds?tab=projects&project="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
+            } else {
+                String id=administration.createPipeline(c,t.region(),t.compartment(),project,name,description,ticket);
+                flash.addFlashAttribute("message","파이프라인 생성 완료 · 빌드 단계를 등록해야 실행할 수 있습니다.");
+                destination="/builds?tab=pipelines&project="+java.net.URLEncoder.encode(project,java.nio.charset.StandardCharsets.UTF_8)+"&pipeline="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch(BusinessException e) { flash.addFlashAttribute("message",e.getMessage()); }
+        return "redirect:"+destination;
     }
     record BuildTicket(String region,String compartment,String pipeline,String etag,String revision) {}
     @SuppressWarnings("unchecked")

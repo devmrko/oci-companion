@@ -19,10 +19,34 @@ class CatalogWebTest {
     static final Path DIRECTORY;
     static { try { DIRECTORY=Files.createTempDirectory("catalog-web-"); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildAdministration administration;
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void projectAndPipelineTabsUseRealAdministrationPortAndScopedSingleUseCreation() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildAdministration.Project("project-empty","empty-project","description","ACTIVE","topic1")));
+        org.mockito.Mockito.when(administration.topics(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
+            .thenReturn(java.util.List.of(new io.github.devmrko.companion.domain.Catalog.Choice("topic1","notifications")));
+        var page=mvc.perform(get("/builds").session(session).param("tab","projects")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("empty-project"))).andExpect(content().string(containsString("notifications"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("adminTicket");
+        org.mockito.Mockito.when(administration.createProject(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq("new-project"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq("topic1"),org.mockito.ArgumentMatchers.eq(ticket))).thenReturn("created-project");
+        mvc.perform(post("/builds/create").session(session).param("ticket",ticket).param("name","new-project")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","new-project").param("topic","topic1"))
+            .andExpect(redirectedUrl("/builds?tab=projects&project=created-project"));
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","new-project")).andExpect(status().isBadRequest());
+        page=mvc.perform(get("/builds").session(session).param("tab","pipelines").param("project","project-empty")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("파이프라인 생성"))).andExpect(content().string(containsString("empty-project"))).andReturn();
+        ticket=(String)page.getModelAndView().getModel().get("adminTicket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","pipeline").param("project","project-empty")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(administration,org.mockito.Mockito.never()).createPipeline(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
+
     @Test void buildExecutionUsesSingleTicketAndRejectsStaleScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))

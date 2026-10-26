@@ -1,0 +1,34 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 프로젝트')}"></head><body>
+<header th:replace="~{layout :: header}"></header>
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
+<nav th:fragment="tabs" class="build-tabs" aria-label="빌드 메뉴">
+<a class="build-tab" th:attr="aria-current=${tab == 'projects' ? 'page' : null}" th:classappend="${tab == 'projects'} ? 'is-active'" th:href="@{/builds(tab='projects')}">프로젝트</a>
+<a class="build-tab" th:attr="aria-current=${tab == 'pipelines' ? 'page' : null}" th:classappend="${tab == 'pipelines'} ? 'is-active'" th:href="@{/builds(tab='pipelines',project=${project},pipeline=${pipeline})}">파이프라인</a>
+<a class="build-tab" th:attr="aria-current=${tab == 'execute' ? 'page' : null}" th:classappend="${tab == 'execute'} ? 'is-active'" th:href="@{/builds(tab='execute',project=${project},pipeline=${pipeline})}">빌드 실행</a>
+<a class="build-tab" th:attr="aria-current=${tab == 'history' ? 'page' : null}" th:classappend="${tab == 'history'} ? 'is-active'" th:href="@{/builds(tab='history',project=${project},pipeline=${pipeline})}">실행 이력</a>
+</nav>
+<section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
+<p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>
+<p th:if="${projectItems.isEmpty()}">프로젝트 없음 또는 조회 실패</p>
+<div class="table-scroll" th:if="${!projectItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명·알림 주제</th><th class="table-heading">파이프라인</th></tr></thead><tbody>
+<tr th:each="p : ${projectItems}"><td class="table-cell"><strong th:text="${p.name()}"></strong><details><summary>OCID</summary><code th:text="${p.id()}"></code></details></td><td class="table-cell" th:text="${p.state()}"></td><td class="table-cell"><p th:text="${p.description()}"></p><details><summary>알림 주제 OCID</summary><code th:text="${p.topic()}"></code></details></td><td class="table-cell"><a th:href="@{/builds(tab='pipelines',project=${p.id()})}">조회·추가</a></td></tr>
+</tbody></table></div></section>
+<section class="card" th:if="${adminTicket != null}"><h2>프로젝트 추가</h2>
+<form th:action="@{/builds/create}" method="post" class="build-field-grid">
+<input type="hidden" name="ticket" th:value="${adminTicket}">
+<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255"><span class="small muted">생성 후 변경할 수 없습니다.</span></label>
+<label class="form-field">알림 주제 · 필수<select class="ui-control" name="topic" required><option value="">선택</option><option th:each="t : ${topics}" th:value="${t.id()}" th:text="${t.name()}"></option></select><span class="small muted">현재 리전·구획의 ACTIVE 주제</span></label>
+<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<div class="form-toolbar"><button class="ui-button" th:disabled="${topics.isEmpty()}">프로젝트 생성</button></div>
+</form><p class="notice" th:if="${topicError != null}" th:text="${topicError}"></p>
+<p class="small muted" th:if="${topics.isEmpty()}">선택 가능한 알림 주제가 없습니다. OCI 콘솔 → 개발자 서비스 → Notifications → 주제에서 생성하세요.</p>
+<p class="small muted">실행 전 프로젝트 로그 활성화와 빌드 리소스의 IAM 권한 설정이 필요합니다.</p></section>
+<details class="card"><summary>OCI에서 확인</summary>
+<p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → DevOps 프로젝트 생성</p>
+<pre class="code-block">oci devops project list --compartment-id &lt;구획 OCID&gt; --all
+oci devops project create --compartment-id &lt;구획 OCID&gt; --name &lt;이름&gt; --notification-config file://notification.json</pre>
+<p class="small muted">현재 프로파일·리전은 --profile, --region으로 지정합니다.</p>
+<pre class="code-block">notification.json: {"topicId":"알림 주제 OCID"}</pre>
+<p>로그 활성화: DevOps → 프로젝트 → 로그 → 로그 사용. 프로젝트 생성만으로 활성화되지는 않습니다.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/create_project.htm" target="_blank" rel="noopener noreferrer">OCI 프로젝트 문서</a>
+</details></main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>
