@@ -24,6 +24,33 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void topicTabSupportsEmptyEnvironmentCreationAndScopeProtection() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var page=mvc.perform(get("/builds").session(session).param("tab","topics")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("현재 리전·구획에 알림 주제가 없습니다.")))
+            .andExpect(content().string(containsString("알림 주제와 로그"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("adminTicket");
+        org.mockito.Mockito.when(administration.createTopic(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),
+            org.mockito.ArgumentMatchers.eq("build-topic"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq(ticket))).thenReturn("topic-created");
+        mvc.perform(post("/builds/create").session(session).param("ticket",ticket).param("name","build-topic")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","build-topic"))
+            .andExpect(redirectedUrl("/builds?tab=topics&topic=topic-created"));
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","build-topic")).andExpect(status().isBadRequest());
+        page=mvc.perform(get("/builds").session(session).param("tab","topics")).andReturn();
+        ticket=(String)page.getModelAndView().getModel().get("adminTicket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/create").session(session).with(csrf()).param("ticket",ticket).param("name","build-topic")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(administration,org.mockito.Mockito.times(1)).createTopic(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
+    @Test void topicReadFailureIsNotDisplayedAsEmptyList() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.topicDetails(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
+            .thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        mvc.perform(get("/builds").session(session).param("tab","topics")).andExpect(status().isOk())
+            .andExpect(content().string(containsString("목록을 조회하지 못했습니다.")))
+            .andExpect(content().string(not(containsString("현재 리전·구획에 알림 주제가 없습니다."))));
+    }
+
     @Test void projectAndPipelineTabsUseRealAdministrationPortAndScopedSingleUseCreation() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))

@@ -13,6 +13,23 @@ import static org.mockito.ArgumentMatchers.*;
 
 class OciBuildAdministrationTest {
     final Connection c=new Connection("DEFAULT","tenant","user","region","label",false);
+    @Test void topicCreationValidatesInputAndUsesScopeAndRetryToken() throws Exception {
+        var clients=mock(OciBuildHistory.class);
+        var client=mock(com.oracle.bmc.ons.NotificationControlPlaneClient.class);
+        var adapter=spy(new OciBuildAdministration(clients));
+        doReturn(client).when(adapter).notificationClient(c,"region");
+        when(client.createTopic(any())).thenReturn(com.oracle.bmc.ons.responses.CreateTopicResponse.builder()
+            .notificationTopic(com.oracle.bmc.ons.model.NotificationTopic.builder().topicId("topic").build()).build());
+        assertThrows(RuntimeException.class,()->adapter.createTopic(c,"region","comp","bad name","","token"));
+        verify(client,never()).createTopic(any());
+        assertEquals("topic",adapter.createTopic(c,"region","comp","build-topic","build events","token"));
+        var request=org.mockito.ArgumentCaptor.forClass(com.oracle.bmc.ons.requests.CreateTopicRequest.class);
+        verify(client).createTopic(request.capture());
+        assertEquals("comp",request.getValue().getCreateTopicDetails().getCompartmentId());
+        assertEquals("build-topic",request.getValue().getCreateTopicDetails().getName());
+        assertEquals("build events",request.getValue().getCreateTopicDetails().getDescription());
+        assertEquals("token",request.getValue().getOpcRetryToken());
+    }
     @Test void pipelineRequiresActiveProjectInSelectedCompartmentAndUsesRetryToken() throws Exception {
         var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);
         when(clients.client(c,"region")).thenReturn(client);

@@ -26,15 +26,32 @@ public class OciBuildAdministration implements BuildAdministration {
             result.sort(Comparator.comparing(Project::name));return result;
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
-    public List<Choice> topics(Connection c,String region,String compartment) {
-        try(var client=NotificationControlPlaneClient.builder().configuration(ClientConfiguration.builder()
-                .connectionTimeoutMillis(5000).readTimeoutMillis(30000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build())
-                .build(clients.authentication(c))) {
-            client.setRegion(region);var result=new ArrayList<Choice>();
+    NotificationControlPlaneClient notificationClient(Connection c,String region) throws java.io.IOException {
+        var client=NotificationControlPlaneClient.builder().configuration(ClientConfiguration.builder()
+            .connectionTimeoutMillis(5000).readTimeoutMillis(30000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build())
+            .build(clients.authentication(c));
+        client.setRegion(region);return client;
+    }
+    public List<Topic> topicDetails(Connection c,String region,String compartment) {
+        try(var client=notificationClient(c,region)) {
+            var result=new ArrayList<Topic>();
             for(var t:client.getPaginators().listTopicsRecordIterator(ListTopicsRequest.builder().compartmentId(compartment).build()))
-                if("ACTIVE".equalsIgnoreCase(t.getLifecycleState().getValue())) result.add(new Choice(t.getTopicId(),t.getName()));
-            result.sort(Comparator.comparing(Choice::name));return result;
+                result.add(new Topic(t.getTopicId(),t.getName(),Objects.toString(t.getDescription(),""),t.getLifecycleState().getValue()));
+            result.sort(Comparator.comparing(Topic::name));return result;
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
+    }
+    public List<Choice> topics(Connection c,String region,String compartment) {
+        return topicDetails(c,region,compartment).stream().filter(t->"ACTIVE".equalsIgnoreCase(t.state()))
+            .map(t->new Choice(t.id(),t.name())).toList();
+    }
+    public String createTopic(Connection c,String region,String compartment,String name,String description,String token) {
+        validate(name,description);
+        if(!name.matches("[A-Za-z0-9_-]{1,255}")) throw Errors.TOPIC_INPUT.exception();
+        try(var client=notificationClient(c,region)) {
+            return client.createTopic(com.oracle.bmc.ons.requests.CreateTopicRequest.builder().opcRetryToken(token)
+                .createTopicDetails(com.oracle.bmc.ons.model.CreateTopicDetails.builder().compartmentId(compartment)
+                    .name(name).description(description).build()).build()).getNotificationTopic().getTopicId();
+        } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
     }
     public String createProject(Connection c,String region,String compartment,String name,String description,String topic,String token) {
         validate(name,description);

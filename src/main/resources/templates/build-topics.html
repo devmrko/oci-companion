@@ -1,0 +1,36 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 알림 주제')}"></head><body>
+<header th:replace="~{layout :: header}"></header>
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
+<nav th:replace="~{build-projects :: tabs}"></nav>
+<section class="card"><h2>알림 주제와 로그</h2>
+<dl class="build-facts">
+<div><dt>알림 주제</dt><dd>프로젝트의 빌드·배포 상태 알림을 전달하는 채널입니다.</dd></div>
+<div><dt>구독</dt><dd>이메일·HTTPS 등 알림 수신 대상입니다. 주제에 등록해야 알림을 받을 수 있습니다.</dd></div>
+<div><dt>로그</dt><dd>빌드 명령·오류 등 실행 기록입니다. OCI Logging에서 별도로 활성화합니다.</dd></div>
+</dl>
+<p class="small muted">주제 생성 → 프로젝트에 연결 → 구독 등록. 이메일 구독은 수신자의 확인 후 활성화됩니다.</p>
+</section>
+<section class="card"><div class="section-title"><h2>알림 주제</h2><a class="ui-button" href="/builds?tab=topics">다시 조회</a></div>
+<p th:if="${topicsLoaded and topicItems.isEmpty()}">현재 리전·구획에 알림 주제가 없습니다. 아래에서 생성하세요.</p>
+<p th:if="${!topicsLoaded}">목록을 조회하지 못했습니다. 연결·범위·Notifications 조회 권한을 확인하세요.</p>
+<div class="table-scroll" th:if="${!topicItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명</th><th class="table-heading">연결</th></tr></thead><tbody>
+<tr th:each="t : ${topicItems}"><td class="table-cell"><strong th:text="${t.name()}"></strong><span class="field-badge" th:if="${t.id() == selectedTopic}">생성됨</span><details><summary>OCID</summary><code th:text="${t.id()}"></code></details></td>
+<td class="table-cell" th:text="${t.state()}"></td><td class="table-cell" th:text="${t.description()}"></td><td class="table-cell"><a th:if="${t.state() == 'ACTIVE'}" th:href="@{/builds(tab='projects',topic=${t.id()})}">이 주제로 프로젝트 생성</a></td></tr>
+</tbody></table></div></section>
+<section class="card" th:if="${adminTicket != null}"><h2>알림 주제 생성</h2>
+<form th:action="@{/builds/create}" method="post" class="build-field-grid">
+<input type="hidden" name="ticket" th:value="${adminTicket}">
+<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255" pattern="[A-Za-z0-9_\-]+" placeholder="build-notifications"><span class="small muted">영문·숫자·하이픈·밑줄. 테넌시에서 중복되지 않는 이름.</span></label>
+<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<div class="form-toolbar"><button class="ui-button">알림 주제 생성</button></div>
+</form><p class="small muted">상단에서 선택한 리전·구획에 생성합니다. 구독은 자동 생성하지 않습니다.</p></section>
+<details class="card"><summary>OCI에서 확인</summary>
+<p>주제 생성: 콘솔 → 개발자 서비스 → Application Integration → Notifications → 주제 → 주제 생성</p>
+<pre class="code-block" th:text="${topicListCli}"></pre><pre class="code-block" th:text="${topicCreateCli}"></pre>
+<p>구독 등록: 주제 선택 → 구독 → 구독 생성 → 프로토콜·수신 대상 입력</p>
+<p class="small muted">현재 앱에서는 구독을 등록하지 않습니다. 이메일은 확인 메일의 링크를 눌러야 수신됩니다.</p>
+<p>로그 활성화: DevOps → 프로젝트 → 로그 → 로그 사용</p>
+<p class="small muted">사용자에게 주제 조회·생성 권한이 필요합니다. DevOps 리소스의 주제 사용 권한은 별도 IAM 정책으로 설정합니다.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/Notification/Tasks/create-topic.htm" target="_blank" rel="noopener noreferrer">주제 생성 문서</a>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_logs.htm" target="_blank" rel="noopener noreferrer">DevOps 로그 문서</a>
+</details></main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

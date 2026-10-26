@@ -8,8 +8,18 @@ const {chromium}=require('../.tools/browser/node_modules/playwright');
   await page.goto('http://127.0.0.1:8091/login');
   await page.locator('[name=profile]').selectOption(process.env.COMPANION_TEST_PROFILE);
   await page.getByRole('button',{name:'연결',exact:true}).click();await page.waitForLoadState('load');
+  await page.goto('http://127.0.0.1:8091/builds?tab=topics');await page.waitForLoadState('load');
+  await page.getByRole('heading',{name:'알림 주제와 로그',exact:true}).waitFor();
+  const topicRow=page.locator('tbody tr').filter({hasText:'db-companion-build'});
+  await topicRow.waitFor();
+  for(const width of [1440,390,320]){
+    await page.setViewportSize({width,height:1000});
+    if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Topic overflow '+width);
+  }
+  await topicRow.getByRole('link',{name:'이 주제로 프로젝트 생성'}).click();await page.waitForLoadState('load');
+  if(!(await page.locator('[name=topic] option:checked').innerText()).includes('db-companion-build'))throw Error('Topic selection not retained');
   await page.goto('http://127.0.0.1:8091/builds?tab=projects');await page.waitForLoadState('load');
-  if(await page.locator('.build-tab').count()!==4)throw Error('Missing tabs');
+  if(await page.locator('.build-tab').count()!==5)throw Error('Missing tabs');
   const row=page.locator('tbody tr').filter({hasText:'db-companion'});
   await row.waitFor();
   if(await page.locator('[name=topic] option').count()<2)throw Error('No real notification topics');

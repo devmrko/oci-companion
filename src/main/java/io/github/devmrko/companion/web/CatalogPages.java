@@ -147,14 +147,25 @@ public class CatalogPages {
     }
     @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
         @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,
-        @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project) {
+        @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project,
+        @RequestParam(defaultValue="") String topic) {
         var c=SecurityConfig.connection(auth);
         if(tab.isEmpty()) tab=run.isEmpty()?"execute":"history";
-        if(!Set.of("projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        if(!Set.of("topics","projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        model.addAttribute("topicItems",List.of());model.addAttribute("selectedTopic",topic);model.addAttribute("topicsLoaded",false);
         model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
+            if(tab.equals("topics")) {
+                model.addAttribute("adminTicket",adminTicket(session,s,tab));
+                String args=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment());
+                model.addAttribute("topicListCli","oci ons topic list"+args+" --all");
+                model.addAttribute("topicCreateCli","oci ons topic create"+args+" --name '<주제 이름>'");
+                model.addAttribute("topicItems",administration.topicDetails(c,s.region(),s.compartment()));
+                model.addAttribute("topicsLoaded",true);
+                return "build-topics";
+            }
             if(tab.equals("projects") || tab.equals("pipelines")) {
                 model.addAttribute("projectItems",administration.projects(c,s.region(),s.compartment()));
                 model.addAttribute("adminTicket",adminTicket(session,s,tab));
@@ -221,7 +232,7 @@ public class CatalogPages {
                 }
             }
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
-        return tab.equals("projects")?"build-projects":"builds";
+        return tab.equals("topics")?"build-topics":tab.equals("projects")?"build-projects":"builds";
     }
 
     record AdminTicket(String region,String compartment,String tab) {}
@@ -249,7 +260,11 @@ public class CatalogPages {
         if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
         String destination="/builds?tab="+t.tab();
         try {
-            if(t.tab().equals("projects")) {
+            if(t.tab().equals("topics")) {
+                String id=administration.createTopic(c,t.region(),t.compartment(),name,description,ticket);
+                flash.addFlashAttribute("message","알림 주제 생성 완료 · 알림을 받으려면 구독을 등록하세요.");
+                destination="/builds?tab=topics&topic="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
+            } else if(t.tab().equals("projects")) {
                 String id=administration.createProject(c,t.region(),t.compartment(),name,description,topic,ticket);
                 flash.addFlashAttribute("message","프로젝트 생성 완료 · 실행 전 프로젝트 로그를 활성화하세요.");
                 destination="/builds?tab=projects&project="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
