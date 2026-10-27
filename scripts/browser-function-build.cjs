@@ -1,5 +1,6 @@
 const {chromium}=require('../.tools/browser/node_modules/playwright');
 const fs=require('fs');
+async function until(check,timeout=240000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await new Promise(r=>setTimeout(r,500));}throw Error('Condition timeout');}
 (async()=>{
  if(process.env.COMPANION_TEST_PROFILE!=='DEFAULT')throw Error('Explicit DEFAULT profile required');
  const browser=await chromium.launch({headless:true});
@@ -31,10 +32,23 @@ const fs=require('fs');
    if(!(await page.locator('main').innerText()).includes('빌드 접수'))throw Error(await page.locator('main').innerText());
    fs.writeFileSync('.tools/function-template-run.json',JSON.stringify({id:new URL(page.url()).searchParams.get('run'),function:target.id,application:app.id,url:page.url()},null,2));
    console.log('PASS GUI detached build accepted');
+   await page.locator('#function-run-status').filter({hasText:'RUNNING'}).waitFor();
+   await until(async()=>(await page.locator('#function-live-log').innerText()).includes('$ git'));
+   const initial=await page.locator('#function-live-log').innerText();
+   await until(async()=>(await page.locator('#function-live-log').innerText()).length>initial.length);
+   console.log('PASS actual running log grows without page reload');
+   await until(async()=>['SUCCEEDED','FAILED'].includes(await page.locator('#function-run-status').innerText()));
+   if(await page.locator('#function-run-status').innerText()!=='SUCCEEDED')throw Error(await page.locator('#function-live-log').innerText());
+   if(!(await page.locator('#function-log-notice').innerText()).includes('자동 갱신 중지'))throw Error('Polling not stopped');
+   let extra=0;page.on('request',r=>{if(r.url().includes('/functions/progress?'))extra++;});
+   await page.waitForTimeout(6500);if(extra)throw Error('Polling continued after completion');
+   await page.screenshot({path:'.tools/function-live-log.png',fullPage:true});
+   console.log('PASS actual build succeeded and automatic polling stopped');
   }
   if(process.env.COMPANION_TEST_FUNCTION_RESULT==='1') {
    const saved=JSON.parse(fs.readFileSync('.tools/function-template-run.json','utf8'));
    await page.goto(saved.url);
+   await until(async()=>(await page.locator('#function-live-log').innerText()).includes('BUILD SUCCESS'));
    const main=await page.locator('main').innerText();
    if(!main.includes('SUCCEEDED') || !main.includes('BUILD SUCCESS') || !main.includes('db-manage-companion-0.1.0-alpha.17.jar'))throw Error('Missing actual result, log or artifact');
    for(const view of ['history','execute']) {
@@ -44,7 +58,12 @@ const fs=require('fs');
      if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error(view+' overflow '+width);
     }
    }
-   console.log('PASS actual successful build history/log/artifact, execute/history six viewport sizes');
+   await page.goto(saved.url);
+   await until(async()=>(await page.locator('#function-log-notice').innerText()).includes('빌드 종료'));
+   let extra=0;page.on('request',r=>{if(r.url().includes('/functions/progress?'))extra++;});
+   await page.waitForTimeout(6500);if(extra)throw Error('Polling continued after completion');
+   await page.screenshot({path:'.tools/function-live-log.png',fullPage:true});
+   console.log('PASS actual successful build history/log/artifact, execute/history six viewport sizes, completion stops polling');
   }
   if(errors.length)throw Error(errors.join('\n'));
  }finally{await browser.close();}

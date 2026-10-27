@@ -3,21 +3,21 @@
 <h1>빌드</h1><nav th:replace="~{build-projects :: tabs}"></nav>
 <nav class="build-flow" aria-label="Functions 빌드 흐름">
 <a class="build-flow-step" th:classappend="${tab == 'environments'} ? 'is-current'" href="/builds/functions"><span class="build-flow-number">1</span>실행 환경</a><span class="build-flow-arrow" aria-hidden="true">→</span>
-<a class="build-flow-step" th:classappend="${tab == 'execute'} ? 'is-current'" th:href="@{/builds/functions(view='execute',application=${application},function=${function})}"><span class="build-flow-number">2</span>소스·설정·실행</a><span class="build-flow-arrow" aria-hidden="true">→</span>
-<a class="build-flow-step" th:classappend="${tab == 'history'} ? 'is-current'" th:href="@{/builds/functions(view='history',application=${application},function=${function})}"><span class="build-flow-number">3</span>결과</a>
+<a class="build-flow-step" th:classappend="${tab == 'execute'} ? 'is-current'" th:href="@{/builds/functions(view='execute',application=${functionApplication},function=${function})}"><span class="build-flow-number">2</span>소스·설정·실행</a><span class="build-flow-arrow" aria-hidden="true">→</span>
+<a class="build-flow-step" th:classappend="${tab == 'history'} ? 'is-current'" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function})}"><span class="build-flow-number">3</span>결과</a>
 </nav>
-<section class="card"><div class="section-title"><h2>Functions</h2><div class="form-toolbar"><a class="ui-button" href="/builds/functions">기존 선택</a><a class="ui-button" th:href="@{/builds/functions(view='new',application=${application})}">새로 구성</a><a class="ui-button" href="/builds?tab=execute">OCI DevOps</a></div></div>
+<section class="card"><div class="section-title"><h2>Functions</h2><div class="form-toolbar"><a class="ui-button" href="/builds/functions">기존 선택</a><a class="ui-button" th:href="@{/builds/functions(view='new',application=${functionApplication})}">새로 구성</a><a class="ui-button" href="/builds?tab=execute">OCI DevOps</a></div></div>
 <form method="get" action="/builds/functions" class="form-toolbar"><input type="hidden" name="view" th:value="${view == 'new' ? 'environments' : view}">
-<label class="form-field">애플리케이션<select class="ui-control" name="application"><option value="">선택</option><option th:each="a : ${applications}" th:value="${a.id()}" th:text="|${a.name()} · ${a.shape()}|" th:selected="${a.id() == application}"></option></select></label><button class="ui-button">조회</button></form>
+<label class="form-field">애플리케이션<select class="ui-control" name="application"><option value="">선택</option><option th:each="a : ${applications}" th:value="${a.id()}" th:text="|${a.name()} · ${a.shape()}|" th:selected="${a.id() == functionApplication}"></option></select></label><button class="ui-button">조회</button></form>
 <p th:if="${loaded and applications.isEmpty()}">선택한 리전·구획에 Functions 애플리케이션이 없습니다. 새로 구성에서 시작하세요.</p>
 <p class="small muted">Functions 애플리케이션은 Function과 네트워크를 묶습니다. DevOps 프로젝트는 필요하지 않습니다.</p>
 <div class="table-scroll" th:if="${!builders.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">Function</th><th class="table-heading">상태</th><th class="table-heading">메모리·제한 시간</th><th class="table-heading">빌더 규격</th><th class="table-heading">작업</th></tr></thead><tbody>
-<tr th:each="b : ${builders}"><td class="table-cell" th:text="${b.name()}"></td><td class="table-cell" th:text="${b.state()}"></td><td class="table-cell" th:text="|${b.memory()} MiB · ${b.timeout()}초|"></td><td class="table-cell" th:text="${b.compatible() ? b.contract() : '연결 규격 미설정'}"></td><td class="table-cell"><a th:href="@{/builds/functions(application=${application},function=${b.id()})}">상세</a> <a th:if="${b.compatible() and b.state() == 'ACTIVE'}" th:href="@{/builds/functions(view='execute',application=${application},function=${b.id()})}">빌드 실행</a></td></tr>
+<tr th:each="b : ${builders}"><td class="table-cell" th:text="${b.name()}"></td><td class="table-cell" th:text="${b.state()}"></td><td class="table-cell" th:text="|${b.memory()} MiB · ${b.timeout()}초|"></td><td class="table-cell" th:text="${b.compatible() ? b.contract() : '연결 규격 미설정'}"></td><td class="table-cell"><a th:href="@{/builds/functions(application=${functionApplication},function=${b.id()})}">상세</a> <a th:if="${b.compatible() and b.state() == 'ACTIVE'}" th:href="@{/builds/functions(view='execute',application=${functionApplication},function=${b.id()})}">빌드 실행</a></td></tr>
 </tbody></table></div><p th:if="${buildersLoaded and builders.isEmpty()}">등록된 Function이 없습니다.</p>
 </section>
 <section class="card" th:if="${builder != null}"><h2 th:text="${builder.name()}"></h2><dl class="build-facts"><dt>이미지</dt><dd><code th:text="${builder.image()}"></code></dd><dt>결과 버킷</dt><dd th:text="${builder.bucket().isEmpty() ? '미설정' : builder.bucket()}"></dd><dt>결과 경로</dt><dd th:text="${builder.prefix()}"></dd></dl>
 <p th:unless="${builder.compatible()}">빌더 규격이 확인되지 않습니다. 템플릿의 실행 코드를 배포한 뒤 다시 조회하세요. 설정 이름만 추가해도 빌드 기능이 생기지는 않습니다.</p>
-<div class="form-toolbar" th:if="${builder.compatible()}"><a class="ui-button" th:href="@{/builds/functions(view='execute',application=${application},function=${function})}">빌드 실행</a><a class="ui-button" th:href="@{/builds/functions(view='history',application=${application},function=${function})}">실행 이력</a></div></section>
+<div class="form-toolbar" th:if="${builder.compatible()}"><a class="ui-button" th:href="@{/builds/functions(view='execute',application=${functionApplication},function=${function})}">빌드 실행</a><a class="ui-button" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function})}">실행 이력</a></div></section>
 <section class="card" th:if="${view == 'new'}"><h2>Fn Project 템플릿</h2>
 <p class="notice" th:if="${storageError != null}" th:text="${storageError}"></p><datalist id="function-buckets" th:if="${storageOptions != null}"><option th:each="b : ${storageOptions.buckets()}" th:value="${b}"></option></datalist>
 <p class="notice" th:if="${registryError != null}" th:text="${registryError}"></p><datalist id="function-registry-prefixes" th:if="${registryPrefixes != null}"><option th:each="p : ${registryPrefixes}" th:value="${p}"></option></datalist>
@@ -45,13 +45,21 @@
 <label class="form-field">산출물 경로 · 선택<input class="ui-control" name="artifact" placeholder="target/*.jar" maxlength="250"><span class="small muted">테스트만 실행하면 비워두세요.</span></label>
 <div class="form-toolbar"><button class="ui-button primary" th:disabled="${builder.state() != 'ACTIVE'}">빌드 실행</button></div></form>
 <p class="small muted">결과는 선택한 Function의 버킷에 저장됩니다. 접수 후 실행 이력에서 확인하세요.</p></section>
-<section class="card" th:if="${tab == 'history' and builder != null and builder.compatible()}"><div class="section-title"><h2>실행 이력</h2><a class="ui-button" th:href="@{/builds/functions(view='history',application=${application},function=${function},run=${selectedRun},cursor=${cursor})}">새로 고침</a></div>
+<section class="card" id="function-progress" th:if="${tab == 'history' and builder != null and builder.compatible() and !selectedRun.isEmpty()}" th:attr="data-url=@{/builds/functions/progress(region=${selection.region()},compartment=${selection.compartment()},application=${functionApplication},function=${function},run=${selectedRun})}">
+<div class="section-title"><h2>빌드 로그</h2><button type="button" class="ui-button" id="function-log-refresh">다시 조회</button></div>
+<p><strong id="function-run-status" role="status">조회 중</strong> · <span th:text="${selectedRun}"></span></p>
+<p class="small muted" id="function-log-notice">5초마다 갱신 · 빌드 종료 시 자동 중지</p>
+<label><input type="checkbox" id="function-log-follow" checked> 마지막 로그 따라가기</label>
+<pre class="code-block function-live-log" id="function-live-log" tabindex="0" aria-label="빌드 진행 로그">로그를 불러오는 중입니다.</pre>
+<details><summary>실행 결과·산출물</summary><pre class="code-block" id="function-live-result"></pre></details>
+</section>
+<section class="card" th:if="${tab == 'history' and builder != null and builder.compatible()}"><div class="section-title"><h2>실행 이력</h2><a class="ui-button" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function},run=${selectedRun},cursor=${cursor})}">새로 고침</a></div>
 <p th:if="${historyLoaded and functionRuns.isEmpty()}">기록 없음 · 접수 직후이거나 결과 저장 권한을 확인해야 할 수 있습니다.</p>
 <p class="small muted">페이지당 결과 경로의 객체 200개를 조회합니다. RUNNING이 오래 유지되면 OCI 호출 로그에서 강제 종료·시간 초과를 확인하세요.</p>
-<div th:each="r : ${functionRuns}"><p class="small muted" th:text="${r.createdAt()}"></p><h3><span th:text="${r.status()}"></span> · <a th:href="@{/builds/functions(view='history',application=${application},function=${function},run=${r.id()},cursor=${cursor})}" th:text="${r.id()}"></a></h3><details><summary>결과·산출물 경로</summary><pre class="code-block" th:text="${r.result()}"></pre></details></div>
-<a class="ui-button" th:if="${functionNext != null and !functionNext.isEmpty()}" th:href="@{/builds/functions(view='history',application=${application},function=${function},cursor=${functionNext})}">다음 페이지</a>
-<details th:if="${functionLog != null}" open><summary>빌드 로그</summary><pre class="code-block" th:text="${functionLog}"></pre></details></section>
+<div th:each="r : ${functionRuns}"><p class="small muted" th:text="${r.createdAt()}"></p><h3><span th:text="${r.status()}"></span> · <a th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function},run=${r.id()},cursor=${cursor})}" th:text="${r.id()}"></a></h3><details><summary>결과·산출물 경로</summary><pre class="code-block" th:text="${r.result()}"></pre></details></div>
+<a class="ui-button" th:if="${functionNext != null and !functionNext.isEmpty()}" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function},cursor=${functionNext})}">다음 페이지</a>
+</section>
 <details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → Functions → 애플리케이션 → Functions / 로그</p><pre class="code-block">oci fn application list --profile '&lt;프로파일&gt;' --region '&lt;리전&gt;' --compartment-id '&lt;구획 OCID&gt;' --all
 oci fn function list --application-id '&lt;애플리케이션 OCID&gt;' --all
 oci fn function invoke --function-id '&lt;Function OCID&gt;' --fn-invoke-type detached --body file://request.json --file response.json</pre><p>HTTP202는 접수입니다. 결과 JSON의 SUCCEEDED와 산출물을 확인하세요.</p><a href="https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionscreatingfunctions.htm" target="_blank" rel="noopener noreferrer">Functions 구성 문서</a></details>
-<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}"></footer></body></html>
+<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}"></footer><script src="/function-progress.js" defer></script></body></html>

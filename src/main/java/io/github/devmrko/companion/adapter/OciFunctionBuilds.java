@@ -57,7 +57,7 @@ public class OciFunctionBuilds implements FunctionBuilds {
             for(var a:client.getPaginators().listApplicationsRecordIterator(ListApplicationsRequest.builder().compartmentId(compartment).build()))
                 result.add(new Application(a.getId(),a.getDisplayName(),a.getLifecycleState().getValue(),String.valueOf(a.getShape())));
             result.sort(Comparator.comparing(Application::name));return result;
-        } catch(Exception e) { throw Errors.CLOUD.exception(); }
+        } catch(Exception e) {throw Errors.CLOUD.exception(); }
     }
     private Builder read(FunctionsManagementClient client,String compartment,String app,String id) {
         var a=application(client,compartment,app);
@@ -73,11 +73,11 @@ public class OciFunctionBuilds implements FunctionBuilds {
             application(client,compartment,app);var result=new ArrayList<Builder>();
             for(var f:client.getPaginators().listFunctionsRecordIterator(ListFunctionsRequest.builder().applicationId(app).build()))result.add(read(client,compartment,app,f.getId()));
             result.sort(Comparator.comparing(Builder::name));return result;
-        } catch(Exception e) { throw Errors.CLOUD.exception(); }
+        } catch(Exception e) {throw Errors.CLOUD.exception(); }
     }
     public Builder read(Connection c,String region,String compartment,String app,String id) {
         try(var client=client(c,region)) { return read(client,compartment,app,id); }
-        catch(Exception e) { throw Errors.CLOUD.exception(); }
+        catch(Exception e) {throw Errors.CLOUD.exception(); }
     }
     public void invoke(Connection c,String region,String compartment,String app,String id,String etag,String payload) {
         try(var management=client(c,region)) {
@@ -118,14 +118,26 @@ public class OciFunctionBuilds implements FunctionBuilds {
                 }
             }
             result.sort(Comparator.comparing(Run::createdAt).reversed());return new Runs(result,Objects.toString(list.getNextStartWith(),""));
-        } catch(Exception e) { throw Errors.CLOUD.exception(); }
+        } catch(Exception e) {throw Errors.CLOUD.exception(); }
+    }
+    public Run run(Connection c,String r,String comp,String app,String f,String run) {
+        if(!run.matches("[0-9a-f-]{36}"))throw Errors.INVALID.exception();var b=ready(c,r,comp,app,f);
+        try(var storage=storage(c,r)) {
+            var response=storage.getObject(GetObjectRequest.builder().namespaceName(b.namespace()).bucketName(b.bucket()).objectName(b.prefix()+"/"+run+"/result.json").build());
+            try(var in=response.getInputStream()) {
+                var text=new String(in.readNBytes(65536),StandardCharsets.UTF_8);
+                return new Run(run,mapper.readTree(text).path("status").asString("UNKNOWN"),text,"");
+            }
+        } catch(com.oracle.bmc.model.BmcException e) {
+            if(e.getStatusCode()==404)return new Run(run,"WAITING","","");throw Errors.CLOUD.exception();
+        } catch(Exception e) {throw Errors.CLOUD.exception();}
     }
     public String log(Connection c,String r,String comp,String app,String f,String run) {
         if(!run.matches("[0-9a-f-]{36}"))throw Errors.INVALID.exception();var b=ready(c,r,comp,app,f);
         try(var storage=storage(c,r)) {
             var response=storage.getObject(GetObjectRequest.builder().namespaceName(b.namespace()).bucketName(b.bucket()).objectName(b.prefix()+"/"+run+"/build.log").build());
-            try(var in=response.getInputStream()) { var bytes=in.readNBytes(200001);return new String(bytes,0,Math.min(bytes.length,200000),StandardCharsets.UTF_8)+(bytes.length>200000?"\n[200KB까지 표시 · 전체 로그는 Object Storage에서 확인]":""); }
+            try(var in=response.getInputStream()) { long skip=Math.max(0,response.getContentLength()-200000L);if(skip>0)in.skipNBytes(skip);var bytes=in.readNBytes(200000);return (skip>0?"[최근 200KB 표시 · 전체 로그는 Object Storage에서 확인]\n":"")+new String(bytes,StandardCharsets.UTF_8); }
         } catch(com.oracle.bmc.model.BmcException e) { if(e.getStatusCode()==404)return "로그 기록 대기 · 계속 없으면 Function 호출 로그와 버킷 권한을 확인하세요.";throw Errors.CLOUD.exception(); }
-        catch(Exception e) { throw Errors.CLOUD.exception(); }
+        catch(Exception e) {throw Errors.CLOUD.exception(); }
     }
 }

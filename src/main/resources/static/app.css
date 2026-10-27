@@ -900,3 +900,5 @@ a:focus-visible, .ui-button:focus-visible {
 .build-flow-arrow { color:#647078; }
 .build-purpose { max-width:420px; margin-bottom:18px; }
 [data-flow-step] { scroll-margin-top:90px; }
+
+.function-live-log { height: 28rem; max-height: 60vh; overflow: auto; }

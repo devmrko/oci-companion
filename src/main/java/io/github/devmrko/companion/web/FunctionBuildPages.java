@@ -36,7 +36,7 @@ public class FunctionBuildPages {
         var c=SecurityConfig.connection(auth);var session=request.getSession();
         catalog.navigation(auth,request,model);model.addAttribute("connection",c);model.addAttribute("scopeBack","/builds/functions");
         model.addAttribute("tab",view.equals("new")?"environments":view);model.addAttribute("view",view);model.addAttribute("functionMode",true);
-        model.addAttribute("project","");model.addAttribute("pipeline","");model.addAttribute("application",application);model.addAttribute("function",function);
+        model.addAttribute("project","");model.addAttribute("pipeline","");model.addAttribute("functionApplication",application);model.addAttribute("function",function);
         model.addAttribute("applications",List.of());model.addAttribute("builders",List.of());model.addAttribute("functionRuns",List.of());model.addAttribute("loaded",false);model.addAttribute("buildersLoaded",false);model.addAttribute("historyLoaded",false);model.addAttribute("selectedRun",run);
         try {
             var s=catalog.selection(c,session);model.addAttribute("selection",s);model.addAttribute("permissionRules",PermissionHelp.rules("functions",s.compartment()));
@@ -62,12 +62,20 @@ public class FunctionBuildPages {
                     }
                     if(builder.compatible() && view.equals("history")) {
                         var results=builds.runs(c,s.region(),s.compartment(),application,function,cursor);var runs=results.items();model.addAttribute("functionRuns",runs);model.addAttribute("functionNext",results.next());model.addAttribute("cursor",cursor);model.addAttribute("historyLoaded",true);
-                        if(!run.isEmpty() && runs.stream().anyMatch(r->r.id().equals(run)))model.addAttribute("functionLog",builds.log(c,s.region(),s.compartment(),application,function,run));
+
                     }
                 }
             }
         }catch(BusinessException | IllegalStateException e){model.addAttribute("message",e.getMessage());}
         return "build-functions";
+    }
+    @GetMapping("/builds/functions/progress") @ResponseBody ResponseEntity<Map<String,String>> progress(Authentication auth,HttpSession session,
+        @RequestParam String region,@RequestParam String compartment,@RequestParam String application,@RequestParam String function,@RequestParam String run) {
+        var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);
+        if(session.getAttribute("scopeInvalid")!=null || !region.equals(s.region()) || !compartment.equals(s.compartment()))throw Errors.SCOPE.exception();
+        var result=builds.run(c,region,compartment,application,function,run);
+        var log=builds.log(c,region,compartment,application,function,run);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("status",result.status(),"result",result.result(),"log",log));
     }
     @PostMapping("/builds/functions/template") ResponseEntity<byte[]> template(Authentication auth,HttpSession session,
         @RequestParam String name,@RequestParam String application,@RequestParam String architecture,@RequestParam String namespace,
@@ -86,6 +94,6 @@ public class FunctionBuildPages {
         var payload=FunctionTemplate.request(t.run(),source,commit,goal,profiles,directory,artifact);
         try {builds.invoke(c,t.region(),t.compartment(),t.application(),t.function(),t.etag(),payload);flash.addFlashAttribute("message","빌드 접수 · "+t.run()+" · 결과가 기록되면 조회됩니다.");}
         catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage()+" 실행 ID: "+t.run());}
-        return "redirect:/builds/functions?view=history&application="+t.application()+"&function="+t.function()+"&run="+t.run();
+        return "redirect:/builds/functions?view=history&application="+t.application()+"&function="+t.function()+"&run="+t.run()+"#function-progress";
     }
 }
