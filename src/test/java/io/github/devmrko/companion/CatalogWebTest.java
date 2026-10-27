@@ -28,6 +28,21 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void taskWizardPersistsActualSettingsAndLoadsThemIntoExecution() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds").session(session)).andExpect(redirectedUrl("/builds/tasks"));
+        var page=mvc.perform(get("/builds/tasks").session(session).param("view","new")).andExpect(status().isOk()).andExpect(content().string(containsString("현재 선택"))).andExpect(content().string(containsString("커밋 SHA 도움말"))).andReturn();
+        var scope=(io.github.devmrko.companion.web.CatalogPages.Selection)page.getModelAndView().getModel().get("selection");
+        var b=new io.github.devmrko.companion.port.FunctionBuilds.Builder("fn-task","maven","ACTIVE","image",3072,3600,"maven-v1","ns","bucket","prefix","etag");
+        org.mockito.Mockito.when(functions.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("app-task"),org.mockito.ArgumentMatchers.eq("fn-task"))).thenReturn(b);
+        mvc.perform(post("/builds/tasks/save").session(session).with(csrf()).param("region",scope.region()).param("compartment",scope.compartment()).param("name","작업 검증").param("runner","FUNCTIONS").param("application","app-task").param("function","fn-task").param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","verify").param("profiles","quality").param("artifact","target/*.jar")).andExpect(redirectedUrl("/builds/tasks"));
+        var model=mvc.perform(get("/builds/tasks").session(session)).andExpect(content().string(containsString("작업 검증"))).andReturn().getModelAndView().getModel();
+        @SuppressWarnings("unchecked") var saved=(java.util.List<io.github.devmrko.companion.port.BuildTaskStore.Task>)model.get("tasks");var task=saved.stream().filter(t->t.name().equals("작업 검증")).findFirst().orElseThrow();
+        org.mockito.Mockito.when(functions.applications(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.FunctionBuilds.Application("app-task","app","ACTIVE","GENERIC_ARM")));
+        org.mockito.Mockito.when(functions.builders(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("app-task"))).thenReturn(java.util.List.of(b));
+        mvc.perform(get("/builds/functions").session(session).param("view","execute").param("application","app-task").param("function","fn-task").param("task",task.id())).andExpect(status().isOk()).andExpect(content().string(containsString("value=\"quality\""))).andExpect(content().string(containsString("value=\"https://github.com/a/b\"")));
+        org.mockito.Mockito.verify(functions,org.mockito.Mockito.never()).invoke(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
     @Test void functionBuilderSelectionTemplateAndSingleUseExecutionAreScoped() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var builder=new io.github.devmrko.companion.port.FunctionBuilds.Builder("function-1","maven","ACTIVE","image",3072,3600,"maven-v1","ns","bucket","maven-1","etag-1");
@@ -195,7 +210,7 @@ class CatalogWebTest {
         context.getBean(io.github.devmrko.companion.port.SelectionStore.class).write(cloud.connect("DEMO"),"unsubscribed","missing");
         mvc.perform(post("/disconnect").session(session).with(csrf()));
         session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
-        mvc.perform(get("/builds").session(session)).andExpect(content().string(containsString("저장한 리전·구획에 접근할 수 없습니다")));
+        mvc.perform(get("/builds/tasks").session(session)).andExpect(content().string(containsString("저장한 리전·구획에 접근할 수 없습니다")));
         org.mockito.Mockito.verifyNoInteractions(builds);
     }
     @org.springframework.test.context.bean.override.mockito.MockitoBean

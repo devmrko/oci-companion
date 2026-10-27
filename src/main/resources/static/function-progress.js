@@ -20,6 +20,7 @@
       status.textContent = data.status;
       log.textContent = data.log;
       result.textContent = data.result;
+      if(data.result){try{document.dispatchEvent(new CustomEvent('function-build-progress',{detail:{...JSON.parse(data.result),profiles:data.profiles}}));}catch{ /* Keep displaying the raw result when parsing fails. */ }}
       if (follow.checked) log.scrollTop = log.scrollHeight;
       const done = ['SUCCEEDED', 'FAILED', 'CANCELED', 'CANCELLED', 'TIMED_OUT'].includes(data.status);
       polls++;
