@@ -8,7 +8,15 @@ public final class PermissionHelp {
         String prefix="Allow group id <GROUP_OCID> to ";
         var result=new ArrayList<Rule>();
         java.util.function.BiConsumer<String,String> add=(task,permission)->result.add(new Rule(task,prefix+permission+" "+scope));
-        if(menu.equals("registry")) {
+        if(menu.equals("functions")) {
+            add.accept("Functions 목록·설정 조회","read functions-family");
+            add.accept("Function 호출","use fn-invocation");
+            add.accept("결과·로그 객체 조회","read objects");
+            add.accept("결과 버킷 목록 조회","read buckets");
+            add.accept("Functions 구성 담당자","manage functions-family");
+            add.accept("서브넷 사용","use virtual-network-family");
+            add.accept("빌더 이미지 업로드","manage repos");
+        } else if(menu.equals("registry")) {
             add.accept("파일 저장소 조회","read artifact-repositories");
             add.accept("파일 목록 조회","read generic-artifacts");
             add.accept("파일 저장소 생성","manage artifact-repositories");

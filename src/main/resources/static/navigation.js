@@ -23,7 +23,7 @@ document.addEventListener('keydown', event => {
   }
 });
 sidebar?.querySelectorAll('a[data-nav-path]').forEach(link => {
-  if (link.dataset.navPath === window.location.pathname) {
+  if (link.dataset.navPath === window.location.pathname || (link.dataset.navPath === '/builds' && window.location.pathname.startsWith('/builds/'))) {
     link.classList.add('is-active');
     link.setAttribute('aria-current', 'page');
   }

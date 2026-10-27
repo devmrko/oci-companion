@@ -11,7 +11,7 @@
 <p class="small muted">정책 생성 권한이 없으면 관리자에게 작업명·프로파일 사용자 OCID·리전·구획·아래 정책 예제를 전달하세요. 앱은 정책을 변경하지 않습니다.</p>
 <div th:each="rule : ${permissionRules}"><h3 th:text="${rule.task()}"></h3><pre class="code-block" th:text="${rule.policy()}"></pre></div>
 <p class="small muted">manage 예제는 해당 리소스의 수정·삭제도 허용할 수 있습니다. 필요한 작업만 부여하세요. 다른 구획의 리소스를 사용하면 해당 구획에도 별도 권한이 필요합니다. 루트 구획 선택 시 &lt;COMPARTMENT_OCID&gt;를 작업 대상 구획으로 바꾸세요.</p>
-<details><summary>파이프라인 실행 권한</summary>
+<details th:unless="${functionMode == true}"><summary>파이프라인 실행 권한</summary>
 <p>사용자 권한과 별개입니다. ID 및 보안 → 동적 그룹에서 실행 파이프라인을 포함하는 규칙을 만든 뒤 정책을 추가합니다.</p>
 <pre class="code-block" th:if="${pipelineRule != null}" th:text="${pipelineRule}"></pre>
 <pre class="code-block" th:unless="${pipelineRule != null}">ALL {resource.type = 'devopsbuildpipeline', resource.id = '&lt;BUILD_PIPELINE_OCID&gt;'}</pre>

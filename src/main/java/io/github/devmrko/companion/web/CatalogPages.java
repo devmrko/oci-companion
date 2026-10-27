@@ -69,7 +69,7 @@ public class CatalogPages {
     public record Report(String error,long elapsedMs) {}
     public record ScopeResult(Choice compartment,String updatedAt,String error,Long elapsedMs) {}
     @SuppressWarnings("unchecked")
-    private Selection selection(Connection c,HttpSession session) {
+    Selection selection(Connection c,HttpSession session) {
         var regions=(List<Choice>)session.getAttribute("regions");
         var compartments=(List<Choice>)session.getAttribute("compartments");
         if (regions==null || compartments==null) {
@@ -144,7 +144,7 @@ public class CatalogPages {
         var s=selection(SecurityConfig.connection(auth),session);
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
-        String destination=Set.of("/sources","/builds","/guides","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
+        String destination=Set.of("/sources","/builds","/guides","/builds/functions","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
         try { selections.write(SecurityConfig.connection(auth),region,compartment); }
         catch(IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage());return "redirect:"+destination; }
         if(!s.region().equals(region) || !s.compartment().equals(compartment)) session.removeAttribute("scopeReports");

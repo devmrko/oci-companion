@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.FunctionBuilds functions;
     static final Path DIRECTORY;
     static { try { DIRECTORY=Files.createTempDirectory("catalog-web-"); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
@@ -27,6 +28,23 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void functionBuilderSelectionTemplateAndSingleUseExecutionAreScoped() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var builder=new io.github.devmrko.companion.port.FunctionBuilds.Builder("function-1","maven","ACTIVE","image",3072,3600,"maven-v1","ns","bucket","maven-1","etag-1");
+        org.mockito.Mockito.when(functions.applications(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.FunctionBuilds.Application("app-1","build-app","ACTIVE","GENERIC_ARM")));
+        org.mockito.Mockito.when(functions.builders(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("app-1"))).thenReturn(java.util.List.of(builder));
+        mvc.perform(get("/builds/functions").session(session).param("view","new")).andExpect(status().isOk()).andExpect(content().string(containsString("Fn Project ZIP 다운로드")));
+        var page=mvc.perform(get("/builds/functions").session(session).param("view","execute").param("application","app-1").param("function","function-1")).andExpect(status().isOk()).andExpect(content().string(containsString("Maven 빌드 실행"))).andReturn();
+        String token=(String)page.getModelAndView().getModel().get("functionTicket");
+        mvc.perform(post("/builds/functions/run").session(session).param("ticket",token).param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","test")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/functions/run").session(session).with(csrf()).param("ticket",token).param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","test")).andExpect(status().is3xxRedirection());
+        mvc.perform(post("/builds/functions/run").session(session).with(csrf()).param("ticket",token).param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","test")).andExpect(status().isConflict());
+        page=mvc.perform(get("/builds/functions").session(session).param("view","execute").param("application","app-1").param("function","function-1")).andReturn();
+        token=(String)page.getModelAndView().getModel().get("functionTicket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/builds/functions")).andExpect(redirectedUrl("/builds/functions"));
+        mvc.perform(post("/builds/functions/run").session(session).with(csrf()).param("ticket",token).param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","test")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(functions,org.mockito.Mockito.times(1)).invoke(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("etag-1"),org.mockito.ArgumentMatchers.anyString());
+    }
     @Test void registryWorksWithoutPipelineAndUsesScopedSingleUseServerTicket() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var repository=new io.github.devmrko.companion.port.Registry.Repository("repo","GENERIC","builds","","Available",true,false,"server-etag");
