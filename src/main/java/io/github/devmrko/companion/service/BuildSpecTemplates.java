@@ -17,7 +17,7 @@ public final class BuildSpecTemplates {
         String command=switch(tool) {
             case "maven" -> "./mvnw -B "+arguments+(profiles.isEmpty()?"":" "+quote("-P"+profiles));
             case "gradle" -> "./gradlew --no-daemon "+arguments;
-            case "python" -> "python3 -m venv .venv\n. .venv/bin/activate\npython -m pip install -r requirements.txt\npython -m pytest "+arguments;
+            case "python" -> "python3 -m venv .venv\n. .venv/bin/activate\nexport PIP_CONFIG_FILE=\"${PIP_CONFIG_FILE:-/dev/null}\"\nexport PIP_CACHE_DIR=\"${PIP_CACHE_DIR:-$PWD/.cache/pip}\"\npython -m pip install -r requirements.txt\npython -m pytest "+arguments;
             default -> "npm ci\n"+Arrays.stream(tasks.trim().split("\\s+")).map(task->"npm run "+quote(task)).collect(java.util.stream.Collectors.joining("\n"));
         };
         var step=new LinkedHashMap<String,Object>();step.put("type","Command");step.put("name","Build and test");
@@ -44,6 +44,66 @@ public final class BuildSpecTemplates {
         }
         var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         return "# 소스에 커밋 후 빌드 단계의 명세 경로를 지정하세요. 런타임은 실행 환경에서 준비합니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
+    public static String reports(String yaml,boolean enabled) {
+        if(!enabled)return yaml;
+        Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
+        var step=steps.getFirst();String command=step.get("command").toString();
+        String collect="""
+            report_root="${OCI_PRIMARY_SOURCE_DIR:-$PWD}"
+            collect_reports() {
+              find "$report_root" -type f \\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' \\) -print0 | tar --null -T - -czf "$report_root/test-reports.tar.gz"
+            }
+            trap 'build_status=$?; collect_reports || { if [ "$build_status" -eq 0 ]; then build_status=1; fi; }; exit "$build_status"' EXIT
+            """;
+        step.put("command",command.replace("set -euo pipefail\n","set -euo pipefail\n"+collect));
+        @SuppressWarnings("unchecked") var outputs=new ArrayList<Map<String,Object>>((List<Map<String,Object>>)spec.getOrDefault("outputArtifacts",List.of()));
+        if(outputs.stream().anyMatch(a->"test-reports".equals(a.get("name"))))throw Errors.BUILD_STAGE_INPUT.exception();
+        outputs.add(Map.of("name","test-reports","type","BINARY","location","test-reports.tar.gz"));spec.put("outputArtifacts",outputs);
+        var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        return "# test-reports 출력은 별도 Registry 전달 연결이 필요합니다. 실패한 단계에서는 전달이 실행되지 않을 수 있습니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
+    public static String runtime(String yaml,String tool,String runtime) {
+        if(runtime.equals("existing"))return yaml;
+        boolean java=Set.of("maven","gradle").contains(tool);
+        String install;
+        if(java && Set.of("jdk17","jdk21").contains(runtime)) {
+            String version=runtime.substring(3);
+            install="""
+                runtime_dir=$(mktemp -d "${OCI_PRIMARY_SOURCE_DIR:-$PWD}/.jdk.XXXXXX")
+                case "$(uname -m)" in x86_64) runtime_arch=x64;; aarch64|arm64) runtime_arch=aarch64;; *) echo 'Unsupported Java architecture' >&2; exit 1;; esac
+                curl --fail --silent --show-error --location --max-time 60 "https://api.adoptium.net/v3/assets/latest/%s/hotspot?architecture=$runtime_arch&image_type=jdk&os=linux&vendor=eclipse" -o "$runtime_dir/metadata.json"
+                python3 - "$runtime_dir" <<'RUNTIME_PY'
+                import json, pathlib, sys
+                root = pathlib.Path(sys.argv[1])
+                package = json.loads((root / 'metadata.json').read_text())[0]['binary']['package']
+                url, checksum = package['link'], package['checksum']
+                if not url.startswith('https://github.com/adoptium/') or len(checksum) != 64 or any(c not in '0123456789abcdef' for c in checksum):
+                    raise ValueError('Invalid runtime metadata')
+                (root / 'url').write_text(url)
+                (root / 'sha256').write_text(checksum + '  ' + str(root / 'jdk.tar.gz') + '\\n')
+                RUNTIME_PY
+                curl --fail --silent --show-error --location --max-time 300 "$(cat "$runtime_dir/url")" -o "$runtime_dir/jdk.tar.gz"
+                sha256sum -c "$runtime_dir/sha256"
+                tar xzf "$runtime_dir/jdk.tar.gz" --strip-components=1 -C "$runtime_dir"
+                export JAVA_HOME="$runtime_dir"
+                export PATH="$JAVA_HOME/bin:$PATH"
+                java -version
+                """.formatted(version);
+        } else if(tool.equals("python") && runtime.equals("python311")) {
+            install="if ! command -v python3.11 >/dev/null 2>&1; then\n  test \"$(id -u)\" -eq 0 || { echo 'Runtime installation requires root' >&2; exit 1; }\n  dnf install -y python3.11 python3.11-pip\nfi\npython3.11 --version\n";
+        } else if(tool.equals("node") && runtime.equals("node22")) {
+            install="if ! node -e \"process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)\" 2>/dev/null; then\n  test \"$(id -u)\" -eq 0 || { echo 'Runtime installation requires root' >&2; exit 1; }\n  dnf module reset -y nodejs\n  dnf module enable -y nodejs:22\n  dnf install -y nodejs npm\n  export PATH=/usr/bin:$PATH\nfi\nnode --version\nnpm --version\n";
+        } else throw Errors.BUILD_STAGE_INPUT.exception();
+        Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
+        var step=steps.getFirst();
+        String command=step.get("command").toString();
+        if(runtime.equals("python311"))command=command.replace("python3 -m venv", "python3.11 -m venv");
+        step.put("command",command.replace("set -euo pipefail\n","set -euo pipefail\n"+install));
+        var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        return "# OCI Managed Build / Oracle Linux 8 · 다운로드 접근 필요 · OS 패키지 설치 시 root 필요\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
     }
     private static Map<String,String> variables(String text,boolean vault) {
         if(text.length()>8192)throw Errors.BUILD_STAGE_INPUT.exception();var result=new LinkedHashMap<String,String>();

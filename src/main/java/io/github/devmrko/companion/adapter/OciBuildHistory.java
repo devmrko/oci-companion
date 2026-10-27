@@ -45,6 +45,14 @@ public class OciBuildHistory implements BuildHistory {
             result.sort(Comparator.comparing(Run::createdAt).reversed());return result;
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
+    public io.github.devmrko.companion.service.TestReports.Summary reports(Connection c,String region,String compartment,String pipeline,String run,String artifact) {
+        var detail=detail(c,region,compartment,pipeline,run);
+        if(detail.artifacts().stream().noneMatch(a->a.id().equals(artifact)&&a.kind().equals("Artifact Registry")&&a.location().endsWith(".tar.gz")))throw Errors.SCOPE.exception();
+        try(var client=com.oracle.bmc.genericartifactscontent.GenericArtifactsContentClient.builder().configuration(ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(authentication(c))) {
+            client.setRegion(region);var response=client.getGenericArtifactContent(com.oracle.bmc.genericartifactscontent.requests.GetGenericArtifactContentRequest.builder().artifactId(artifact).build());
+            try(var in=response.getInputStream()){return io.github.devmrko.companion.service.TestReports.read(in);}
+        }catch(Exception e){throw Errors.CLOUD.exception();}
+    }
     public Detail detail(Connection c,String region,String compartment,String pipeline,String run) {
         try(var client=client(c,region)) {
             var r=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build()).getBuildRun();

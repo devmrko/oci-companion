@@ -927,3 +927,6 @@ a:focus-visible, .ui-button:focus-visible {
 .field-help p { position:absolute; z-index:12; top:100%; left:0; right:0; min-width:min(15rem,70vw); margin:.35rem 0 0; padding:.8rem; background:#fff; color:#243e49; border:1px solid #bacad1; border-radius:.3rem; box-shadow:0 4px 14px #0002; font-size:.85rem; line-height:1.6; }
 
 .schedule-time { display: block; overflow-wrap: anywhere; margin-block: .35rem; }
+
+/* Honor semantic visibility even when a component defines display. */
+[hidden] { display:none !important; }

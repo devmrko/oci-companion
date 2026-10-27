@@ -35,5 +35,17 @@
   }
   refresh.addEventListener('click', () => { polls = 0; update(); });
   window.addEventListener('pagehide', () => clearTimeout(timer));
+  const reports=document.getElementById('function-reports-refresh');
+  reports.addEventListener('click',async()=>{
+    reports.disabled=true;const label=document.getElementById('function-reports-status'),details=document.getElementById('function-reports-details');
+    label.textContent='보고서 조회 중';details.hidden=true;
+    try {
+      const url=new URL(panel.dataset.url,location.origin);url.pathname='/builds/functions/reports';
+      const response=await fetch(url,{headers:{Accept:'application/json'},cache:'no-store'});
+      if(!response.ok)throw Error();const data=await response.json();
+      label.textContent=data.state==='MISSING'?'보고서 없음 · 테스트 통과 여부를 판단할 수 없습니다.':data.state==='EMPTY'?'보고서에 테스트가 없습니다.':`테스트 ${data.tests} · 실패 ${data.failures} · 오류 ${data.errors} · 건너뜀 ${data.skipped}`;
+      details.textContent=data.details.map(item=>`${item.suite} / ${item.test}\n${item.message}`).join('\n\n');details.hidden=!data.details.length;
+    }catch{label.textContent='보고서 조회 실패 · 권한 또는 보고서 형식을 확인하세요.';}finally{reports.disabled=false;}
+  });
   update();
 })();

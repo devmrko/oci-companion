@@ -22,5 +22,6 @@ foundation:
   jobs:
     enabled: false
 companion:
+  git-hosts: ${COMPANION_GIT_HOSTS:}
   oci-config: ${OCI_CONFIG_FILE:${user.home}/.oci/config}
   data-dir: ${COMPANION_DATA_DIR:.data/catalog}

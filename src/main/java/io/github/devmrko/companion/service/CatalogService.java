@@ -49,7 +49,7 @@ public class CatalogService {
             var resource=snapshot.resources().stream().filter(r -> r.kind().equals("REPOSITORY") && r.id().equals(selectedId)).findFirst().orElseThrow(Errors.MISSING::exception);
             url=resource.url(); name=resource.name();
         } else {
-            if (!Set.of("GITHUB","GITLAB").contains(provider)) throw Errors.INVALID.exception();
+            if (!Set.of("GITHUB","GITLAB","GITEA").contains(provider)) throw Errors.INVALID.exception();
             try {
                 var uri=URI.create(url);
                 if (url.length()>2048 || !"https".equals(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getQuery()!=null || uri.getFragment()!=null || uri.getPort()!=-1 || uri.getPath()==null || uri.getPath().split("/").length<3) throw Errors.INVALID.exception();

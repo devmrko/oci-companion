@@ -19,6 +19,8 @@ public enum Errors implements ErrorDescriptor {
     BUILD_UNKNOWN(ErrorCategory.UNAVAILABLE, "실행 결과를 확인하지 못했습니다. 다시 실행하기 전에 이력과 OCI 콘솔을 확인하세요."),
     INVALID(ErrorCategory.VALIDATION, "입력값을 확인하세요. 저장소에는 인증정보 없는 HTTPS URL을 사용하세요."),
     CONFIG(ErrorCategory.UNAVAILABLE, "OCI 프로파일을 읽거나 연결할 수 없습니다. API 키 설정과 tenancy 조회 권한을 확인하세요."),
+    GIT_CONFLICT(ErrorCategory.CONFLICT, "원격 브랜치 변경·보호 규칙 또는 만료된 요청입니다. Git 내용을 다시 비교하세요."),
+    GIT_ACCESS(ErrorCategory.UNAVAILABLE, "Git 연결 실패 · 저장소 URL·브랜치·Vault 읽기 권한·토큰의 저장소 권한을 확인하세요."),
     CLOUD(ErrorCategory.UNAVAILABLE, "OCI 요청을 완료하지 못했습니다. 연결·리전·IAM 권한과 OCI 콘솔을 확인하세요."),
     MISSING(ErrorCategory.NOT_FOUND, "현재 연결에서 찾을 수 없는 항목입니다."),
     CONFLICT(ErrorCategory.CONFLICT, "이미 사용된 요청입니다. 실행 이력을 확인하세요."),

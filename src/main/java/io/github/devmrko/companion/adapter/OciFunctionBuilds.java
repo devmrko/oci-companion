@@ -132,6 +132,14 @@ public class OciFunctionBuilds implements FunctionBuilds {
             if(e.getStatusCode()==404)return new Run(run,"WAITING","","");throw Errors.CLOUD.exception();
         } catch(Exception e) {throw Errors.CLOUD.exception();}
     }
+    public io.github.devmrko.companion.service.TestReports.Summary reports(Connection c,String r,String comp,String app,String f,String run) {
+        if(!run.matches("[0-9a-f-]{36}"))throw Errors.INVALID.exception();var b=ready(c,r,comp,app,f);
+        try(var storage=storage(c,r)) {
+            var response=storage.getObject(GetObjectRequest.builder().namespaceName(b.namespace()).bucketName(b.bucket()).objectName(b.prefix()+"/"+run+"/test-reports.tar.gz").build());
+            try(var in=response.getInputStream()) {return io.github.devmrko.companion.service.TestReports.read(in);}
+        } catch(com.oracle.bmc.model.BmcException e) {if(e.getStatusCode()==404)return io.github.devmrko.companion.service.TestReports.missing();throw Errors.CLOUD.exception();}
+        catch(Exception e){throw Errors.CLOUD.exception();}
+    }
     public String log(Connection c,String r,String comp,String app,String f,String run) {
         if(!run.matches("[0-9a-f-]{36}"))throw Errors.INVALID.exception();var b=ready(c,r,comp,app,f);
         try(var storage=storage(c,r)) {

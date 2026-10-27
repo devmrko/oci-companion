@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.GitSpecifications gitSpecifications;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.FunctionBuilds functions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.SourceVersions sourceVersions;
     static final Path DIRECTORY;
@@ -244,6 +245,21 @@ class CatalogWebTest {
     }
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     io.github.devmrko.companion.port.BuildHistory builds;
+    @Test void gitSaveRequiresPreviewAndCannotBeReplayed() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/sources"));
+        mvc.perform(post("/sources").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("provider","GITEA").param("name","spec-save-test").param("url","https://git.example.test/team/spec.git").param("branch","main"));
+        var connection=context.getBean(io.github.devmrko.companion.port.CloudConnection.class).connect("DEMO");
+        var source=context.getBean(io.github.devmrko.companion.service.CatalogService.class).sources(connection,"us-ashburn-1","demo-development").stream().filter(v->v.name().equals("spec-save-test")).findFirst().orElseThrow();
+        org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("a".repeat(40),"old"));
+        org.mockito.Mockito.when(gitSpecifications.save(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn("b".repeat(40));
+        mvc.perform(post("/builds/specification/git/save").session(session).param("ticket","invalid")).andExpect(status().isForbidden());
+        var response=mvc.perform(post("/builds/specification/git/preview").session(session).with(csrf()).param("source",source.id()).param("branch","main").param("path","build_spec.yaml").param("username","user").param("secret","env:TEST").param("content","version: '0.1'").param("message","Save specification")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String ticket=tools.jackson.databind.json.JsonMapper.builder().build().readTree(response).path("ticket").asString();
+        mvc.perform(post("/builds/specification/git/save").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isOk());
+        mvc.perform(post("/builds/specification/git/save").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(gitSpecifications,org.mockito.Mockito.times(1)).save(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
     @Test void buildPageUsesSelectedRegionAndRejectsUnlistedRuns() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         mvc.perform(get("/builds")).andExpect(redirectedUrl("/login"));

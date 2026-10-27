@@ -24,5 +24,6 @@ public interface BuildHistory {
     }
     List<Pipeline> pipelines(Connection connection,String region,String compartment);
     List<Run> runs(Connection connection,String region,String compartment,String pipeline);
+    io.github.devmrko.companion.service.TestReports.Summary reports(Connection connection,String region,String compartment,String pipeline,String run,String artifact);
     Detail detail(Connection connection,String region,String compartment,String pipeline,String run);
 }

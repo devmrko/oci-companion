@@ -22,5 +22,6 @@ public interface FunctionBuilds {
     void invoke(Connection connection,String region,String compartment,String application,String function,String etag,String payload);
     Runs runs(Connection connection,String region,String compartment,String application,String function,String start);
     Run run(Connection connection,String region,String compartment,String application,String function,String run);
+    io.github.devmrko.companion.service.TestReports.Summary reports(Connection connection,String region,String compartment,String application,String function,String run);
     String log(Connection connection,String region,String compartment,String application,String function,String run);
 }

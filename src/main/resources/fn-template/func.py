@@ -107,6 +107,7 @@ def handler(ctx, data=None):
                         process.wait()
             with logpath.open("rb") as log:
                 put("build.log", log)
+        directory = None
         try:
             command(["git", "init", "source"], root)
             source = root / "source"
@@ -138,16 +139,29 @@ def handler(ctx, data=None):
                     with jar.open("rb") as content:
                         put("artifacts/" + relative, content)
                     artifacts.append({"object": key + "/artifacts/" + relative, "bytes": jar.stat().st_size, "sha256": digest})
-            reports = [str(p.relative_to(directory)) for p in directory.rglob("surefire-reports") if p.is_dir()]
-            reports += [str(p.relative_to(directory)) for p in directory.rglob("pmd.xml") if p.is_file()]
-            if reports:
-                command(["tar", "czf", str(root / "test-reports.tar.gz")] + reports, directory)
-                with (root / "test-reports.tar.gz").open("rb") as content:
-                    put("test-reports.tar.gz", content)
             result.update(status="SUCCEEDED", artifacts=artifacts)
         except Exception as error:
             result.update(status="FAILED", error=type(error).__name__ + ": " + str(error))
         finally:
+            # Preserve test evidence even when Maven returns a non-zero status.
+            try:
+                if directory is not None and directory.is_dir():
+                    import tarfile
+                    files = [p for p in directory.rglob("*.xml")
+                             if any(x in ("surefire-reports", "failsafe-reports") for x in p.parts)
+                             and p.is_file() and not p.is_symlink()
+                             and p.resolve().is_relative_to(directory)]
+                    if files:
+                        archive = root / "test-reports.tar.gz"
+                        with tarfile.open(archive, "w:gz") as reports:
+                            for path in files:
+                                reports.add(path, arcname=str(path.relative_to(directory)), recursive=False)
+                        with archive.open("rb") as content:
+                            put("test-reports.tar.gz", content)
+                        result["testReports"] = key + "/test-reports.tar.gz"
+            except Exception as error:
+                result["reportError"] = type(error).__name__ + ": " + str(error)
+                result["status"] = "FAILED"
             if logpath.exists():
                 with logpath.open("rb") as log:
                     put("build.log", log)

@@ -88,6 +88,12 @@ public class FunctionBuildPages {
         String profiles;synchronized(session){profiles=submittedProfiles(session).getOrDefault(String.join("/",region,compartment,application,function,run),"");}
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("status",result.status(),"result",result.result(),"log",log,"profiles",profiles));
     }
+    @GetMapping("/builds/functions/reports") @ResponseBody ResponseEntity<TestReports.Summary> reports(Authentication auth,HttpSession session,
+        @RequestParam String region,@RequestParam String compartment,@RequestParam String application,@RequestParam String function,@RequestParam String run) {
+        var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);
+        if(session.getAttribute("scopeInvalid")!=null || !region.equals(s.region()) || !compartment.equals(s.compartment()))throw Errors.SCOPE.exception();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(builds.reports(c,region,compartment,application,function,run));
+    }
     @PostMapping("/builds/functions/template") ResponseEntity<byte[]> template(Authentication auth,HttpSession session,
         @RequestParam String name,@RequestParam String application,@RequestParam String architecture,@RequestParam String namespace,
         @RequestParam String bucket,@RequestParam(defaultValue="") String subnet,@RequestParam(defaultValue="builders") String registryPrefix) {

@@ -55,13 +55,13 @@ public class JsonCatalogStore implements CatalogStore {
                 catch (Exception e) { continue; } // Unreadable files remain untouched.
                 if (legacy.scope()==null || !legacy.scope().startsWith(identityPrefix) || legacy.scope().equals(destination)
                     || legacy.version()!=1 || legacy.items()==null || !file.equals(path(legacy.scope(),"-sources"))) continue;
-                var external=legacy.items().stream().filter(s -> Set.of("GITHUB","GITLAB").contains(s.provider())).toList();
+                var external=legacy.items().stream().filter(s -> Set.of("GITHUB","GITLAB","GITEA").contains(s.provider())).toList();
                 if (external.isEmpty()) continue;
                 var merged=new ArrayList<>(sources(destination).items());
                 for (var source:external) if (merged.stream().noneMatch(s -> s.id().equals(source.id()) || (s.provider().equals(source.provider()) && s.url().equals(source.url()) && s.branch().equals(source.branch()) && s.name().equals(source.name())))) merged.add(source);
                 persist(path(destination,"-sources"),new Sources(1,destination,List.copyOf(merged)));
                 // Destination is durable before removing old entries. Repeating after interruption is safe.
-                persist(file,new Sources(1,legacy.scope(),legacy.items().stream().filter(s -> !Set.of("GITHUB","GITLAB").contains(s.provider())).toList()));
+                persist(file,new Sources(1,legacy.scope(),legacy.items().stream().filter(s -> !Set.of("GITHUB","GITLAB","GITEA").contains(s.provider())).toList()));
             }
         } catch (java.io.IOException e) { throw new IllegalStateException("소스 이전 실패 · 기존 파일 보존"); }
     }

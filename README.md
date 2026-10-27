@@ -76,3 +76,5 @@ DB Companion과 같은 좌측 그룹 메뉴·접기/펼치기·상단 연결 정
 
 Spring Foundation 소스 커밋: `abc0bb10a7ddf1d0767a044ebe654b58eea48ac3`.
 빌드 스크립트가 `.tools`에 내려받아 프로젝트 전용 Maven 저장소에서 빌드합니다.
+
+명세 저장·런타임·테스트 보고서: [사용 흐름과 Git 인증 설정](docs/design/build-specification-delivery.md).
