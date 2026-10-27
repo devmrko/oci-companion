@@ -33,7 +33,10 @@ public class CatalogPages {
     private final BuildDefinition definitions;
     private final BuildInputStore inputRules;
     private final BuildPresetStore presets;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup,Registry registry) {
+    private final BuildTaskStore taskStore;
+    private final TaskSources taskSources;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup,Registry registry,BuildTaskStore taskStore,TaskSources taskSources) {
+        this.taskStore=taskStore;this.taskSources=taskSources;
         this.registry=registry;this.setup=setup;this.logs=logs;this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
@@ -156,7 +159,7 @@ public class CatalogPages {
         @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,
         @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project,
         @RequestParam(defaultValue="") String topic,@RequestParam(defaultValue="GENERIC") String kind,
-        @RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String page) {
+        @RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String page,@RequestParam(defaultValue="") String task,@RequestParam(defaultValue="") String registeredSource) {
         var c=SecurityConfig.connection(auth);
         if(tab.isEmpty() && pipeline.isEmpty() && run.isEmpty())return "redirect:/builds/tasks";
         if(tab.isEmpty()) tab=run.isEmpty()?"execute":"history";
@@ -166,6 +169,7 @@ public class CatalogPages {
         model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
+            if(!registeredSource.isEmpty())model.addAttribute("handoffSource",service.sources(c,s.region(),s.compartment()).stream().filter(v->v.id().equals(registeredSource)).findFirst().orElseThrow(Errors.MISSING::exception));
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
             if(tab.equals("registry")) {
                 if(!Set.of("GENERIC","CONTAINER").contains(kind))throw Errors.REGISTRY_INPUT.exception();
@@ -268,6 +272,15 @@ public class CatalogPages {
                     parameters=loaded.parameters();
                     final String savedSource=loaded.source().source();
                     if(!savedSource.isEmpty() && definition.sources().stream().noneMatch(v->v.key().equals(savedSource))) throw Errors.BUILD_PRESET.exception();
+                    if(!task.isEmpty()) {
+                        var savedTask=taskStore.list(c,s.region(),s.compartment()).stream().filter(v->v.id().equals(task)).findFirst().orElseThrow(Errors.MISSING::exception);
+                        if(!savedTask.runner().equals("DEVOPS") || !savedTask.pipeline().equals(selected))throw Errors.SCOPE.exception();
+                        if(!savedTask.source().isEmpty()) {
+                            var chosen=taskSources.resolve(c,s.region(),s.compartment(),savedTask.sourceId(),savedTask.source(),savedTask.branch());
+                            var matched=TaskSources.match(chosen,definition);
+                            loaded=new BuildPresetStore.Preset(loaded.name(),loaded.parameters(),savedTask.name(),new BuildDefinition.SourceOverride(matched.key(),savedTask.branch(),savedTask.commit()));
+                        }
+                    }
                     model.addAttribute("runName",loaded.runName());model.addAttribute("sourceOverride",loaded.source());
                     model.addAttribute("fields",BuildInputs.fields(settings.parameters(),parameters,inputRules.read(c,s.region(),s.compartment(),selected)));
                     model.addAttribute("parameters",parameters);model.addAttribute("presets",saved);
@@ -419,7 +432,7 @@ public class CatalogPages {
     }
     @GetMapping("/builds/source-options") @ResponseBody
     Map<String,Object> buildSourceOptions(Authentication auth,HttpSession session,@RequestParam String ticket,@RequestParam String source,
-        @RequestParam(defaultValue="") String branch) {
+        @RequestParam(defaultValue="") String branch,@RequestParam(defaultValue="") String commit) {
         var c=SecurityConfig.connection(auth);BuildTicket t;
         synchronized(session) { t=tickets(session).get(ticket); }
         if(t==null) throw Errors.CONFLICT.exception();
@@ -432,7 +445,11 @@ public class CatalogPages {
         String requestedBranch=branch.isEmpty()?chosen.branch():branch;
         String selected=branches.stream().anyMatch(v->v.value().equals(requestedBranch))?requestedBranch:branches.isEmpty()?"":branches.getFirst().value();
         var commits=selected.isEmpty()?List.<BuildDefinition.Choice>of():definitions.commits(c,t.region(),chosen,selected);
-        return Map.of("branches",branches,"branch",selected,"commits",commits,"external",chosen.repositoryId().isEmpty());
+        if(!commit.isEmpty() && commits.stream().noneMatch(v->v.value().equals(commit))) {
+            if(!definitions.validCommit(c,t.region(),chosen,commit))throw Errors.BUILD_PARAMETERS.exception();
+            var expanded=new ArrayList<>(commits);expanded.addFirst(new BuildDefinition.Choice(commit,commit.substring(0,12)+" · 저장된 커밋"));commits=expanded;
+        }
+        return Map.of("branches",branches,"branch",selected,"commits",commits,"external",chosen.repositoryId().isEmpty() && commits.isEmpty());
     }
     @PostMapping("/builds/action")
     String buildAction(Authentication auth,HttpSession session,RedirectAttributes flash,

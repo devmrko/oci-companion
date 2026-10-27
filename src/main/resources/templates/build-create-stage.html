@@ -1,9 +1,9 @@
 <!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines' and setupTicket != null}" id="build-stage-create" data-flow-step="settings">
-<h2>빌드 단계 추가</h2>
+<h2>빌드 단계 추가</h2><p th:if="${handoffSource != null}">선택한 등록 소스: <strong th:text="${handoffSource.name()}"></strong> · <span th:text="${handoffSource.url()}"></span></p>
 <p class="notice" th:if="${buildOptionsError != null}" th:text="${buildOptionsError}"></p>
 <th:block th:if="${buildOptions != null}">
 <p class="notice" th:each="warning : ${buildOptions.warnings()}" th:text="${warning}"></p>
-<form th:action="@{/builds/setup}" method="post" class="build-field-grid" id="create-build-stage">
+<form th:action="@{/builds/setup}" method="post" class="build-field-grid" id="create-build-stage" th:attr="data-source-url=${handoffSource != null ? handoffSource.url() : ''},data-source-provider=${handoffSource != null ? handoffSource.provider() : ''},data-source-resource=${handoffSource != null ? handoffSource.resourceId() : ''},data-source-branch=${handoffSource != null ? handoffSource.branch() : ''}">
 <input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="create-build">
 <label class="form-field">단계 이름 · 필수<input name="name" class="ui-control" required maxlength="255" placeholder="build-test"></label>
 <label class="form-field">소스 · 필수<select name="buildSource" class="ui-control" required><option value="">저장소·연결 선택</option><option th:each="s : ${buildOptions.sources()}" th:value="${s.id()}" th:text="|${s.provider()} · ${s.name()}|" th:attr="data-provider=${s.provider()},data-url=${s.url()},data-branch=${s.branch()}"></option></select></label>

@@ -13,7 +13,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class OciBuildDefinition implements BuildDefinition {
     private final OciBuildHistory clients;
-    public OciBuildDefinition(OciBuildHistory clients) { this.clients=clients; }
+    private final io.github.devmrko.companion.port.SourceVersions versions;
+    public OciBuildDefinition(OciBuildHistory clients) { this(clients,new OciSourceVersions(clients)); }
+    @org.springframework.beans.factory.annotation.Autowired public OciBuildDefinition(OciBuildHistory clients,io.github.devmrko.companion.port.SourceVersions versions) { this.clients=clients;this.versions=versions; }
+    private io.github.devmrko.companion.domain.Catalog.Source registered(Source s){return new io.github.devmrko.companion.domain.Catalog.Source("",s.repositoryId().isEmpty()?"EXTERNAL":"OCI",s.name(),s.url(),s.branch(),s.repositoryId());}
+    public boolean validCommit(Connection c,String region,Source source,String commit){return versions.hasCommit(c,region,"",registered(source),commit);}
     private static String text(Object value) { return Objects.toString(value,""); }
     public Definition read(Connection c,String r,String comp,String pipeline) {
         try(var client=clients.client(c,r)) {
@@ -65,7 +69,10 @@ public class OciBuildDefinition implements BuildDefinition {
         } catch(BusinessException e) { throw e; } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
     public List<Choice> branches(Connection c,String r,Source source) {
-        if(source.repositoryId().isEmpty()) return List.of(new Choice(source.branch(),source.branch()+" · OCI 설정"));
+        if(source.repositoryId().isEmpty()) {
+            try {var list=new ArrayList<>(versions.refs(c,r,"",registered(source)).stream().filter(v->v.kind().equals("BRANCH")).map(v->new Choice(v.name(),v.name())).toList());if(list.stream().noneMatch(v->v.value().equals(source.branch())))list.add(new Choice(source.branch(),source.branch()+" · OCI 설정"));return list;}
+            catch(Exception e){return List.of(new Choice(source.branch(),source.branch()+" · OCI 설정"));}
+        }
         try(var client=clients.client(c,r)) {
             var choices=new ArrayList<Choice>();
             for(var ref:client.getPaginators().listRefsRecordIterator(ListRefsRequest.builder().repositoryId(source.repositoryId()).refType(ListRefsRequest.RefType.Branch).build()))
@@ -74,7 +81,10 @@ public class OciBuildDefinition implements BuildDefinition {
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
     public List<Choice> commits(Connection c,String r,Source source,String branch) {
-        if(source.repositoryId().isEmpty()) return List.of();
+        if(source.repositoryId().isEmpty()) {
+            try{return versions.commits(c,r,"",registered(source),branch).stream().map(v->new Choice(v.commit(),v.commit().substring(0,12)+" · "+v.name())).toList();}
+            catch(Exception e){return List.of();}
+        }
         if(branches(c,r,source).stream().noneMatch(v->v.value().equals(branch))) throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,r)) {
             return client.listCommits(ListCommitsRequest.builder().repositoryId(source.repositoryId()).refName(branch).limit(50).build())

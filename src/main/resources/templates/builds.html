@@ -17,7 +17,7 @@
 <p class="small muted">소스, 빌드·테스트, 산출물 전달 단계를 묶은 실행 설정입니다.</p>
 <p th:if="${pipelines.isEmpty()}">파이프라인 없음 · 프로젝트·리전·구획을 확인하세요.</p>
 <form action="/builds" method="get" class="scope-bar" id="pipeline-picker">
-<input type="hidden" name="tab" th:value="${tab}"><input type="hidden" name="repository" th:if="${tab == 'pipelines'}" th:value="${repository}">
+<input type="hidden" name="tab" th:value="${tab}"><input type="hidden" name="registeredSource" th:if="${handoffSource != null}" th:value="${handoffSource.id()}"><input type="hidden" name="repository" th:if="${tab == 'pipelines'}" th:value="${repository}">
 <label class="form-field">프로젝트<select name="project" class="ui-control"><option value="">전체 프로젝트</option><option th:each="p : ${projects}" th:value="${p.key}" th:text="${p.value}" th:selected="${p.key == project}"></option></select></label>
 <label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
 <button class="ui-button">다시 조회</button></form>

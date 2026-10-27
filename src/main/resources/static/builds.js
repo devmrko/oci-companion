@@ -29,7 +29,7 @@
     loading = true;run.disabled = true;branch.disabled = commit.disabled = true;
     status.textContent = '브랜치·커밋 조회 중…';
     try {
-      const query = new URLSearchParams({ticket:form.elements.ticket.value,source:source.value,branch:wantedBranch});
+      const query = new URLSearchParams({ticket:form.elements.ticket.value,source:source.value,branch:wantedBranch,commit:wantedCommit});
       const response = await fetch('/builds/source-options?' + query, {headers:{Accept:'application/json'}});
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw Error();
       const data = await response.json();

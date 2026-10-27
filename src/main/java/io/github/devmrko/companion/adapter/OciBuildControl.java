@@ -49,7 +49,7 @@ public class OciBuildControl implements BuildControl {
             var source=definition.sources().stream().filter(v->v.key().equals(override.source())).findFirst().orElseThrow(Errors.BUILD_PARAMETERS::exception);
             if(override.branch().isBlank() || override.branch().length()>255) throw Errors.BUILD_PARAMETERS.exception();
             if(definitions.branches(c,r,source).stream().noneMatch(v->v.value().equals(override.branch()))) throw Errors.BUILD_PARAMETERS.exception();
-            if(!override.commit().isEmpty() && definitions.commits(c,r,source,override.branch()).stream().noneMatch(v->v.value().equals(override.commit()))) throw Errors.BUILD_PARAMETERS.exception();
+            if(!override.commit().isEmpty() && definitions.commits(c,r,source,override.branch()).stream().noneMatch(v->v.value().equals(override.commit())) && !definitions.validCommit(c,r,source,override.commit())) throw Errors.BUILD_PARAMETERS.exception();
             commit=CommitInfo.builder().repositoryUrl(source.url()).repositoryBranch(override.branch()).commitHash(override.commit().isEmpty()?null:override.commit()).build();
         } else if(!override.branch().isEmpty() || !override.commit().isEmpty()) throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,r)) {

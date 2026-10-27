@@ -16,7 +16,12 @@
     const option = event.target.selectedOptions[0], external = option.dataset.provider && option.dataset.provider !== 'OCI';
     create.elements.sourceUrl.readOnly = !external;
     create.elements.sourceUrl.required = !!external;
-    create.elements.sourceUrl.value = option.dataset.url || '';
-    create.elements.branch.value = option.dataset.branch || 'main';
+    create.elements.sourceUrl.value = external && create.dataset.sourceProvider===option.dataset.provider ? create.dataset.sourceUrl || option.dataset.url || '' : option.dataset.url || '';
+    create.elements.branch.value = create.dataset.sourceBranch || option.dataset.branch || 'main';
   });
+  if(create?.dataset.sourceProvider) {
+    const select=create.elements.buildSource;
+    const candidates=[...select.options].filter(o=>o.dataset.provider===create.dataset.sourceProvider && (o.dataset.provider!=='OCI' || o.value===create.dataset.sourceResource));
+    if(candidates.length===1){select.value=candidates[0].value;select.dispatchEvent(new Event('change'));}
+  }
 })();

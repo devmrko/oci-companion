@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.FunctionBuilds functions;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.SourceVersions sourceVersions;
     static final Path DIRECTORY;
     static { try { DIRECTORY=Files.createTempDirectory("catalog-web-"); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }
     @DynamicPropertySource static void properties(DynamicPropertyRegistry r) { r.add("companion.data-dir",()->DIRECTORY.toString()); }
@@ -28,6 +29,19 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void registeredTaskSourceRejectsUrlTamperingAndStaleScope() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var model=mvc.perform(get("/builds/tasks").session(session).param("view","new")).andReturn().getModelAndView().getModel();
+        var scope=(io.github.devmrko.companion.web.CatalogPages.Selection)model.get("selection");
+        var connection=(io.github.devmrko.companion.domain.Models.Connection)model.get("connection");
+        var catalog=context.getBean(io.github.devmrko.companion.service.CatalogService.class);
+        catalog.register(connection,scope.region(),scope.compartment(),"GITHUB","registered-test","https://github.com/a/registered-test","main","");
+        var source=catalog.sources(connection,scope.region(),scope.compartment()).stream().filter(v->v.name().equals("registered-test")).findFirst().orElseThrow();
+        org.mockito.Mockito.when(sourceVersions.refs(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq(source))).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.SourceVersions.Ref("BRANCH","main","a".repeat(40))));
+        mvc.perform(get("/builds/tasks/source-versions").session(session).param("region",scope.region()).param("compartment",scope.compartment()).param("sourceId",source.id()).param("source",source.url())).andExpect(status().isOk()).andExpect(jsonPath("$[0].commit").value("a".repeat(40)));
+        mvc.perform(get("/builds/tasks/source-versions").session(session).param("region",scope.region()).param("compartment",scope.compartment()).param("sourceId",source.id()).param("source","https://github.com/a/wrong")).andExpect(status().isBadRequest());
+        mvc.perform(get("/builds/tasks/source-versions").session(session).param("region","wrong-region").param("compartment",scope.compartment()).param("sourceId",source.id())).andExpect(status().isConflict());
+    }
     @Test void taskWizardPersistsActualSettingsAndLoadsThemIntoExecution() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         mvc.perform(get("/builds").session(session)).andExpect(redirectedUrl("/builds/tasks"));
@@ -35,7 +49,7 @@ class CatalogWebTest {
         var scope=(io.github.devmrko.companion.web.CatalogPages.Selection)page.getModelAndView().getModel().get("selection");
         var b=new io.github.devmrko.companion.port.FunctionBuilds.Builder("fn-task","maven","ACTIVE","image",3072,3600,"maven-v1","ns","bucket","prefix","etag");
         org.mockito.Mockito.when(functions.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("app-task"),org.mockito.ArgumentMatchers.eq("fn-task"))).thenReturn(b);
-        mvc.perform(post("/builds/tasks/save").session(session).with(csrf()).param("region",scope.region()).param("compartment",scope.compartment()).param("name","작업 검증").param("runner","FUNCTIONS").param("application","app-task").param("function","fn-task").param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("goal","verify").param("profiles","quality").param("artifact","target/*.jar")).andExpect(redirectedUrl("/builds/tasks"));
+        mvc.perform(post("/builds/tasks/save").session(session).with(csrf()).param("region",scope.region()).param("compartment",scope.compartment()).param("name","작업 검증").param("runner","FUNCTIONS").param("application","app-task").param("function","fn-task").param("source","https://github.com/a/b").param("commit","a".repeat(40)).param("branch","main").param("goal","verify").param("profiles","quality").param("artifact","target/*.jar")).andExpect(redirectedUrl("/builds/tasks"));
         var model=mvc.perform(get("/builds/tasks").session(session)).andExpect(content().string(containsString("작업 검증"))).andReturn().getModelAndView().getModel();
         @SuppressWarnings("unchecked") var saved=(java.util.List<io.github.devmrko.companion.port.BuildTaskStore.Task>)model.get("tasks");var task=saved.stream().filter(t->t.name().equals("작업 검증")).findFirst().orElseThrow();
         org.mockito.Mockito.when(functions.applications(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.FunctionBuilds.Application("app-task","app","ACTIVE","GENERIC_ARM")));

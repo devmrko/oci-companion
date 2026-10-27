@@ -20,5 +20,6 @@ public interface BuildDefinition {
     Definition read(Connection c,String region,String compartment,String pipeline);
     List<Choice> branches(Connection c,String region,Source source);
     List<Choice> commits(Connection c,String region,Source source,String branch);
+    default boolean validCommit(Connection c,String region,Source source,String commit) { return false; }
     Specification specification(Connection c,String region,Source source,String path);
 }

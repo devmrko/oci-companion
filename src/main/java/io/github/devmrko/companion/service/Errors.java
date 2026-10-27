@@ -1,6 +1,8 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    SOURCE_READ(ErrorCategory.UNAVAILABLE, "소스 버전 조회 실패 · 접근 권한·공개 여부·API 조회 한도를 확인하세요. 커밋 SHA 직접 입력도 가능합니다."),
+    SOURCE_MISMATCH(ErrorCategory.VALIDATION, "선택한 소스와 파이프라인 소스가 다르거나 여러 단계에 중복됩니다. 소스 연결을 확인하세요."),
     BUILD_STAGE_INPUT(ErrorCategory.VALIDATION, "빌드 단계의 소스·브랜치·명세 경로·이미지·선행 단계를 확인하세요."),
     BUILD_PURPOSE(ErrorCategory.VALIDATION, "실행 목적과 단계 구성이 다릅니다. 빌드·저장·배포 단계와 산출물 연결을 확인하세요."),
     DESTINATION_LINK(ErrorCategory.CONFLICT, "저장 위치 참조는 생성됐지만 단계 연결에 실패했습니다. 파이프라인 탭의 전달 위치에서 build-output 참조와 현재 연결을 확인하세요."),
