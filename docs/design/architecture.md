@@ -1,6 +1,7 @@
 # OCI Companion — initial design
 
 > 이전 설계. 현재 기본 흐름과 저장 방식은 [리소스 중심 개편](resource-catalog.md)을 따른다.
+> 빌드의 화면·저장 범위·교체 경계는 [빌드·저장·배포 화면 설계](build-workflow.md)를 따른다. 신규 경계는 구현 예정이다.
 
 2026-10-21. Local single-operator web application. Delivery order: VM, Functions, OKE.
 
