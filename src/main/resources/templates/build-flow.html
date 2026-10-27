@@ -1,0 +1,11 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><th:block th:fragment="flow(tab,pipeline)"><nav class="build-flow" aria-label="빌드 작업 흐름">
+<a class="build-flow-step" data-step="source" th:classappend="${tab == 'sources'} ? 'is-current'" th:attr="aria-current=${tab == 'sources' ? 'step' : null}" th:href="${tab == 'execute' ? '#build-source-area' : '/sources'}"><span class="build-flow-number">1</span>소스</a>
+<span class="build-flow-arrow" aria-hidden="true">→</span>
+<a class="build-flow-step" data-step="settings" th:classappend="${(tab == 'pipelines' or tab == 'projects' or tab == 'topics')} ? 'is-current'" th:attr="aria-current=${(tab == 'pipelines' or tab == 'projects' or tab == 'topics') ? 'step' : null}" th:href="@{/builds(tab='pipelines',pipeline=${pipeline})}"><span class="build-flow-number">2</span>빌드 설정</a>
+<span class="build-flow-arrow" aria-hidden="true">→</span>
+<a class="build-flow-step" data-step="storage" th:classappend="${tab == 'registry'} ? 'is-current'" th:attr="aria-current=${tab == 'registry' ? 'step' : null}" th:href="${tab == 'execute'} ? '#build-destinations' : @{/builds(tab='registry',pipeline=${pipeline})}"><span class="build-flow-number">3</span>저장소</a>
+<span class="build-flow-arrow" aria-hidden="true">→</span>
+<a class="build-flow-step" data-step="execute" th:classappend="${tab == 'execute'} ? 'is-current'" th:attr="aria-current=${tab == 'execute' ? 'step' : null}" th:href="@{/builds(tab='execute',pipeline=${pipeline})}"><span class="build-flow-number">4</span>실행</a>
+<span class="build-flow-arrow" aria-hidden="true">→</span>
+<a class="build-flow-step" data-step="result" th:classappend="${tab == 'history'} ? 'is-current'" th:attr="aria-current=${tab == 'history' ? 'step' : null}" th:href="@{/builds(tab='history',pipeline=${pipeline})}"><span class="build-flow-number">5</span>결과</a>
+</nav><script src="/build-flow.js" defer></script></th:block></body></html>

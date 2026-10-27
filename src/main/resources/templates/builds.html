@@ -2,6 +2,7 @@
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
 <h1>빌드</h1>
 <nav th:replace="~{build-projects :: tabs}"></nav>
+<div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card" th:if="${tab == 'pipelines' and adminTicket != null}">
 <h2>파이프라인 추가</h2><p class="small muted">빌드·테스트·산출물 전달 단계를 저장합니다. 생성 후 빌드 단계 등록이 필요합니다.</p>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">
@@ -21,8 +22,8 @@
 <label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
 <button class="ui-button">다시 조회</button></form>
 </section>
-<div th:replace="~{build-setup :: form}"></div>
-<section class="card pipeline-definition" th:if="${definition != null}">
+<div th:replace="~{build-specification :: form}"></div><script src="/build-specification.js" defer></script><div th:replace="~{build-create-stage :: form}"></div><div th:replace="~{build-setup :: form}"></div>
+<section id="build-source-area" data-flow-step="source" class="card pipeline-definition" th:if="${definition != null}">
 <div class="section-title"><h2 th:text="${definition.name()}"></h2><span class="field-badge" th:text="${definition.state()}"></span></div>
 <p class="small muted" th:text="${definition.project()}"></p><p th:if="${!definition.description().isEmpty()}" th:text="${definition.description()}"></p>
 <p th:if="${definition.stages().isEmpty()}">등록된 단계 없음 · 실행할 수 없습니다.</p>
@@ -50,8 +51,9 @@
 <ul th:if="${!stage.artifacts().isEmpty()}"><li th:each="artifact : ${stage.artifacts()}" th:text="${artifact}"></li></ul>
 </li></ol>
 <p th:if="${tab == 'pipelines' and definition.runnable()}"><a class="ui-button" th:href="@{/builds(tab='execute',project=${project},pipeline=${pipeline})}">이 파이프라인으로 실행</a></p>
-<p class="small muted" th:if="${tab == 'pipelines' and !definition.runnable()}">ACTIVE 상태의 빌드 단계가 필요합니다. 현재 단계 추가는 OCI 콘솔에서 진행하세요.</p>
+<p class="small muted" th:if="${tab == 'pipelines' and !definition.runnable()}">ACTIVE 상태의 빌드 단계가 필요합니다. 위 빌드 단계 추가에서 소스와 명세를 지정하세요.</p>
 </section>
+<div th:replace="~{build-destinations :: form}"></div>
 <section class="card" th:if="${tab == 'history'}"><h2>실행 이력</h2><p th:if="${runs.isEmpty()}">실행 이력 없음</p>
 <div class="table-scroll" th:if="${!runs.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">실행</th><th class="table-heading">상태</th><th class="table-heading">시작 요청 (UTC)</th></tr></thead><tbody><tr th:each="r : ${runs}"><td class="table-cell"><a th:href="@{/builds(pipeline=${pipeline},run=${r.id()})}" th:text="${r.name()}"></a><details><summary>OCID</summary><code th:text="${r.id()}"></code></details></td><td th:text="${r.state()}" class="table-cell"></td><td th:text="${r.createdAt()}" class="table-cell"></td></tr></tbody></table></div>
 </section>
@@ -74,10 +76,12 @@
 <p>로그 활성화: OCI 콘솔 → DevOps → 프로젝트 → 로그 → 로그 사용. <a href="#permissions">권한 설정</a></p>
 </details><script src="/build-logs.js" defer></script></section>
 <section class="card" th:if="${tab == 'execute' and ticket != null}">
-<h2>실행 설정</h2>
+<h2 id="build-execute-area">실행 설정</h2>
+<details class="build-advanced" th:if="${buildChecks != null}"><summary>실행 준비 상태</summary><ul><li th:each="check : ${buildChecks}" th:text="|${check.name()} · ${check.state()} · ${check.message()}|"></li></ul></details>
 <p th:if="${!definition.runnable()}" class="notice">실행 가능한 ACTIVE 단계가 필요합니다. 파이프라인 상태를 확인하세요.</p>
-<form th:action="@{/builds/action}" method="post" class="build-execution" th:attr="data-pipeline=${definition.name()}">
+<form th:action="@{/builds/action}" method="post" class="build-execution" data-flow-step="execute" th:attr="data-pipeline=${definition.name()}">
 <input type="hidden" name="ticket" th:value="${ticket}">
+<label class="form-field build-purpose">실행 목적 · 필수<select name="purpose" class="ui-control" required><option value="test" th:selected="${buildPurpose == 'test'}">빌드·테스트만</option><option value="store" th:selected="${buildPurpose == 'store'}">빌드·저장</option><option value="deploy" th:selected="${buildPurpose == 'deploy'}">빌드·저장·배포</option></select><span class="small muted">목적을 바꿔도 기존 단계는 생략되지 않습니다.</span></label>
 <div class="build-field-grid build-source-fields">
 <label class="form-field"><span>실행 이름 <span class="field-badge">선택</span></span><input class="ui-control" name="runName" th:value="${runName}" maxlength="255" placeholder="OCI 자동 생성"></label>
 <label class="form-field"><span>소스 버전 <span class="field-badge">선택</span></span>

@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · Registry')}"></head><body>
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content">
-<div th:replace="~{layout :: notice}"></div><h1>빌드</h1><nav th:replace="~{build-projects :: tabs}"></nav>
+<div th:replace="~{layout :: notice}"></div><h1>빌드</h1><nav th:replace="~{build-projects :: tabs}"></nav><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card"><div class="section-title"><h2>Registry</h2><a class="ui-button" th:href="@{/builds(tab='registry',kind=${kind},repository=${repository},pipeline=${pipeline})}">다시 조회</a></div>
 <form method="get" action="/builds" class="scope-bar"><input type="hidden" name="tab" value="registry"><input type="hidden" name="pipeline" th:value="${pipeline}">
 <label class="form-field">유형<select name="kind" class="ui-control"><option value="GENERIC" th:selected="${kind == 'GENERIC'}">파일 · JAR/ZIP</option><option value="CONTAINER" th:selected="${kind == 'CONTAINER'}">컨테이너 이미지</option></select></label><button class="ui-button">조회</button></form>

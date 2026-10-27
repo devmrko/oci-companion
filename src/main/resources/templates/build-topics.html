@@ -1,7 +1,7 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 알림 주제')}"></head><body>
 <header th:replace="~{layout :: header}"></header>
 <main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
-<nav th:replace="~{build-projects :: tabs}"></nav>
+<nav th:replace="~{build-projects :: tabs}"></nav><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card"><h2>알림 주제와 로그</h2>
 <dl class="build-facts">
 <div><dt>알림 주제</dt><dd>프로젝트의 빌드·배포 상태 알림을 전달하는 채널입니다.</dd></div>

@@ -3,6 +3,7 @@
 2026-10-27 · Redmine [#996](https://redmine.cloud-handson.com/issues/996)
 
 상태: 설계. 구현·배포 완료 기록이 아니다.
+후속 구현과 검증 범위: [빌드 누락 보완 검증](../build-gap-validation.md). 상단에는 큰 단계와 현재 위치만 표시하고 자세한 안내는 접는다.
 근거: [DevOps 액션·입력값 대조](devops-action-matrix.md). 주요 21개 액션과 기본 배포 경로를 대상으로 한다.
 기존 구현 기준은 58167a7. 작성 중인 실행 탭 변경은 완료 판정에서 제외한다.
 

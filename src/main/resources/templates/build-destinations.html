@@ -1,0 +1,25 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" th:if="${tab == 'execute'}" class="card" id="build-destinations" data-flow-step="storage">
+<div class="section-title"><h2>산출물 저장소</h2><a class="ui-button" th:href="@{/builds(tab='registry',pipeline=${pipeline})}">Registry 조회·생성</a></div>
+<p th:if="${setup == null}">저장 위치 조회 실패 · 파이프라인 설정과 권한을 확인하세요.</p>
+<th:block th:if="${setup != null}"><p class="notice" th:each="warning : ${setup.warnings()}" th:text="${warning}"></p>
+<p th:if="${setup.deliveries().isEmpty()}">Registry 전달 단계 없음 · 이 빌드는 Registry에 자동 저장하지 않습니다.</p>
+<a th:if="${setup.deliveries().isEmpty()}" class="ui-button" th:href="@{/builds(tab='pipelines',pipeline=${pipeline})}">전달 단계 설정</a>
+<th:block th:each="d : ${setup.deliveries()}"><div th:each="m : ${d.mappings()}" th:with="a=${destinationArtifacts[m.artifact()]}" class="build-advanced">
+<h3 th:text="|출력: ${m.output()}|"></h3>
+<p th:if="${a == null}">저장 위치 참조 조회 실패 · DevOps 산출물 읽기 권한을 확인하세요.</p>
+<th:block th:if="${a != null}"><p class="small destination-current" th:attr="data-output=${m.output()}"><strong>현재 위치: </strong><span th:text="${a.location()}"></span></p>
+<form th:action="@{/builds/setup}" method="post" class="build-field-grid build-destination-form">
+<input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="destination"><input type="hidden" name="stage" th:value="${d.id()}"><input type="hidden" name="output" th:value="${m.output()}">
+<label class="form-field"><span th:text="${a.type() == 'GENERIC_FILE' ? '파일 저장소 · 필수' : '컨테이너 저장소 · 필수'}"></span>
+<select name="repository" class="ui-control" required><option value="">저장소 선택</option>
+<th:block th:if="${a.type() == 'GENERIC_FILE'}"><option th:each="r : ${setup.repositories()}" th:value="${r.id()}" th:text="${r.name()}" th:selected="${r.id() == a.repository()}"></option></th:block>
+<th:block th:if="${a.type() == 'DOCKER_IMAGE'}"><option th:each="r : ${containerRepositories}" th:value="${r.id()}" th:text="${r.name()}" th:selected="${r.id() == a.repository()}"></option></th:block>
+</select></label>
+<label class="form-field" th:if="${a.type() == 'GENERIC_FILE'}">파일 경로 · 필수<input class="ui-control" name="path" th:value="${a.path()}" required maxlength="1024"></label>
+<label class="form-field">버전·태그 · 필수<input class="ui-control" name="version" th:value="${a.version()}" required maxlength="255"></label>
+<div class="form-toolbar"><button class="ui-button">저장 위치 적용</button></div></form>
+</th:block></div></th:block>
+<details class="build-advanced" th:if="${!setup.deliveries().isEmpty()}"><summary>적용 범위·버전</summary><p class="small muted">적용하면 OCI 파이프라인의 저장 위치를 변경합니다. 이후 실행에도 적용됩니다. 다른 파이프라인이 공유하는 참조는 변경하지 않습니다.</p>
+<p class="small muted" th:if="${!setup.deliveries().isEmpty()}">버전 덮어쓰기 금지 저장소는 매 빌드마다 새 버전이 필요합니다. ${변수명}을 사용하면 아래 빌드 파라미터에서 값을 지정하세요.</p>
+</details><p class="notice" th:if="${containerRegistryError != null}" th:text="${containerRegistryError}"></p><p class="notice" id="destination-unsaved" hidden>변경한 저장 위치를 먼저 적용하세요.</p>
+</th:block></section></body></html>

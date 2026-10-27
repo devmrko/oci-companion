@@ -45,6 +45,9 @@ class OciBuildAdministrationTest {
         assertEquals("token",request.getValue().getOpcRetryToken());
         assertEquals("project",request.getValue().getCreateBuildPipelineDetails().getProjectId());
         assertEquals("description",request.getValue().getCreateBuildPipelineDetails().getDescription());
+        adapter.createPipeline(c,"region","comp","project","name","","token2");
+        verify(client,times(2)).createBuildPipeline(request.capture());
+        assertNull(request.getValue().getCreateBuildPipelineDetails().getDescription());
     }
     @Test void projectRequiresListedTopicAndCreatesActualNotificationConfiguration() throws Exception {
         var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);

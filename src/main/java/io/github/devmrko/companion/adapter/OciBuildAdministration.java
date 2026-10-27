@@ -50,7 +50,7 @@ public class OciBuildAdministration implements BuildAdministration {
         try(var client=notificationClient(c,region)) {
             return client.createTopic(com.oracle.bmc.ons.requests.CreateTopicRequest.builder().opcRetryToken(token)
                 .createTopicDetails(com.oracle.bmc.ons.model.CreateTopicDetails.builder().compartmentId(compartment)
-                    .name(name).description(description).build()).build()).getNotificationTopic().getTopicId();
+                    .name(name).description(description.isBlank()?null:description).build()).build()).getNotificationTopic().getTopicId();
         } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
     }
     public String createProject(Connection c,String region,String compartment,String name,String description,String topic,String token) {
@@ -58,7 +58,7 @@ public class OciBuildAdministration implements BuildAdministration {
         if(topics(c,region,compartment).stream().noneMatch(t->t.id().equals(topic))) throw Errors.MISSING.exception();
         try(var client=clients.client(c,region)) {
             return client.createProject(CreateProjectRequest.builder().opcRetryToken(token).createProjectDetails(
-                CreateProjectDetails.builder().compartmentId(compartment).name(name.trim()).description(description)
+                CreateProjectDetails.builder().compartmentId(compartment).name(name.trim()).description(description.isBlank()?null:description)
                     .notificationConfig(NotificationConfig.builder().topicId(topic).build()).build()).build()).getProject().getId();
         } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
     }
@@ -70,7 +70,7 @@ public class OciBuildAdministration implements BuildAdministration {
                 throw Errors.SCOPE.exception();
             try {
                 return client.createBuildPipeline(CreateBuildPipelineRequest.builder().opcRetryToken(token).createBuildPipelineDetails(
-                    CreateBuildPipelineDetails.builder().projectId(project).displayName(name.trim()).description(description).build()).build())
+                    CreateBuildPipelineDetails.builder().projectId(project).displayName(name.trim()).description(description.isBlank()?null:description).build()).build())
                     .getBuildPipeline().getId();
             } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
         } catch(io.github.devmrko.foundation.core.error.BusinessException e) { throw e; }

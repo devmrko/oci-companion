@@ -1,6 +1,9 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    BUILD_STAGE_INPUT(ErrorCategory.VALIDATION, "빌드 단계의 소스·브랜치·명세 경로·이미지·선행 단계를 확인하세요."),
+    BUILD_PURPOSE(ErrorCategory.VALIDATION, "실행 목적과 단계 구성이 다릅니다. 빌드·저장·배포 단계와 산출물 연결을 확인하세요."),
+    DESTINATION_LINK(ErrorCategory.CONFLICT, "저장 위치 참조는 생성됐지만 단계 연결에 실패했습니다. 파이프라인 탭의 전달 위치에서 build-output 참조와 현재 연결을 확인하세요."),
     REGISTRY_INPUT(ErrorCategory.VALIDATION, "저장소 유형·이름·설명을 확인하세요. 파일: 영문·숫자·밑줄·하이픈, 이미지: 소문자·숫자·경로. 설명 최대 4,000자."),
     TOPIC_INPUT(ErrorCategory.VALIDATION, "알림 주제 이름은 영문·숫자·하이픈·밑줄 1–255자로 입력하세요."),
     DELIVERY_ORDER(ErrorCategory.VALIDATION, "뒤에 연결된 단계가 있습니다. 기존 순서를 OCI 콘솔에서 확인하고 전달 단계를 연결하세요."),

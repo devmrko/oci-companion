@@ -889,3 +889,14 @@ a:focus-visible, .ui-button:focus-visible {
 .registry-table { min-width:640px; }
 .registry-table .table-cell { vertical-align:top; }
 .registry-table code { display:inline-block; min-width:220px; max-width:320px; overflow-wrap:anywhere; }
+
+.destination-current { overflow-wrap:anywhere; }
+
+.build-flow { display:flex; gap:8px; align-items:center; overflow-x:auto; margin:18px 0; padding:4px 0 10px; }
+.build-flow-step { display:flex; flex:1 0 108px; gap:8px; align-items:center; justify-content:center; padding:12px; border:1px solid #bec9cd; border-radius:5px; color:#34444b; background:#fff; text-decoration:none; white-space:nowrap; }
+.build-flow-step.is-current { border:2px solid #007991; background:#e8f5f7; color:#00576b; font-weight:700; }
+.build-flow-step:focus-visible { outline:3px solid #007991; outline-offset:1px; }
+.build-flow-number { font-size:12px; }
+.build-flow-arrow { color:#647078; }
+.build-purpose { max-width:420px; margin-bottom:18px; }
+[data-flow-step] { scroll-margin-top:90px; }

@@ -66,6 +66,7 @@ class CatalogWebTest {
         mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
         mvc.perform(post("/builds/setup").session(session).with(csrf()).param("ticket",ticket).param("action","pipeline").param("name","new")).andExpect(status().isConflict());
         org.mockito.Mockito.verify(setup,org.mockito.Mockito.times(2)).read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"));
+        org.mockito.Mockito.verify(setup,org.mockito.Mockito.times(2)).buildOptions(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"));
         org.mockito.Mockito.verifyNoMoreInteractions(setup);
     }
     @Test void logsRequireCurrentScopeAndExposePermissions() throws Exception {
@@ -134,14 +135,14 @@ class CatalogWebTest {
         org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
             .thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p1","pipeline","ACTIVE")));
         org.mockito.Mockito.when(definitions.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
-            .thenReturn(new io.github.devmrko.companion.port.BuildDefinition.Definition("pipeline","project","ACTIVE","","revision",java.util.List.of()));
+            .thenReturn(new io.github.devmrko.companion.port.BuildDefinition.Definition("pipeline","project","ACTIVE","","revision",java.util.List.of(new io.github.devmrko.companion.port.BuildDefinition.Stage("stage","build","빌드·테스트","ACTIVE",java.util.List.of("시작"),"image","build_spec.yaml",3600,java.util.List.of(),java.util.List.of()))));
         org.mockito.Mockito.when(control.settings(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p1")))
             .thenReturn(new io.github.devmrko.companion.port.BuildControl.Settings("etag",java.util.List.of()));
         org.mockito.Mockito.when(control.start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p1"),org.mockito.ArgumentMatchers.eq("etag"),org.mockito.ArgumentMatchers.eq("test"),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString())).thenReturn("run1");
         var result=mvc.perform(get("/builds").session(session).param("tab","execute")).andExpect(status().isOk()).andExpect(content().string(containsString("프리셋 저장"))).andReturn();
         String ticket=(String)result.getModelAndView().getModel().get("ticket");
         mvc.perform(post("/builds/action").session(session).param("ticket",ticket).param("action","run")).andExpect(status().isForbidden());
-        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run").param("runName","test")).andExpect(redirectedUrl("/builds?pipeline=p1&run=run1"));
+        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run").param("runName","test").param("purpose","test")).andExpect(redirectedUrl("/builds?pipeline=p1&run=run1"));
         mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run")).andExpect(status().isBadRequest());
         org.mockito.Mockito.verify(control,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString());
         result=mvc.perform(get("/builds").session(session).param("tab","execute")).andReturn();

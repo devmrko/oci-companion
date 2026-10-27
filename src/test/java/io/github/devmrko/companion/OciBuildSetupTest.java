@@ -12,6 +12,29 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 class OciBuildSetupTest {
     final Connection c=new Connection("DEFAULT","tenant","user","region","label",false);
+    @Test void newManagedBuildUsesSelectedSourceAndRejectsStaleOrForgedInput() throws Exception {
+        var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);when(clients.client(c,"region")).thenReturn(client);
+        when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().buildPipeline(BuildPipeline.builder().id("pipe").projectId("project").compartmentId("comp").build()).build());
+        when(client.createBuildPipelineStage(any())).thenReturn(CreateBuildPipelineStageResponse.builder().buildPipelineStage(BuildStage.builder().id("created").build()).build());
+        var defs=mock(BuildDefinition.class);
+        when(defs.read(c,"region","comp","pipe")).thenReturn(new BuildDefinition.Definition("pipe","project","ACTIVE","","revision",List.of()));
+        when(defs.branches(eq(c),eq("region"),any())).thenReturn(List.of(new BuildDefinition.Choice("main","main")));
+        when(defs.specification(eq(c),eq("region"),any(),eq("build_spec.yaml"))).thenReturn(new BuildDefinition.Specification("version: 0.1\ncomponent: build\nsteps: [{type: Command, command: 'true'}]","",List.of(),List.of()));
+        var adapter=spy(new OciBuildSetup(clients,defs));
+        doReturn(new io.github.devmrko.companion.port.BuildSetup.BuildOptions(List.of(new io.github.devmrko.companion.port.BuildSetup.SourceOption("repo","source","OCI","https://oci/repo","main")),List.of("OL8_X86_64_STANDARD_10"),List.of())).when(adapter).buildOptions(c,"region","comp","pipe");
+        var input=new io.github.devmrko.companion.port.BuildSetup.NewBuild("build","repo","https://forged/repo","main","build_spec.yaml","OL8_X86_64_STANDARD_10",3600,"");
+        assertThrows(RuntimeException.class,()->adapter.createBuild(c,"region","comp","pipe","stale",input,"token"));
+        var bad=new io.github.devmrko.companion.port.BuildSetup.NewBuild("build","foreign","","main","build_spec.yaml","OL8_X86_64_STANDARD_10",3600,"");
+        assertThrows(RuntimeException.class,()->adapter.createBuild(c,"region","comp","pipe","revision",bad,"token"));
+        verify(client,never()).createBuildPipelineStage(any());
+        assertEquals("created",adapter.createBuild(c,"region","comp","pipe","revision",input,"token"));
+        var request=org.mockito.ArgumentCaptor.forClass(CreateBuildPipelineStageRequest.class);verify(client).createBuildPipelineStage(request.capture());
+        var details=(CreateBuildStageDetails)request.getValue().getCreateBuildPipelineStageDetails();
+        assertEquals("pipe",details.getBuildPipelineStagePredecessorCollection().getItems().getFirst().getId());
+        assertEquals("https://oci/repo",details.getBuildSourceCollection().getItems().getFirst().getRepositoryUrl());
+        assertEquals("repo",((DevopsCodeRepositoryBuildSource)details.getBuildSourceCollection().getItems().getFirst()).getRepositoryId());
+        assertEquals("token",request.getValue().getOpcRetryToken());
+    }
     @Test void containerReferenceUsesSelectedRepositoryAndRejectsAnotherCompartment() throws Exception {
         var clients=mock(OciBuildHistory.class);var devops=mock(DevopsClient.class);when(clients.client(c,"ap-seoul-1")).thenReturn(devops);
         when(devops.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().buildPipeline(BuildPipeline.builder().compartmentId("comp").projectId("project").build()).build());
@@ -84,6 +107,23 @@ class OciBuildSetupTest {
         assertNull(details.getBuildPipelineStagePredecessorCollection());
         assertEquals("new",details.getDeliverArtifactCollection().getItems().getFirst().getArtifactId());
         assertEquals(report,details.getDeliverArtifactCollection().getItems().get(1));
+    }
+    @Test void destinationUsesIndependentReferenceAndRejectsStaleWriteBeforeCreation() throws Exception {
+        var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);when(clients.client(c,"region")).thenReturn(client);
+        when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().buildPipeline(BuildPipeline.builder().projectId("project").compartmentId("comp").build()).build());
+        when(client.getBuildPipelineStage(any())).thenReturn(GetBuildPipelineStageResponse.builder().etag("current").buildPipelineStage(DeliverArtifactStage.builder()
+            .buildPipelineId("pipe").compartmentId("comp").deliverArtifactCollection(DeliverArtifactCollection.builder().items(List.of(DeliverArtifact.builder().artifactName("jar").artifactId("shared").build())).build()).build()).build());
+        when(client.getDeployArtifact(any())).thenReturn(GetDeployArtifactResponse.builder().deployArtifact(DeployArtifact.builder().projectId("project").deployArtifactType(DeployArtifact.DeployArtifactType.GenericFile)
+            .deployArtifactSource(GenericDeployArtifactSource.builder().repositoryId("repo").deployArtifactPath("app.jar").deployArtifactVersion("v1").build()).build()).build());
+        var adapter=spy(new OciBuildSetup(clients,mock(BuildDefinition.class)));
+        doReturn("independent").when(adapter).createArtifact(any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString());
+        doNothing().when(adapter).updateDelivery(any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString());
+        assertThrows(RuntimeException.class,()->adapter.destination(c,"region","comp","pipe","stage","stale","jar","repo","app.jar","v2","token"));
+        adapter.destination(c,"region","comp","pipe","stage","current","jar","repo","app.jar","v1","token");
+        verify(adapter,never()).createArtifact(any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString());
+        adapter.destination(c,"region","comp","pipe","stage","current","jar","repo","app.jar","v2","token");
+        verify(adapter).updateDelivery(c,"region","comp","pipe","stage","current","jar","independent");
+        verify(client,never()).updateDeployArtifact(any());
     }
     @Test void completedBuildDoesNotImplyStoredArtifact() {
         var d=new io.github.devmrko.companion.port.BuildHistory.Detail("run","build","SUCCEEDED","",List.of(new io.github.devmrko.companion.port.BuildHistory.Step("build","SUCCEEDED","BUILD")));

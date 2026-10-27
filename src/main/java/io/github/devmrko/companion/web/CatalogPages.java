@@ -234,7 +234,7 @@ public class CatalogPages {
                         if(primary.isPresent()) specs.put(stage.id(),definitions.specification(c,s.region(),primary.get(),stage.spec()));
                     }
                     model.addAttribute("specifications",specs);
-                    if(tab.equals("pipelines")) {
+                    if(tab.equals("pipelines") || tab.equals("execute")) {
                         var value=setup.read(c,s.region(),s.compartment(),selected);
                         model.addAttribute("setup",value);
                         model.addAttribute("selectedRepository",repository);
@@ -245,11 +245,19 @@ public class CatalogPages {
                             synchronized(session) {
                                 var map=setupTickets(session);
                                 if(map.size()>=32)map.remove(map.keySet().iterator().next());
-                                map.put(token,new SetupTicket(s.region(),s.compartment(),selected,definition.revision(),value));
+                                map.put(token,new SetupTicket(s.region(),s.compartment(),selected,definition.revision(),value,tab));
                             }
                             model.addAttribute("setupTicket",token);
                         }
-                        return "builds";
+                        if(value!=null)model.addAttribute("destinationArtifacts",value.artifacts().stream().collect(java.util.stream.Collectors.toMap(BuildSetup.Artifact::id,a->a,(a,b)->a)));
+                        if(tab.equals("pipelines")) {
+                            try {model.addAttribute("buildOptions",setup.buildOptions(c,s.region(),s.compartment(),selected));}
+                            catch(BusinessException e){model.addAttribute("buildOptionsError",e.getMessage());}
+                            model.addAttribute("stageCreateCli","oci devops build-pipeline-stage create-build-stage --profile "+quote(c.profile())+" --region "+quote(s.region())+" --build-pipeline-id "+quote(selected)+" --build-source-collection file://sources.json --image OL8_X86_64_STANDARD_10 --stage-predecessor-collection file://predecessors.json --build-spec-file build_spec.yaml");
+                            return "builds";
+                        }
+                        model.addAttribute("buildChecks",BuildChecks.inspect(definition,value,specs));
+                        model.addAttribute("buildPurpose",BuildChecks.purpose(definition));
                     }
                     var settings=control.settings(c,s.region(),s.compartment(),selected);
                     var saved=presets.list(c,s.region(),s.compartment(),selected);
@@ -316,7 +324,7 @@ public class CatalogPages {
         if(session.getAttribute("scopeInvalid")!=null) throw Errors.SCOPE.exception();
         return logs.read(c,region,compartment,pipeline,run,page,until);
     }
-    record SetupTicket(String region,String compartment,String pipeline,String revision,BuildSetup.Settings settings) {}
+    record SetupTicket(String region,String compartment,String pipeline,String revision,BuildSetup.Settings settings,String tab) {}
     @SuppressWarnings("unchecked")
     private Map<String,SetupTicket> setupTickets(HttpSession session) {
         var map=(Map<String,SetupTicket>)session.getAttribute("setupTickets");
@@ -327,7 +335,8 @@ public class CatalogPages {
         @RequestParam(defaultValue="") String name,@RequestParam(defaultValue="") String description,@RequestParam(defaultValue="") String stage,
         @RequestParam(defaultValue="") String spec,@RequestParam(defaultValue="3600") int timeout,@RequestParam(defaultValue="") String branch,
         @RequestParam(defaultValue="") String type,@RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String path,
-        @RequestParam(defaultValue="") String version,@RequestParam(defaultValue="") String output,@RequestParam(defaultValue="") String artifact) {
+        @RequestParam(defaultValue="") String version,@RequestParam(defaultValue="") String output,@RequestParam(defaultValue="") String artifact,
+        @RequestParam(defaultValue="") String buildSource,@RequestParam(defaultValue="") String sourceUrl,@RequestParam(defaultValue="") String image) {
         var c=SecurityConfig.connection(auth);SetupTicket t;
         synchronized(session) { t=setupTickets(session).remove(ticket); }
         if(t==null)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
@@ -335,6 +344,7 @@ public class CatalogPages {
         if(session.getAttribute("scopeInvalid")!=null)throw Errors.SCOPE.exception();
         try {
             switch(action) {
+                case "create-build" -> setup.createBuild(c,t.region(),t.compartment(),t.pipeline(),t.revision(),new BuildSetup.NewBuild(name,buildSource,sourceUrl,branch,spec,image,timeout,stage),ticket);
                 case "pipeline" -> setup.rename(c,t.region(),t.compartment(),t.pipeline(),t.settings().etag(),name,description);
                 case "stage" -> {
                     var saved=t.settings().stages().stream().filter(v->v.id().equals(stage)).findFirst().orElseThrow(Errors.SCOPE::exception);
@@ -345,13 +355,18 @@ public class CatalogPages {
                     setup.updateDelivery(c,t.region(),t.compartment(),t.pipeline(),stage,saved.etag(),output,artifact);
                 }
                 case "repository" -> setup.createRepository(c,t.region(),t.compartment(),name,ticket);
+                case "destination" -> {
+                    var saved=t.settings().deliveries().stream().filter(v->v.id().equals(stage)).findFirst().orElseThrow(Errors.SCOPE::exception);
+                    if(saved.mappings().stream().noneMatch(m->m.output().equals(output)))throw Errors.SCOPE.exception();
+                    setup.destination(c,t.region(),t.compartment(),t.pipeline(),stage,saved.etag(),output,repository,path,version,ticket);
+                }
                 case "artifact" -> setup.createArtifact(c,t.region(),t.compartment(),t.pipeline(),name,type,repository,path,version,ticket);
                 case "deliver" -> setup.deliver(c,t.region(),t.compartment(),t.pipeline(),t.revision(),stage,output,artifact,ticket);
                 default -> throw Errors.BUILD_PARAMETERS.exception();
             }
-            flash.addFlashAttribute("message","OCI 설정 저장 완료 · 실행 중인 빌드에는 적용되지 않습니다.");
+            flash.addFlashAttribute("message","OCI 설정 요청 완료 · 단계 상태와 저장값을 다시 조회하세요. 실행 중인 빌드에는 적용되지 않습니다.");
         } catch(BusinessException e) { flash.addFlashAttribute("message",e.getMessage()); }
-        return "redirect:/builds?tab=pipelines&pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);
+        return "redirect:/builds?tab="+t.tab()+"&pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);
     }
     record AdminTicket(String region,String compartment,String tab) {}
     @SuppressWarnings("unchecked")
@@ -468,6 +483,18 @@ public class CatalogPages {
                 case "run" -> {
                     var current=control.settings(c,t.region(),t.compartment(),t.pipeline());
                     BuildInputs.validate(BuildInputs.fields(current.parameters(),values,inputRules.read(c,t.region(),t.compartment(),t.pipeline())));
+                    var currentDefinition=definitions.read(c,t.region(),t.compartment(),t.pipeline());
+                    if(!Objects.equals(currentDefinition.revision(),t.revision()))throw Errors.BUILD_CHANGED.exception();
+                    var currentSetup=setup.read(c,t.region(),t.compartment(),t.pipeline());
+                    var currentSpecs=new LinkedHashMap<String,BuildDefinition.Specification>();
+                    for(var item:currentDefinition.stages()) if(!item.spec().isEmpty()) {
+                        var primary=item.sources().stream().filter(BuildDefinition.Source::primary).findFirst().orElse(item.sources().isEmpty()?null:item.sources().getFirst());
+                        if(primary!=null) {
+                            if(primary.key().equals(override.source()))primary=new BuildDefinition.Source(primary.key(),primary.name(),primary.provider(),primary.repositoryId(),primary.url(),override.commit().isEmpty()?override.branch():override.commit(),true);
+                            currentSpecs.put(item.id(),definitions.specification(c,t.region(),primary,item.spec()));
+                        }
+                    }
+                    BuildChecks.validate(currentDefinition,currentSetup,currentSpecs,input.getFirst("purpose"));
                     String run=control.start(c,t.region(),t.compartment(),t.pipeline(),t.etag(),runName,values,ticket,override,t.revision());
                     destination="/builds?pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8)+"&run="+java.net.URLEncoder.encode(run,java.nio.charset.StandardCharsets.UTF_8);
                     flash.addFlashAttribute("message","빌드 실행 요청 완료");

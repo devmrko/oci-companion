@@ -9,6 +9,9 @@
   let dirty = false, loading = false, sequence = 0;
   const source = form.querySelector('#build-source'), branch = form.querySelector('#build-branch'), commit = form.querySelector('#build-commit');
   const status = document.querySelector('#source-status'), run = form.querySelector('#build-run');
+  document.querySelectorAll('.build-destination-form').forEach(destination => destination.addEventListener('input', () => {
+    dirty = true;form.dataset.destinationDirty='true';document.querySelector('#destination-unsaved').hidden=false;
+  }));
   const runnable = !run.disabled, review = document.querySelector('#build-review');
   document.querySelectorAll('.build-execution,.build-rules,.build-defaults').forEach(f => f.addEventListener('input', () => { dirty = true; }));
   function options(select, values, empty) {
@@ -71,13 +74,16 @@
   document.querySelectorAll('.build-execution,.build-rules,.build-defaults').forEach(f => f.addEventListener('submit', event => {
     const action = event.submitter?.value;
     if (action === 'run') {
-      if (loading) { event.preventDefault();return; }
+      if (loading || form.dataset.destinationDirty) { event.preventDefault();document.querySelector('#destination-unsaved')?.scrollIntoView({block:'center'});return; }
       if (!event.submitter.dataset.confirmed) {
         event.preventDefault();document.querySelector('#build-review-values').replaceChildren();
         addSummary('파이프라인',form.dataset.pipeline);
         const global = document.querySelector('.global-scope');
         if (global) ['region','compartment'].forEach((key,i) => addSummary(['리전','구획'][i],global.querySelector('[name='+key+']')?.selectedOptions[0]?.textContent || ''));
+        addSummary('실행 목적',form.elements.purpose.selectedOptions[0].textContent);
         addSummary('실행 이름',form.elements.runName.value || 'OCI 자동 생성');
+        document.querySelectorAll('.destination-current').forEach(item => addSummary('산출물 · '+item.dataset.output,item.textContent.trim()));
+        if(!document.querySelector('.destination-current'))addSummary('산출물 저장소','Registry 전달 위치 없음 또는 조회 불가');
         addSummary('소스',source.selectedOptions[0].textContent);
         if(source.value) {addSummary('브랜치',branch.value);addSummary('커밋',commit.value || '최신 커밋');}
         form.querySelectorAll('.build-parameter').forEach(field => addSummary(field.dataset.label,field.querySelector('[name=parameterValue]').value || '(빈 값)'));
@@ -88,5 +94,6 @@
     if(f.dataset.pending) {event.preventDefault();return;}
     f.dataset.pending = 'true';dirty = false;f.setAttribute('aria-busy','true');
   }));
+  document.querySelectorAll('.build-destination-form').forEach(destination => destination.addEventListener('submit',()=>{dirty=false;}));
   window.addEventListener('beforeunload', event => {if(dirty) {event.preventDefault();event.returnValue='';}});
 })();

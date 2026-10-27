@@ -24,7 +24,7 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
   // Verify real update path without altering the existing stage values.
   const edit=page.locator('details').filter({has:page.locator('summary').filter({hasText:'빌드 단계 수정'})}).first();
   await edit.locator('summary').click();await edit.getByRole('button',{name:'빌드 단계 저장'}).click();await page.waitForLoadState('load');
-  await page.getByText('OCI 설정 저장 완료 · 실행 중인 빌드에는 적용되지 않습니다.',{exact:true}).waitFor();
+  await page.getByText('OCI 설정 요청 완료 · 단계 상태와 저장값을 다시 조회하세요. 실행 중인 빌드에는 적용되지 않습니다.',{exact:true}).waitFor();
   }
   let artifact=page.locator('select[name=artifact] option').filter({hasText:'db-companion-jar-delivery'});
   if(!await artifact.count()){

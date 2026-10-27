@@ -8,7 +8,7 @@
 <a class="build-tab" th:attr="aria-current=${tab == 'history' ? 'page' : null}" th:classappend="${tab == 'history'} ? 'is-active'" th:href="@{/builds(tab='history',project=${project},pipeline=${pipeline})}">실행 이력</a>
 <a class="build-tab" th:attr="aria-current=${tab == 'registry' ? 'page' : null}" th:classappend="${tab == 'registry'} ? 'is-active'" th:href="@{/builds(tab='registry',pipeline=${pipeline})}">Registry</a>
 <a class="build-tab" th:attr="aria-current=${tab == 'topics' ? 'page' : null}" th:classappend="${tab == 'topics'} ? 'is-active'" th:href="@{/builds(tab='topics')}">알림 주제</a>
-</nav>
+</nav><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
 <p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>
 <p th:if="${projectItems.isEmpty()}">프로젝트 없음 또는 조회 실패</p>
