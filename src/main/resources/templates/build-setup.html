@@ -15,24 +15,21 @@
 <section class="card"><h2>산출물 저장</h2>
 <p class="notice" th:each="warning : ${setup.warnings()}" th:text="${warning}"></p>
 <p>빌드 → outputArtifacts → Registry 전달. 빌드 사양의 출력 이름과 저장 위치를 연결합니다.</p>
-<details class="build-advanced"><summary>1. Artifact Registry 저장소 생성</summary>
-<form th:action="@{/builds/setup}" method="post" class="scope-bar"><input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="repository">
-<label class="form-field">저장소 이름<input class="ui-control" name="name" required maxlength="255"></label><button class="ui-button">저장소 생성</button></form>
-<p class="small muted">현재 구획에 버전 덮어쓰기를 금지하는 저장소를 생성합니다. 컨테이너 저장소는 OCI 콘솔 → 개발자 서비스 → 컨테이너 레지스트리에서 준비하세요.</p></details>
-<details class="build-advanced"><summary>2. 산출물 저장 위치 등록</summary>
+<p><a class="ui-button" th:href="@{/builds(tab='registry',pipeline=${pipeline})}">Registry 조회·생성·관리</a></p>
+<details class="build-advanced"><summary>1. 산출물 저장 위치 등록</summary>
 <form th:action="@{/builds/setup}" method="post" class="build-field-grid"><input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="artifact">
 <label class="form-field">참조 이름 · 필수<input class="ui-control" name="name" required maxlength="255"></label>
-<label class="form-field">유형 · 필수<select class="ui-control" name="type"><option value="BINARY">파일 · JAR/ZIP (Artifact Registry)</option><option value="DOCKER_IMAGE">컨테이너 이미지 (Container Registry)</option></select></label>
-<label class="form-field">파일 저장소 · 파일 유형 필수<select class="ui-control" name="repository"><option value="">선택</option><option th:each="r : ${setup.repositories()}" th:value="${r.id()}" th:text="${r.name()}"></option></select></label>
-<label class="form-field">저장 경로 · 필수<input class="ui-control" name="path" required maxlength="1024" placeholder="db-companion/app.jar"><span class="small muted">이미지: &lt;리전&gt;.ocir.io/&lt;namespace&gt;/&lt;repository&gt;</span></label>
+<label class="form-field">유형 · 필수<select class="ui-control" name="type" id="artifact-type"><option value="BINARY">파일 · JAR/ZIP (Artifact Registry)</option><option value="DOCKER_IMAGE">컨테이너 이미지 (Container Registry)</option></select></label>
+<label class="form-field">저장소 · 필수<select class="ui-control" name="repository" id="artifact-repository" required><option value="">선택</option><option th:each="r : ${setup.repositories()}" th:value="${r.id()}" th:text="${r.name()}" data-kind="BINARY" th:selected="${r.id() == selectedRepository}"></option><option th:each="r : ${containerRepositories}" th:value="${r.id()}" th:text="${r.name()}" data-kind="DOCKER_IMAGE" th:selected="${r.id() == selectedRepository}"></option></select></label>
+<label class="form-field">파일 경로 · 파일 유형 필수<input class="ui-control" name="path" id="artifact-path" required maxlength="1024" placeholder="db-companion/app.jar"><span class="small muted">이미지 주소는 선택한 Container Registry 저장소에서 구성합니다.</span></label>
 <label class="form-field">버전·태그 · 필수<input class="ui-control" name="version" required maxlength="255" placeholder="1.0.0"><span class="small muted">매 실행마다 고유 버전 사용. ${변수명} 사용 시 OCI 파라미터 또는 exportedVariables에 먼저 정의하세요.</span></label>
-<div class="form-toolbar"><button class="ui-button">저장 위치 등록</button></div></form><p class="small muted">DevOps 산출물 참조를 생성합니다. 아직 파일·이미지를 저장하지는 않습니다.</p></details>
+<p class="notice" th:if="${containerRegistryError != null}" th:text="${containerRegistryError}"></p><div class="form-toolbar"><button class="ui-button">저장 위치 등록</button></div></form><p class="small muted">DevOps 산출물 참조를 생성합니다. 아직 파일·이미지를 저장하지는 않습니다.</p></details>
 <details class="build-advanced" th:each="d : ${setup.deliveries()}"><summary th:text="|전달 위치 수정 · ${d.name()}|"></summary>
 <form th:each="m : ${d.mappings()}" th:action="@{/builds/setup}" method="post" class="scope-bar">
 <input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="delivery"><input type="hidden" name="stage" th:value="${d.id()}"><input type="hidden" name="output" th:value="${m.output()}">
 <label class="form-field"><span th:text="|출력: ${m.output()}|"></span><select name="artifact" class="ui-control" required><option value="">선택</option><option th:each="a : ${setup.artifacts()}" th:value="${a.id()}" th:text="| ${a.name()} · ${a.location()}|" th:selected="${a.id() == m.artifact()}"></option></select></label>
 <button class="ui-button">전달 위치 저장</button></form><p class="small muted">경로·버전을 바꾸려면 새 저장 위치를 등록한 뒤 선택하세요. 다른 출력 연결과 단계 순서는 유지합니다.</p></details>
-<details open class="build-advanced"><summary>3. Registry 전달 단계 추가</summary>
+<details open class="build-advanced"><summary>2. Registry 전달 단계 추가</summary>
 <form th:action="@{/builds/setup}" method="post" class="build-field-grid"><input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="deliver">
 <label class="form-field">선행 빌드 단계 · 필수<select class="ui-control" name="stage" required><option value="">선택</option><option th:each="s : ${setup.stages()}" th:value="${s.id()}" th:text="${s.name()}"></option></select></label>
 <label class="form-field">빌드 출력 이름 · 필수<input class="ui-control" name="output" required maxlength="255" list="build-output-names"><datalist id="build-output-names"><th:block th:each="entry : ${specifications}"><option th:each="o : ${entry.value.outputs()}" th:value="${#strings.substringBefore(o, ' · ')}" th:text="${o}"></option></th:block></datalist><span class="small muted">outputArtifacts의 name. 서버에서 빌드 사양과 유형을 재검증합니다.</span></label>
@@ -40,4 +37,4 @@
 <div class="form-toolbar"><button class="ui-button" th:disabled="${setup.stages().isEmpty() or setup.artifacts().isEmpty()}">전달 단계 추가</button></div></form>
 <p class="small muted">뒤에 다른 단계가 없는 빌드 단계에 추가합니다. 기존 연결이 있으면 OCI 콘솔에서 순서를 편집하세요. 외부 Git 빌드 사양을 조회할 수 없는 구성은 콘솔에서 연결하세요.</p></details>
 <p><a href="#permissions">사용자·파이프라인의 Registry 권한 설정</a></p>
-</section></th:block></body></html>
+<script src="/registry-selection.js" defer></script></section></th:block></body></html>

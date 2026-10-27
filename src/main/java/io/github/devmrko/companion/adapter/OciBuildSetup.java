@@ -107,7 +107,7 @@ public class OciBuildSetup implements BuildSetup {
         } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
     }
     public String createArtifact(Connection c,String region,String comp,String pipeline,String name,String type,String repository,String path,String version,String token) {
-        name(name);if(path.isBlank() || path.length()>1024 || version.isBlank() || version.length()>255 || path.chars().anyMatch(Character::isISOControl) || version.chars().anyMatch(Character::isISOControl))throw Errors.BUILD_PARAMETERS.exception();
+        name(name);if((type.equals("BINARY") && path.isBlank()) || path.length()>1024 || version.isBlank() || version.length()>255 || path.chars().anyMatch(Character::isISOControl) || version.chars().anyMatch(Character::isISOControl))throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,region)) {
             var p=pipeline(client,comp,pipeline);DeployArtifactSource source;DeployArtifact.DeployArtifactType artifactType;
             if(type.equals("BINARY")) {
@@ -118,7 +118,13 @@ public class OciBuildSetup implements BuildSetup {
                 artifactType=DeployArtifact.DeployArtifactType.GenericFile;
                 source=GenericDeployArtifactSource.builder().repositoryId(repository).deployArtifactPath(path).deployArtifactVersion(version).build();
             } else if(type.equals("DOCKER_IMAGE")) {
-                if(!path.matches("[a-zA-Z0-9.-]+/[a-zA-Z0-9_./-]+") || path.contains("..") || path.contains("@"))throw Errors.BUILD_PARAMETERS.exception();
+                try(var registry=registry(c,region)) {
+                    var repo=registry.getContainerRepository(com.oracle.bmc.artifacts.requests.GetContainerRepositoryRequest.builder().repositoryId(repository).build()).getContainerRepository();
+                    if(!comp.equals(repo.getCompartmentId()) || repo.getLifecycleState()!=com.oracle.bmc.artifacts.model.ContainerRepository.LifecycleState.Available)throw Errors.SCOPE.exception();
+                    var selectedRegion=com.oracle.bmc.Region.fromRegionId(region);
+                    if(!selectedRegion.getRealm().getRealmId().equals("oc1"))throw Errors.REGISTRY_INPUT.exception();
+                    path=selectedRegion.getRegionCode()+".ocir.io/"+repo.getNamespace()+"/"+repo.getDisplayName();
+                }
                 artifactType=DeployArtifact.DeployArtifactType.DockerImage;
                 source=OcirDeployArtifactSource.builder().imageUri(path+":"+version).build();
             } else throw Errors.BUILD_PARAMETERS.exception();

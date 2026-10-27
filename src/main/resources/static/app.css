@@ -885,3 +885,7 @@ a:focus-visible, .ui-button:focus-visible {
 .build-source-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }
 @media(max-width:700px) { .build-source-fields { grid-template-columns:1fr; } }
 .build-log-output { max-height:560px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; }
+
+.registry-table { min-width:640px; }
+.registry-table .table-cell { vertical-align:top; }
+.registry-table code { display:inline-block; min-width:220px; max-width:320px; overflow-wrap:anywhere; }

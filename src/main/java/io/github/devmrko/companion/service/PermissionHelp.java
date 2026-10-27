@@ -8,7 +8,14 @@ public final class PermissionHelp {
         String prefix="Allow group id <GROUP_OCID> to ";
         var result=new ArrayList<Rule>();
         java.util.function.BiConsumer<String,String> add=(task,permission)->result.add(new Rule(task,prefix+permission+" "+scope));
-        if(menu.equals("topics")) {
+        if(menu.equals("registry")) {
+            add.accept("파일 저장소 조회","read artifact-repositories");
+            add.accept("파일 목록 조회","read generic-artifacts");
+            add.accept("파일 저장소 생성","manage artifact-repositories");
+            add.accept("파일 저장소 설정 수정","use artifact-repositories");
+            add.accept("컨테이너 저장소·이미지 조회","read repos");
+            add.accept("컨테이너 저장소 생성·설정 수정","manage repos");
+        } else if(menu.equals("topics")) {
             add.accept("알림 주제 조회","read ons-topics");
             result.add(new Rule("알림 주제 생성",prefix+"manage ons-topics "+scope+" where request.permission = 'ONS_TOPIC_CREATE'"));
         } else {

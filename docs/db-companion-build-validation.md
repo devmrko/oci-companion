@@ -216,3 +216,30 @@ Registry GetGenericArtifactByPath로 아래 파일을 별도 조회했다.
 Maven BUILD SUCCESS 로그 페이지 조회·검색·자동 갱신·중지, 1440/390/320px 표시.
 실행: COMPANION_TEST_STORAGE_SUCCESS=1 및 해당 RUN_ID로 browser-build-flow.cjs.
 이번 변경은 재현 스크립트·검증 문서이며, 앱 코드 변경은 없다. 이전 Maven verify 44개 통과 결과를 유지한다.
+
+## 2026-10-27 Registry 탭 (#995)
+
+- 빌드 → Registry. 파일(Artifact Registry)·이미지(Container Registry) 유형별 실제 목록.
+- 기존 저장소는 별도 앱 등록 없이 선택. 전역 프로파일·리전·구획 사용. 파이프라인 없이도 조회·생성 가능.
+- 저장소 생성, 상세, 파일 저장소 이름/설명 수정, 컨테이너 README 수정.
+- 파일: 경로·버전·크기·SHA256·OCID·상태·생성 시각. 이미지: 저장소·태그·digest·OCID·상태·생성 시각.
+- 저장소 목록은 OCI 페이지네이션 순회. 산출물은 100건씩 다음 페이지 조회. 조회 실패를 빈 목록으로 표시하지 않음.
+- `Registry` 인터페이스와 `OciRegistry` SDK 어댑터. 요청 구획 재검증, 서버 ETag, CSRF, 일회성 티켓, 생성 retry token.
+- 저장소 상세 → 빌드 저장소로 선택 → 파이프라인의 산출물 저장 위치에서 선택 유지.
+- 파일·이미지 저장소를 목록에서 선택. 이미지 URI는 서버에서 실제 선택 저장소 namespace/name으로 구성한다.
+- 파이프라인 변경 시 선택 저장소 유지. 전역 범위 적용 시 Registry 유형 탭 유지.
+- Console 경로, 범위별 CLI 조회/생성/수정/산출물 목록, IAM 도움말. 공통 CSS 사용.
+
+실제 검증: DEFAULT / ap-seoul-1 / Joungmin.Ko.
+기존 db-companion-builds의 app.jar 버전 gui-1793006202881, 61,111,725 bytes 및 SHA256을 화면에서 확인.
+검증용 파일 저장소 companion-registry-check, 비공개 컨테이너 저장소 companion/registry-check를 GUI로 생성했다.
+각 설명/README 수정 후 OCI 재조회 및 빌드 저장소 선택을 확인했다. 기존 컨테이너 이미지 ID/digest도 화면에서 대조했다.
+1440/390/320px 레이아웃 통과. Maven verify 49개 통과. 실제 검증은 mocks 없이 OCI 사용.
+
+컨테이너 생성 요청의 isImmutable 필드는 실제 OCI API가 400 `Setting isImmutable is not currently supported`로 거부했다.
+필드를 제외하고 재검증하여 생성 성공. 컨테이너 생성 화면에는 해당 옵션을 제공하지 않는다.
+파일 저장소의 immutable 선택은 유지하며 생성 후 수정하지 않는다. 컨테이너 공개 전환·저장소/산출물 삭제는 콘솔 안내만 제공한다.
+수동 파일 업로드·이미지 push·배포 실행은 이번 기능에 포함하지 않는다. 이미지 참조 URI 자동 구성은 상용 OCI(oc1) 리전 대상이다.
+
+재현: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-registry.cjs`.
+검증용 저장소 생성/메타데이터 수정은 `COMPANION_TEST_CREATE=1`을 명시한다. 같은 이름의 기존 저장소는 재사용한다.

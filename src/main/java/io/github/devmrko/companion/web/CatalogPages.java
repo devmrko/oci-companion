@@ -26,14 +26,15 @@ public class CatalogPages {
     private final BuildHistory builds;
     private final BuildLogs logs;
     private final BuildSetup setup;
+    private final Registry registry;
     private final BuildAdministration administration;
     private final SelectionStore selections;
     private final BuildControl control;
     private final BuildDefinition definitions;
     private final BuildInputStore inputRules;
     private final BuildPresetStore presets;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup) {
-        this.setup=setup;this.logs=logs;this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup,Registry registry) {
+        this.registry=registry;this.setup=setup;this.logs=logs;this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
@@ -44,7 +45,8 @@ public class CatalogPages {
             String menu=request.getRequestURI().equals("/builds")?Objects.toString(request.getParameter("tab"),"execute"):request.getRequestURI().equals("/guides")?"guides":"catalog";
             var nav=(Selection)model.getAttribute("navSelection");
             model.addAttribute("permissionRules",PermissionHelp.rules(menu,nav==null?null:nav.compartment()));
-            model.addAttribute("scopeBack",Set.of("/sources","/builds","/guides").contains(request.getRequestURI())?request.getRequestURI():"/");
+            if(menu.equals("registry"))model.addAttribute("scopeBack","/builds?tab=registry&kind="+("CONTAINER".equals(request.getParameter("kind"))?"CONTAINER":"GENERIC"));
+            else model.addAttribute("scopeBack",Set.of("/sources","/builds","/guides").contains(request.getRequestURI())?request.getRequestURI():"/");
         }
     }
     @ModelAttribute("connection") Connection connection(Authentication auth) { return auth!=null && auth.getPrincipal() instanceof Connection c?c:null; }
@@ -142,7 +144,7 @@ public class CatalogPages {
         var s=selection(SecurityConfig.connection(auth),session);
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
-        String destination=Set.of("/sources","/builds","/guides").contains(back)?back:"/";
+        String destination=Set.of("/sources","/builds","/guides","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
         try { selections.write(SecurityConfig.connection(auth),region,compartment); }
         catch(IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage());return "redirect:"+destination; }
         if(!s.region().equals(region) || !s.compartment().equals(compartment)) session.removeAttribute("scopeReports");
@@ -153,15 +155,39 @@ public class CatalogPages {
     @GetMapping("/builds") String builds(Authentication auth,HttpSession session,Model model,
         @RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,
         @RequestParam(defaultValue="") String tab,@RequestParam(defaultValue="") String preset,@RequestParam(defaultValue="") String project,
-        @RequestParam(defaultValue="") String topic) {
+        @RequestParam(defaultValue="") String topic,@RequestParam(defaultValue="GENERIC") String kind,
+        @RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String page) {
         var c=SecurityConfig.connection(auth);
         if(tab.isEmpty()) tab=run.isEmpty()?"execute":"history";
-        if(!Set.of("topics","projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        if(!Set.of("registry","topics","projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        model.addAttribute("pipeline",pipeline);model.addAttribute("registryItems",List.of());model.addAttribute("registryLoaded",false);model.addAttribute("kind",kind);model.addAttribute("repository",repository);
         model.addAttribute("topicItems",List.of());model.addAttribute("selectedTopic",topic);model.addAttribute("topicsLoaded",false);
         model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
+            if(tab.equals("registry")) {
+                if(!Set.of("GENERIC","CONTAINER").contains(kind))throw Errors.REGISTRY_INPUT.exception();
+                model.addAttribute("registryTicket",registryTicket(session,s,kind,pipeline,null));
+                model.addAttribute("registryItems",registry.list(c,s.region(),s.compartment(),kind));
+                model.addAttribute("registryLoaded",true);
+                String args=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment());
+                String command=kind.equals("GENERIC")?"repository":"container repository";
+                model.addAttribute("registryListCli","oci artifacts "+command+" list"+args+" --all");
+                model.addAttribute("registryCreateCli","oci artifacts "+command+" create"+args+(kind.equals("GENERIC")?" --repository-type GENERIC":" --is-public false")+" --display-name '<저장소 이름>'"+(kind.equals("GENERIC")?" --is-immutable true":""));
+                if(!repository.isEmpty()) {
+                    var detail=registry.read(c,s.region(),s.compartment(),kind,repository);
+                    model.addAttribute("registryDetail",detail);
+                    String identity=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --repository-id "+quote(repository);
+                    model.addAttribute("registryGetCli","oci artifacts "+command+" get"+identity);
+                    model.addAttribute("registryUpdateCli","oci artifacts "+command+" update"+identity+(kind.equals("GENERIC")?" --description '<설명>'":" --readme file://readme.json"));
+                    model.addAttribute("registryArtifactsCli","oci artifacts "+(kind.equals("GENERIC")?"generic artifact":"container image")+" list"+args+" --repository-id "+quote(repository)+" --all");
+                    model.addAttribute("registryEditTicket",registryTicket(session,s,kind,pipeline,detail));
+                    try {model.addAttribute("registryArtifacts",registry.artifacts(c,s.region(),s.compartment(),kind,repository,page));}
+                    catch(BusinessException e){model.addAttribute("artifactError",e.getMessage());}
+                }
+                return "build-registry";
+            }
             if(tab.equals("topics")) {
                 model.addAttribute("adminTicket",adminTicket(session,s,tab));
                 String args=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment());
@@ -211,6 +237,9 @@ public class CatalogPages {
                     if(tab.equals("pipelines")) {
                         var value=setup.read(c,s.region(),s.compartment(),selected);
                         model.addAttribute("setup",value);
+                        model.addAttribute("selectedRepository",repository);
+                        try { model.addAttribute("containerRepositories",registry.list(c,s.region(),s.compartment(),"CONTAINER").stream().filter(r->r.state().equalsIgnoreCase("AVAILABLE")).toList()); }
+                        catch(BusinessException e) {model.addAttribute("containerRegistryError",e.getMessage());model.addAttribute("containerRepositories",List.of());}
                         if(value!=null) {
                             var token=UUID.randomUUID().toString();
                             synchronized(session) {
@@ -251,7 +280,32 @@ public class CatalogPages {
                 }
             }
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }
-        return tab.equals("topics")?"build-topics":tab.equals("projects")?"build-projects":"builds";
+        return tab.equals("registry")?"build-registry":tab.equals("topics")?"build-topics":tab.equals("projects")?"build-projects":"builds";
+    }
+
+    record RegistryTicket(String region,String compartment,String kind,String pipeline,Registry.Repository repository) {}
+    @SuppressWarnings("unchecked")
+    private Map<String,RegistryTicket> registryTickets(HttpSession session) {
+        var map=(Map<String,RegistryTicket>)session.getAttribute("registryTickets");
+        if(map==null){map=new LinkedHashMap<>();session.setAttribute("registryTickets",map);}return map;
+    }
+    private String registryTicket(HttpSession session,Selection scope,String kind,String pipeline,Registry.Repository repository) {
+        synchronized(session){var map=registryTickets(session);if(map.size()>=32)map.remove(map.keySet().iterator().next());
+            var token=UUID.randomUUID().toString();map.put(token,new RegistryTicket(scope.region(),scope.compartment(),kind,pipeline,repository));return token;}
+    }
+    @PostMapping("/builds/registry") String registryAction(Authentication auth,HttpSession session,RedirectAttributes flash,
+        @RequestParam String ticket,@RequestParam String name,@RequestParam(defaultValue="") String description,@RequestParam(defaultValue="true") boolean immutable) {
+        RegistryTicket t;synchronized(session){t=registryTickets(session).remove(ticket);}
+        if(t==null)throw Errors.CONFLICT.exception();
+        var c=SecurityConfig.connection(auth);checkScope(selection(c,session),t.region(),t.compartment());
+        if(session.getAttribute("scopeInvalid")!=null)throw Errors.SCOPE.exception();
+        String id=t.repository()==null?"":t.repository().id();
+        try {
+            if(t.repository()==null)id=registry.create(c,t.region(),t.compartment(),t.kind(),name,description,immutable,ticket);
+            else registry.update(c,t.region(),t.compartment(),t.kind(),id,t.repository().etag(),name,description);
+            flash.addFlashAttribute("message",t.repository()==null?"저장소 생성 완료":"저장소 설정 저장 완료");
+        }catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());}
+        return "redirect:/builds?tab=registry&kind="+t.kind()+"&repository="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8)+"&pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);
     }
 
     @GetMapping("/builds/logs") @ResponseBody

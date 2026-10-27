@@ -12,6 +12,22 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 class OciBuildSetupTest {
     final Connection c=new Connection("DEFAULT","tenant","user","region","label",false);
+    @Test void containerReferenceUsesSelectedRepositoryAndRejectsAnotherCompartment() throws Exception {
+        var clients=mock(OciBuildHistory.class);var devops=mock(DevopsClient.class);when(clients.client(c,"ap-seoul-1")).thenReturn(devops);
+        when(devops.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().buildPipeline(BuildPipeline.builder().compartmentId("comp").projectId("project").build()).build());
+        var registry=mock(com.oracle.bmc.artifacts.ArtifactsClient.class);
+        var adapter=spy(new OciBuildSetup(clients,mock(BuildDefinition.class)));doReturn(registry).when(adapter).registry(c,"ap-seoul-1");
+        when(registry.getContainerRepository(any())).thenReturn(com.oracle.bmc.artifacts.responses.GetContainerRepositoryResponse.builder().containerRepository(
+            com.oracle.bmc.artifacts.model.ContainerRepository.builder().id("repo").compartmentId("other").displayName("team/app").namespace("namespace").lifecycleState(com.oracle.bmc.artifacts.model.ContainerRepository.LifecycleState.Available).build()).build());
+        assertThrows(RuntimeException.class,()->adapter.createArtifact(c,"ap-seoul-1","comp","pipe","image","DOCKER_IMAGE","repo","","v1","token"));
+        verify(devops,never()).createDeployArtifact(any());
+        when(registry.getContainerRepository(any())).thenReturn(com.oracle.bmc.artifacts.responses.GetContainerRepositoryResponse.builder().containerRepository(
+            com.oracle.bmc.artifacts.model.ContainerRepository.builder().id("repo").compartmentId("comp").displayName("team/app").namespace("namespace").lifecycleState(com.oracle.bmc.artifacts.model.ContainerRepository.LifecycleState.Available).build()).build());
+        when(devops.createDeployArtifact(any())).thenReturn(CreateDeployArtifactResponse.builder().deployArtifact(DeployArtifact.builder().id("artifact").build()).build());
+        assertEquals("artifact",adapter.createArtifact(c,"ap-seoul-1","comp","pipe","image","DOCKER_IMAGE","repo","forged.example/repo","v1","token"));
+        var request=org.mockito.ArgumentCaptor.forClass(CreateDeployArtifactRequest.class);verify(devops).createDeployArtifact(request.capture());
+        assertEquals("icn.ocir.io/namespace/team/app:v1",((OcirDeployArtifactSource)request.getValue().getCreateDeployArtifactDetails().getDeployArtifactSource()).getImageUri());
+    }
     @Test void editRetainsRepositoryAndSecondarySourceAndRejectsStaleStage() throws Exception {
         var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);when(clients.client(c,"region")).thenReturn(client);
         when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().buildPipeline(BuildPipeline.builder().id("pipe").compartmentId("comp").build()).build());

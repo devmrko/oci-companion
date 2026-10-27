@@ -11,10 +11,12 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
   if(!(await page.locator('.pipeline-definition').innerText()).includes('db-companion-maven'))throw Error('Only db-companion example supported');
   let repo=page.locator('select[name=repository] option').filter({hasText:'db-companion-builds'});
   if(!await repo.count()){
-   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'1. Artifact Registry 저장소 생성'})}).first();
+   await page.goto('http://127.0.0.1:8091/builds?tab=registry');
+   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'저장소 생성'})}).first();
    await section.locator('summary').click();await section.locator('[name=name]').fill('db-companion-builds');
    await section.getByRole('button',{name:'저장소 생성',exact:true}).click();await page.waitForLoadState('load');
-   console.log('Repository create submitted');
+   await page.getByText('저장소 생성 완료',{exact:true}).waitFor();
+   await page.goto(base+'&tab=pipelines');await page.waitForLoadState('load');
    repo=page.locator('select[name=repository] option').filter({hasText:'db-companion-builds'});await repo.waitFor({state:'attached'});
   }
   const repoId=await repo.getAttribute('value');
@@ -26,7 +28,7 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
   }
   let artifact=page.locator('select[name=artifact] option').filter({hasText:'db-companion-jar-delivery'});
   if(!await artifact.count()){
-   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'2. 산출물 저장 위치 등록'})}).first();
+   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'1. 산출물 저장 위치 등록'})}).first();
    await section.locator('summary').click();await section.locator('[name=name]').fill('db-companion-jar-delivery');
    await section.locator('[name=type]').selectOption('BINARY');await section.locator('[name=repository]').selectOption(repoId);
    await section.locator('[name=path]').fill('db-companion/app.jar');await section.locator('[name=version]').fill('${COMPANION_VERSION}');
@@ -38,7 +40,7 @@ const {chromium}=require('../.tools/browser/node_modules/playwright'),fs=require
   if(artifactIds.length!==1)throw Error('Ambiguous artifact references');
   const artifactId=artifactIds[0];
   if(!(await page.locator('.pipeline-definition').innerText()).includes('Registry · db-companion-jar')){
-   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'3. Registry 전달 단계 추가'})}).first();
+   const section=page.locator('details').filter({has:page.locator('summary').filter({hasText:'2. Registry 전달 단계 추가'})}).first();
    await section.locator('[name=stage]').selectOption({index:1});await section.locator('[name=output]').fill('db-companion-jar');
    await section.locator('[name=artifact]').selectOption(artifactId);await section.getByRole('button',{name:'전달 단계 추가'}).click();await page.waitForLoadState('load');
    console.log('Delivery stage create submitted');

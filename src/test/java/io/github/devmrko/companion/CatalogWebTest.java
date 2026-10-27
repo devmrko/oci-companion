@@ -22,10 +22,28 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildAdministration administration;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildSetup setup;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildLogs logs;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.Registry registry;
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void registryWorksWithoutPipelineAndUsesScopedSingleUseServerTicket() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var repository=new io.github.devmrko.companion.port.Registry.Repository("repo","GENERIC","builds","","Available",true,false,"server-etag");
+        org.mockito.Mockito.when(registry.list(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("GENERIC"))).thenReturn(java.util.List.of(repository));
+        org.mockito.Mockito.when(registry.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("GENERIC"),org.mockito.ArgumentMatchers.eq("repo"))).thenReturn(repository);
+        org.mockito.Mockito.when(registry.artifacts(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("GENERIC"),org.mockito.ArgumentMatchers.eq("repo"),org.mockito.ArgumentMatchers.anyString())).thenReturn(new io.github.devmrko.companion.port.Registry.Page(java.util.List.of(),""));
+        var result=mvc.perform(get("/builds").session(session).param("tab","registry").param("repository","repo")).andExpect(status().isOk()).andExpect(content().string(containsString("빌드 저장소로 선택"))).andReturn();
+        String ticket=(String)result.getModelAndView().getModel().get("registryEditTicket");
+        mvc.perform(post("/builds/registry").session(session).param("ticket",ticket).param("name","builds")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",ticket).param("name","builds").param("etag","forged")).andExpect(status().is3xxRedirection());
+        org.mockito.Mockito.verify(registry).update(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("GENERIC"),org.mockito.ArgumentMatchers.eq("repo"),org.mockito.ArgumentMatchers.eq("server-etag"),org.mockito.ArgumentMatchers.eq("builds"),org.mockito.ArgumentMatchers.eq(""));
+        mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",ticket).param("name","builds")).andExpect(status().isBadRequest());
+        String create=(String)result.getModelAndView().getModel().get("registryTicket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",create).param("name","builds")).andExpect(status().isConflict());
+        org.mockito.Mockito.verifyNoInteractions(builds);
+    }
     @Test void setupWritesUseServerEtagsAndSingleUseScopedTicket() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))

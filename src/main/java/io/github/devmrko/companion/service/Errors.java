@@ -1,6 +1,7 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    REGISTRY_INPUT(ErrorCategory.VALIDATION, "저장소 유형·이름·설명을 확인하세요. 파일: 영문·숫자·밑줄·하이픈, 이미지: 소문자·숫자·경로. 설명 최대 4,000자."),
     TOPIC_INPUT(ErrorCategory.VALIDATION, "알림 주제 이름은 영문·숫자·하이픈·밑줄 1–255자로 입력하세요."),
     DELIVERY_ORDER(ErrorCategory.VALIDATION, "뒤에 연결된 단계가 있습니다. 기존 순서를 OCI 콘솔에서 확인하고 전달 단계를 연결하세요."),
     OUTPUT_UNKNOWN(ErrorCategory.VALIDATION, "빌드 사양에서 출력 이름을 확인할 수 없습니다. outputArtifacts와 소스 읽기 권한을 확인하세요."),
