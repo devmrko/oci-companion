@@ -6,3 +6,5 @@ target/
 *.db-shm
 .env
 .DS_Store
+__pycache__/
+*.pyc

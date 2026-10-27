@@ -14,6 +14,14 @@ public class OciBuildControl implements BuildControl {
     private final OciBuildHistory clients;
     private final BuildDefinition definitions;
     public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions) { this.clients=clients;this.definitions=definitions; }
+    public void cancel(Connection c,String region,String compartment,String pipeline,String run) {
+        try(var client=clients.client(c,region)) {
+            var response=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build());var r=response.getBuildRun();
+            if(!compartment.equals(r.getCompartmentId()) || !pipeline.equals(r.getBuildPipelineId()))throw Errors.SCOPE.exception();
+            if(!Set.of("ACCEPTED","IN_PROGRESS").contains(r.getLifecycleState().getValue()))throw Errors.BUILD_CHANGED.exception();
+            client.cancelBuildRun(CancelBuildRunRequest.builder().buildRunId(run).ifMatch(response.getEtag()).build());
+        }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.BUILD_UNKNOWN.exception();}
+    }
     public Settings settings(Connection c,String region,String compartment,String pipeline) {
         try(var client=clients.client(c,region)) {
             var response=client.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(pipeline).build());

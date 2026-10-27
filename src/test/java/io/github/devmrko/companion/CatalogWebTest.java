@@ -25,10 +25,25 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildSetup setup;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildLogs logs;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.Registry registry;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildAutomation automation;
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void automationShowsRealServiceErrorsAndConsumesMutationTicketOnce() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p","pipeline","ACTIVE","project","project")));
+        org.mockito.Mockito.when(definitions.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.BuildDefinition.Definition("pipeline","project","ACTIVE","","revision",java.util.List.of()));
+        org.mockito.Mockito.when(automation.schedules(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        var page=mvc.perform(get("/builds/automation").session(session).param("pipeline","p")).andExpect(status().isOk()).andExpect(content().string(containsString("IAM 권한"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("ticket");
+        mvc.perform(get("/builds/automation/preview").session(session).param("cron","0 0 * * *")).andExpect(status().isOk()).andExpect(jsonPath("$[0]").exists());
+        mvc.perform(post("/builds/automation/template").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isOk()).andExpect(header().string("Content-Disposition",containsString(".zip")));
+        mvc.perform(post("/builds/automation/schedule").session(session).param("ticket",ticket).param("function","fn").param("name","nightly").param("cron","0 0 * * *").param("confirmed","true")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/automation/schedule").session(session).with(csrf()).param("ticket",ticket).param("function","fn").param("name","nightly").param("cron","0 0 * * *").param("confirmed","true")).andExpect(status().is3xxRedirection());
+        mvc.perform(post("/builds/automation/schedule").session(session).with(csrf()).param("ticket",ticket).param("function","fn").param("name","nightly").param("cron","0 0 * * *").param("confirmed","true")).andExpect(status().isConflict());
+        mvc.perform(get("/builds/configure").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("Vault 참조")));
+    }
     @Test void registeredTaskSourceRejectsUrlTamperingAndStaleScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var model=mvc.perform(get("/builds/tasks").session(session).param("view","new")).andReturn().getModelAndView().getModel();

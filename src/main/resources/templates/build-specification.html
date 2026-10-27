@@ -1,13 +1,17 @@
-<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines'}" data-flow-step="settings">
-<details><summary>빌드 명세 작성</summary>
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines' or tab == 'recipes'}" data-flow-step="settings">
+<details th:open="${tab == 'recipes'}"><summary th:text="${tab == 'recipes' ? '2. 빌드 명세' : '빌드 명세 작성'}">빌드 명세 작성</summary>
 <form th:action="@{/builds/specification}" method="post" class="build-field-grid" id="build-specification-form">
 <label class="form-field">빌드 도구<select name="tool" class="ui-control"><option value="maven">Maven</option><option value="gradle">Gradle</option><option value="python">Python · pytest</option><option value="node">JavaScript/TypeScript · npm</option></select></label>
+<label class="form-field">Java 빌드 도구 실행<select name="launcher" class="ui-control"><option value="wrapper">저장소 Wrapper · mvnw / gradlew</option><option value="system">환경에 설치된 mvn / gradle</option></select></label>
 <label class="form-field"><span id="build-tasks-label">Goal</span><input name="tasks" class="ui-control" value="verify" required maxlength="1000" list="build-task-options"><datalist id="build-task-options"><option value="test"></option><option value="package"></option><option value="verify"></option></datalist></label>
 <label class="form-field">Maven profile · 선택<input name="profiles" class="ui-control" maxlength="255" placeholder="ci"></label>
 <label class="form-field">작업 경로<input name="directory" class="ui-control" value="." required maxlength="1024"></label>
+<label class="form-field">산출물 유형<select name="outputType" class="ui-control"><option value="BINARY">파일 · JAR / wheel / 압축 파일</option><option value="DOCKER_IMAGE">컨테이너 이미지 · 별도 이미지 빌드 명령 필요</option></select></label>
 <label class="form-field">출력 이름 · 저장 시 필수<input name="outputName" class="ui-control" maxlength="255" placeholder="application"></label>
 <label class="form-field">출력 파일 · 저장 시 필수<input name="location" class="ui-control" maxlength="1024" placeholder="target/application.jar"></label>
+<label class="form-field">환경 변수 · 선택<textarea name="variables" class="ui-control" rows="3" maxlength="8192" placeholder="APP_ENV=ci"></textarea><span class="small muted">한 줄에 이름=값 · 비밀값은 Vault 참조 사용</span></label>
+<label class="form-field">Vault 참조 · 선택<textarea name="vaultVariables" class="ui-control" rows="3" maxlength="8192" placeholder="TOKEN=ocid1.vaultsecret.…"></textarea><span class="small muted">한 줄에 이름=Secret OCID</span></label>
 <div class="form-toolbar"><button class="ui-button">명세 미리보기</button></div></form>
-<p class="small muted">초안입니다. 런타임·의존성과 명령을 확인하고 build_spec.yaml로 소스에 커밋하세요.</p>
+<p class="small muted">명세 작성 → build_spec.yaml 커밋 → 파이프라인에 연결. 런타임 설치와 컨테이너 빌드 명령은 원문에서 확인하세요.</p>
 <p id="build-specification-status" role="status"></p><pre class="code-block" id="build-specification-preview" hidden></pre><button type="button" class="ui-button" id="build-specification-download" hidden>build_spec.yaml 다운로드</button>
 </details></section></body></html>

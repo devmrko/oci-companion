@@ -1,0 +1,4 @@
+'use strict';
+(()=>{const button=document.getElementById('schedule-preview');if(!button)return;const input=document.getElementById('schedule-cron'),status=document.getElementById('schedule-preview-result');let sequence=0;
+input.addEventListener('input',()=>{sequence++;status.textContent='';});
+button.addEventListener('click',async()=>{const current=++sequence;status.textContent='조회 중';try{const response=await fetch('/builds/automation/preview?'+new URLSearchParams({cron:input.value}),{headers:{Accept:'application/json'}});if(!response.ok || !response.headers.get('content-type')?.includes('application/json'))throw Error();const times=await response.json();if(current!==sequence)return;status.replaceChildren(...times.map(time=>{const p=document.createElement('span');p.className='schedule-time';p.textContent=time;return p;}));}catch{if(current===sequence)status.textContent='UTC cron을 확인하세요. 분 시 일 월 요일, 다섯 항목입니다.';}});})();

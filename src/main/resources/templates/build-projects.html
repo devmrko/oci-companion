@@ -5,10 +5,11 @@
 <nav class="build-tabs" aria-label="빌드 메뉴">
 <a class="build-tab" th:classappend="${tab == 'tasks' or tab == 'execute'} ? 'is-active'" href="/builds/tasks">빌드 작업</a>
 <a class="build-tab" th:classappend="${tab == 'history'} ? 'is-active'" href="/builds/tasks?view=history">실행 이력</a>
-<a class="build-tab" th:classappend="${tab != 'tasks' and tab != 'execute' and tab != 'history'} ? 'is-active'" href="/builds/tasks?view=environments">환경 관리</a>
+<a class="build-tab" th:classappend="${tab == 'automation'} ? 'is-active'" href="/builds/automation">자동 실행</a>
+<a class="build-tab" th:classappend="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'} ? 'is-active'" href="/builds/tasks?view=environments">환경 관리</a>
 </nav>
-<nav class="form-toolbar build-management-links" aria-label="OCI 리소스 관리" th:if="${tab != 'tasks' and tab != 'execute' and tab != 'history'}">
-<a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
+<nav class="form-toolbar build-management-links" aria-label="OCI 리소스 관리" th:if="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'}">
+<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
 </nav></div><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
 <p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>

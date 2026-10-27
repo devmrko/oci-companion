@@ -20,6 +20,7 @@
     for(const [name,value] of [['작업',field('name').value],['소스',source],['빌드',build],['실행 환경',environment],['저장 위치',storage]]) {
       const dt=document.createElement('dt'), dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;review.append(dt,dd);
     }
+    form.querySelectorAll('.task-configure-link').forEach(link=>{const url=new URL('/builds/configure',location.origin);if(field('sourceId').value)url.searchParams.set('registeredSource',field('sourceId').value);link.href=url;});
     form.querySelectorAll('.task-pipeline-link').forEach(link => {const url=new URL('/builds',location.origin);url.searchParams.set('tab','pipelines');if(field('pipeline').value)url.searchParams.set('pipeline',field('pipeline').value);if(field('sourceId').value)url.searchParams.set('registeredSource',field('sourceId').value);link.href=url;});
   }
   function mode() {
