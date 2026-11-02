@@ -15,7 +15,7 @@
 <p th:if="${!topicsLoaded}">목록을 조회하지 못했습니다. 연결·범위·Notifications 조회 권한을 확인하세요.</p>
 <div class="table-scroll" th:if="${!topicItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명</th><th class="table-heading">연결</th></tr></thead><tbody>
 <tr th:each="t : ${topicItems}"><td class="table-cell"><strong th:text="${t.name()}"></strong><span class="field-badge" th:if="${t.id() == selectedTopic}">생성됨</span><details><summary>OCID</summary><code th:text="${t.id()}"></code></details></td>
-<td class="table-cell" th:text="${t.state()}"></td><td class="table-cell" th:text="${t.description()}"></td><td class="table-cell"><a th:if="${t.state() == 'ACTIVE'}" th:href="@{/builds(tab='projects',topic=${t.id()})}">이 주제로 프로젝트 생성</a></td></tr>
+<td class="table-cell" th:text="${t.state()}"></td><td class="table-cell" th:text="${#strings.isEmpty(t.description()) ? '설명 없음' : t.description()}"></td><td class="table-cell"><a th:if="${t.state() == 'ACTIVE'}" th:href="@{/builds(tab='projects',topic=${t.id()})}">이 주제로 프로젝트 생성</a></td></tr>
 </tbody></table></div></section>
 <section class="card" th:if="${adminTicket != null}"><h2>알림 주제 생성</h2>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">

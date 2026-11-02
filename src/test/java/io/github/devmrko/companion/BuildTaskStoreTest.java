@@ -8,6 +8,16 @@ import java.nio.file.*;
 import static org.junit.jupiter.api.Assertions.*;
 class BuildTaskStoreTest {
     @TempDir Path root;
+    @Test void taskClassificationPersistsAndOlderRecordsStayUnclassified() throws Exception {
+        var mapper=tools.jackson.databind.json.JsonMapper.builder().build();
+        var old=mapper.readValue("{\"id\":\"old\",\"runner\":\"FUNCTIONS\"}",Task.class);
+        assertEquals("UNSPECIFIED",old.target());assertEquals("UNKNOWN",old.architecture());
+        var c=new Connection("DEFAULT","tenant","user","region","test",false);
+        var store=new JsonBuildTaskStore(root.toString());
+        var task=new Task("id","container","DEVOPS","","","pipeline","source","a".repeat(40),"","","","","source-id","main","CONTAINER","X86_64");
+        store.save(c,"region","comp",task);
+        assertEquals(task,new JsonBuildTaskStore(root.toString()).list(c,"region","comp").getFirst());
+    }
     @Test void tasksPersistAndRemainIsolatedByIdentityAndScope() throws Exception {
         var c=new Connection("DEFAULT","tenant","user","region","test",false);
         var store=new JsonBuildTaskStore(root.toString());

@@ -11,7 +11,8 @@
   function summary() {
     const fn = field('runner').value === 'FUNCTIONS';
     const source = (field('source').value || '미선택') + (field('branch').value ? ' · '+field('branch').value : '') + (field('commit').value ? ' · '+field('commit').value.slice(0,12) : '');
-    const build = fn ? 'Maven · '+field('goal').value+(field('profiles').value ? ' · '+field('profiles').value : '') : 'OCI 파이프라인 설정';
+    const buildDetail = fn ? 'Maven · '+field('goal').value+(field('profiles').value ? ' · '+field('profiles').value : '') : 'OCI 파이프라인 설정';
+    const build = selected('target')+' · '+selected('architecture')+' · '+buildDetail;
     const environment = fn ? field('function').value ? 'Functions · '+selected('function') : 'Functions · 빌더 미선택' : field('pipeline').value ? 'OCI DevOps · '+selected('pipeline') : 'OCI DevOps · 미선택';
     const storage = fn ? bucket() ? bucket()+(field('artifact').value ? ' · '+field('artifact').value : ' · 로그·보고서') : '빌더 선택 후 확인' : 'OCI 전달 단계 설정 · 상세에서 확인';
     text('task-summary-name',field('name').value || '이름 미입력');text('task-summary-source',source);text('task-summary-build',build);text('task-summary-environment',environment);text('task-summary-storage',storage);
@@ -24,6 +25,9 @@
     form.querySelectorAll('.task-pipeline-link').forEach(link => {const url=new URL('/builds',location.origin);url.searchParams.set('tab','pipelines');if(field('pipeline').value)url.searchParams.set('pipeline',field('pipeline').value);if(field('sourceId').value)url.searchParams.set('registeredSource',field('sourceId').value);link.href=url;});
   }
   function mode() {
+    const image=['CONTAINER','FUNCTION'].includes(field('target').value);
+    field('runner').querySelector('[value=FUNCTIONS]').disabled=image;
+    if(image)field('runner').value='DEVOPS';
     form.querySelectorAll('[data-runner]').forEach(box => {
       const enabled=box.dataset.runner===field('runner').value;box.hidden=!enabled;
       box.querySelectorAll('input,select,button').forEach(control=>control.disabled=!enabled);
@@ -41,7 +45,7 @@
   document.getElementById('task-previous').addEventListener('click',()=>show(Math.max(0,step-1)));
   form.querySelectorAll('[data-jump]').forEach(button=>button.addEventListener('click',()=>show(Number(button.dataset.jump))));
   document.addEventListener('keydown',event=>{if(event.key==='Escape')form.querySelectorAll('.field-help[open]').forEach(help=>help.open=false);});
-  field('runner').addEventListener('change',mode);form.addEventListener('input',summary);form.addEventListener('change',summary);
+  field('runner').addEventListener('change',mode);field('target').addEventListener('change',mode);form.addEventListener('input',summary);form.addEventListener('change',summary);
 
   function options(name, items, label, extras) {
     const select=field(name), old=select.value;select.replaceChildren(new Option('선택',''));
@@ -66,4 +70,14 @@
   form.noValidate=true;
   form.addEventListener('submit',event=>{if(loading){event.preventDefault();return;}for(let i=0;i<steps.length;i++){const invalid=[...steps[i].querySelectorAll('input,select')].find(c=>!c.disabled && !c.checkValidity());if(invalid){event.preventDefault();show(i);invalid.reportValidity();return;}}});
   document.querySelector('.task-wizard-controls').hidden=false;mode();show(0);
+})();
+
+(() => {
+ const filters=document.querySelectorAll('[data-target-filter]');
+ filters.forEach(button=>button.addEventListener('click',()=>{
+   filters.forEach(other=>other.setAttribute('aria-pressed',String(other===button)));
+   const cards=[...document.querySelectorAll('.task-card[data-target]')];
+   cards.forEach(card=>card.hidden=button.dataset.targetFilter!=='ALL' && card.dataset.target!==button.dataset.targetFilter);
+   document.getElementById('task-type-empty').hidden=cards.some(card=>!card.hidden);
+ }));
 })();

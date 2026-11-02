@@ -4,7 +4,9 @@ import io.github.devmrko.companion.domain.Models.Connection;
 import java.util.List;
 
 public interface BuildHistory {
-    record Pipeline(String id,String name,String state,String projectId,String projectName) {
+    record Pipeline(String id,String name,String state,String projectId,String projectName,String description) {
+        public Pipeline { description = description == null ? "" : description; }
+        public Pipeline(String id,String name,String state,String projectId,String projectName) { this(id,name,state,projectId,projectName,""); }
         public Pipeline(String id,String name,String state) { this(id,name,state,"",""); }
     }
     record Run(String id,String name,String state,String createdAt) {}

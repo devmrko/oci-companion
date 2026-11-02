@@ -7,14 +7,18 @@
 <label class="form-field"><span id="build-tasks-label">Goal</span><input name="tasks" class="ui-control" value="verify" required maxlength="1000" list="build-task-options"><datalist id="build-task-options"><option value="test"></option><option value="package"></option><option value="verify"></option></datalist></label>
 <label class="form-field">Maven profile · 선택<input name="profiles" class="ui-control" maxlength="255" placeholder="ci"></label>
 <label class="form-field">작업 경로<input name="directory" class="ui-control" value="." required maxlength="1024"></label>
-<label class="form-field">산출물 유형<select name="outputType" class="ui-control"><option value="BINARY">파일 · JAR / wheel / 압축 파일</option><option value="DOCKER_IMAGE">컨테이너 이미지 · 별도 이미지 빌드 명령 필요</option></select></label>
+<label class="form-field">빌드 아키텍처<select name="architecture" class="ui-control"><option value="NATIVE">실행 환경 기준</option><option value="X86_64">x86 (amd64)</option><option value="ARM64">ARM (arm64)</option></select><span class="small muted">일치하는 실행 환경 필요 · 불일치 시 중단 · 교차 빌드 미지원</span></label>
+<label class="form-field">산출물 유형<select name="outputType" class="ui-control"><option value="BINARY">파일 · JAR / wheel / 압축 파일</option><option value="DOCKER_IMAGE">컨테이너 이미지 · Dockerfile 빌드</option></select></label>
 <label class="form-field">출력 이름 · 저장 시 필수<input name="outputName" class="ui-control" maxlength="255" placeholder="application"></label>
-<label class="form-field">출력 파일 · 저장 시 필수<input name="location" class="ui-control" maxlength="1024" placeholder="target/application.jar"></label>
+<label class="form-field"><span id="build-location-label">출력 파일 · 저장 시 필수</span><input name="location" class="ui-control" maxlength="1024" placeholder="target/application.jar"></label>
+<label class="form-field" data-container-field hidden>Dockerfile 경로 · 필수<input name="dockerfile" class="ui-control" value="Dockerfile" maxlength="1024" disabled><span class="small muted">작업 경로 기준 · 기존 파일 사용</span></label>
+<label class="form-field" data-container-field hidden>빌드 컨텍스트 · 필수<input name="context" class="ui-control" value="." maxlength="1024" disabled><span class="small muted">작업 경로 기준 · COPY에 포함할 디렉터리</span></label>
+<p class="small muted" data-container-field hidden>앱 빌드 후 Docker 이미지를 생성합니다. 실행 환경의 아키텍처를 사용합니다. OCIR 저장은 산출물 전달 단계에서 설정하세요.</p>
 <label class="form-field">환경 변수 · 선택<textarea name="variables" class="ui-control" rows="3" maxlength="8192" placeholder="APP_ENV=ci"></textarea><span class="small muted">한 줄에 이름=값 · 비밀값은 Vault 참조 사용</span></label>
 <label class="form-field">Vault 참조 · 선택<textarea name="vaultVariables" class="ui-control" rows="3" maxlength="8192" placeholder="TOKEN=ocid1.vaultsecret.…"></textarea><span class="small muted">한 줄에 이름=Secret OCID</span></label>
 <label class="form-field"><span><input type="checkbox" name="reports" value="true" checked> JUnit 보고서 수집</span><span class="small muted">Surefire·Failsafe·test-results·reports의 XML → test-reports.tar.gz. Registry 전달은 별도 설정.</span></label>
 <div class="form-toolbar"><button class="ui-button">명세 미리보기</button></div></form>
-<p class="small muted">명세 작성 → build_spec.yaml 커밋 → 파이프라인에 연결. 컨테이너 빌드 명령은 원문에서 확인하세요.</p>
+<p class="small muted">명세 작성 → build_spec.yaml 커밋 → 파이프라인에 연결. 이미지 빌드는 Docker 실행 환경이 필요합니다.</p>
 <p id="build-specification-status" role="status"></p><pre class="code-block" id="build-specification-preview" hidden></pre><button type="button" class="ui-button" id="build-specification-download" hidden>build_spec.yaml 다운로드</button>
 <section th:if="${specSources != null}">
 <h3>Git에 저장</h3>

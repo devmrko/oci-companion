@@ -7,7 +7,7 @@
 <h2>파이프라인 추가</h2><p class="small muted">빌드·테스트·산출물 전달 단계를 저장합니다. 생성 후 빌드 단계 등록이 필요합니다.</p>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">
 <input type="hidden" name="ticket" th:value="${adminTicket}">
-<label class="form-field">프로젝트 · 필수<select class="ui-control" name="project" required><option value="">선택</option><option th:each="p : ${projectItems}" th:if="${p.state() == 'ACTIVE'}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == project}"></option></select></label>
+<label class="form-field">프로젝트 · 필수<select class="ui-control" name="project" data-resource-description required><option value="">선택</option><option th:each="p : ${projectItems}" th:attr="data-description=${p.description()}" th:if="${p.state() == 'ACTIVE'}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == project}"></option></select></label>
 <label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255"></label>
 <label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
 <div class="form-toolbar"><button class="ui-button" th:disabled="${projectItems.isEmpty()}">파이프라인 생성</button></div>
@@ -19,13 +19,13 @@
 <form action="/builds" method="get" class="scope-bar" id="pipeline-picker">
 <input type="hidden" name="tab" th:value="${tab}"><input type="hidden" name="registeredSource" th:if="${handoffSource != null}" th:value="${handoffSource.id()}"><input type="hidden" name="repository" th:if="${tab == 'pipelines'}" th:value="${repository}">
 <label class="form-field">프로젝트<select name="project" class="ui-control"><option value="">전체 프로젝트</option><option th:each="p : ${projects}" th:value="${p.key}" th:text="${p.value}" th:selected="${p.key == project}"></option></select></label>
-<label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option th:each="p : ${pipelines}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
+<label class="form-field">파이프라인<select name="pipeline" class="ui-control" data-resource-description><option th:each="p : ${pipelines}" th:attr="data-description=${p.description()}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
 <button class="ui-button">다시 조회</button></form>
 </section>
 <div th:replace="~{build-specification :: form}"></div><script src="/build-specification.js" defer></script><div th:replace="~{build-create-stage :: form}"></div><div th:replace="~{build-setup :: form}"></div>
 <section id="build-source-area" data-flow-step="source" class="card pipeline-definition" th:if="${definition != null}">
 <div class="section-title"><h2 th:text="${definition.name()}"></h2><span class="field-badge" th:text="${definition.state()}"></span></div>
-<p class="small muted" th:text="${definition.project()}"></p><p th:if="${!definition.description().isEmpty()}" th:text="${definition.description()}"></p>
+<p class="small muted" th:text="${definition.project()}"></p><p class="resource-description" th:text="${#strings.isEmpty(definition.description()) ? '설명 없음' : definition.description()}"></p>
 <p th:if="${definition.stages().isEmpty()}">등록된 단계 없음 · 실행할 수 없습니다.</p>
 <ol class="pipeline-stages">
 <li class="pipeline-stage" th:each="stage : ${definition.stages()}">

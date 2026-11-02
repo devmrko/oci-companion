@@ -7,9 +7,9 @@
 <p class="small muted">현재 리전·구획의 OCI 저장소입니다. 기존 저장소는 별도 등록 없이 선택합니다.</p>
 <p th:if="${!registryLoaded}">목록 조회 실패 · 연결·범위·권한을 확인하세요.</p><p th:if="${registryLoaded and registryItems.isEmpty()}">저장소 없음</p>
 <div class="table-scroll" th:if="${!registryItems.isEmpty()}"><table class="data-table registry-table"><thead><tr><th class="table-heading">저장소</th><th class="table-heading">상태</th><th class="table-heading">버전 덮어쓰기</th><th class="table-heading">접근</th></tr></thead><tbody>
-<tr th:each="r : ${registryItems}"><td class="table-cell"><a th:href="@{/builds(tab='registry',kind=${kind},repository=${r.id()},pipeline=${pipeline})}" th:text="${r.name()}"></a></td><td class="table-cell" th:text="${r.state()}"></td><td class="table-cell" th:text="${r.immutable() == null ? '상세에서 확인' : (r.immutable() ? '금지' : '허용')}"></td><td class="table-cell" th:text="${r.publicAccess() ? '공개' : '비공개'}"></td></tr>
+<tr th:each="r : ${registryItems}"><td class="table-cell"><a th:href="@{/builds(tab='registry',kind=${kind},repository=${r.id()},pipeline=${pipeline})}" th:text="${r.name()}"></a><p class="resource-description" th:text="${kind == 'CONTAINER' ? 'README: 저장소 선택 후 확인' : (#strings.isEmpty(r.description()) ? '설명 없음' : r.description())}"></p></td><td class="table-cell" th:text="${r.state()}"></td><td class="table-cell" th:text="${r.immutable() == null ? '상세에서 확인' : (r.immutable() ? '금지' : '허용')}"></td><td class="table-cell" th:text="${r.publicAccess() ? '공개' : '비공개'}"></td></tr>
 </tbody></table></div></section>
-<section class="card" th:if="${registryDetail != null}" th:with="r=${registryDetail}"><h2 th:text="${r.name()}"></h2>
+<section class="card" th:if="${registryDetail != null}" th:with="r=${registryDetail}"><h2 th:text="${r.name()}"></h2><p class="resource-description" th:text="${#strings.isEmpty(r.description()) ? '설명 없음' : r.description()}"></p>
 <dl class="build-facts"><div><dt>OCID</dt><dd th:text="${r.id()}"></dd></div><div><dt>상태</dt><dd th:text="${r.state()}"></dd></div><div><dt>버전 덮어쓰기</dt><dd th:text="${r.immutable() ? '금지' : '허용'}"></dd></div></dl>
 <a class="ui-button" th:if="${#strings.equalsIgnoreCase(r.state(), 'AVAILABLE')}" th:href="@{/builds(tab='pipelines',pipeline=${pipeline},repository=${r.id()})}">빌드 저장소로 선택</a>
 <details class="build-advanced"><summary>저장소 설정</summary>

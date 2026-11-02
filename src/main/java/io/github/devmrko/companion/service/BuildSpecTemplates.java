@@ -30,11 +30,20 @@ public final class BuildSpecTemplates {
         return "# 초안: 런타임·의존성·명령·출력 경로를 확인하고 소스에 커밋하세요.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
     }
     public static String configured(String tool,String tasks,String profiles,String directory,String output,String location,String launcher,String variables,String vaultVariables,String outputType) {
+        return configured(tool,tasks,profiles,directory,output,location,launcher,variables,vaultVariables,outputType,"Dockerfile",".");
+    }
+    public static String configured(String tool,String tasks,String profiles,String directory,String output,String location,String launcher,String variables,String vaultVariables,String outputType,String dockerfile,String context) {
         if(!Set.of("wrapper","system").contains(launcher) || !Set.of("BINARY","DOCKER_IMAGE").contains(outputType))throw Errors.BUILD_STAGE_INPUT.exception();
         Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(render(tool,tasks,profiles,directory,output,location));
         @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
         String command=steps.getFirst().get("command").toString();
         if(launcher.equals("system"))command=command.replace("\n./mvnw -B ","\nmvn -B ").replace("\n./gradlew --no-daemon ","\ngradle --no-daemon ");
+        if(outputType.equals("DOCKER_IMAGE")) {
+            if(output.isBlank() || !location.matches("[a-z0-9]+(?:[._/-][a-z0-9]+)*:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}"))throw Errors.BUILD_STAGE_INPUT.exception();
+            containerPath(dockerfile);containerPath(context);
+            command += "\ndocker info >/dev/null\ndocker build --file "+quote(dockerfile)+" --tag "+quote(location)+" -- "+quote(context)
+                +"\ndocker image inspect "+quote(location)+" --format '{{.Id}}'";
+        }
         steps.getFirst().put("command",command);
         var plain=variables(variables,false);var vault=variables(vaultVariables,true);
         if(plain.keySet().stream().anyMatch(vault::containsKey))throw Errors.BUILD_STAGE_INPUT.exception();
@@ -44,6 +53,28 @@ public final class BuildSpecTemplates {
         }
         var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         return "# 소스에 커밋 후 빌드 단계의 명세 경로를 지정하세요. 런타임은 실행 환경에서 준비합니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
+    public static String architecture(String yaml,String architecture) {
+        if(architecture.equals("NATIVE"))return yaml;
+        String expected=switch(architecture){case "X86_64" -> "x86_64";case "ARM64" -> "aarch64";default -> throw Errors.BUILD_STAGE_INPUT.exception();};
+        Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
+        var step=steps.getFirst();String guard="actual_arch=$(uname -m)\nprintf 'Build architecture: %s\\n' \"$actual_arch\"\n"
+            +"test \"$actual_arch\" = "+quote(expected)+" || { echo 'Architecture mismatch: use a matching build environment'; exit 1; }\n";
+        step.put("command",step.get("command").toString().replace("set -euo pipefail\n","set -euo pipefail\n"+guard));
+        @SuppressWarnings("unchecked") var outputs=(List<Map<String,Object>>)spec.getOrDefault("outputArtifacts",List.of());
+        String imageArchitecture=architecture.equals("X86_64")?"amd64":"arm64";
+        for(var output:outputs)if("DOCKER_IMAGE".equals(output.get("type"))) {
+            String check="\ntest \"$(docker image inspect "+quote(output.get("location").toString())+" --format '{{.Architecture}}')\" = "+quote(imageArchitecture)
+                +" || { echo 'Image architecture mismatch'; exit 1; }";
+            step.put("command",step.get("command").toString()+check);
+        }
+        var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        return new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
+    private static void containerPath(String path) {
+        if(path.isBlank() || path.length()>1024 || path.startsWith("/") || path.startsWith("-")
+            || path.chars().anyMatch(Character::isISOControl) || Arrays.asList(path.split("/",-1)).contains(".."))throw Errors.BUILD_STAGE_INPUT.exception();
     }
     public static String reports(String yaml,boolean enabled) {
         if(!enabled)return yaml;

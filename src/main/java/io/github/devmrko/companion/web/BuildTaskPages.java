@@ -60,8 +60,10 @@ public class BuildTaskPages {
     private void check(HttpSession session,CatalogPages.Selection s,String region,String compartment){if(session.getAttribute("scopeInvalid")!=null || !s.region().equals(region) || !s.compartment().equals(compartment))throw Errors.SCOPE.exception();}
     @PostMapping("/builds/tasks/save") String save(Authentication auth,HttpSession session,@RequestParam String region,@RequestParam String compartment,
         @RequestParam(defaultValue="") String id,@RequestParam String name,@RequestParam String runner,@RequestParam(defaultValue="") String application,@RequestParam(defaultValue="") String function,@RequestParam(defaultValue="") String pipeline,
-        @RequestParam(defaultValue="") String source,@RequestParam(defaultValue="") String sourceId,@RequestParam(defaultValue="") String branch,@RequestParam(defaultValue="") String commit,@RequestParam(defaultValue="verify") String goal,@RequestParam(defaultValue="") String profiles,@RequestParam(defaultValue=".") String directory,@RequestParam(defaultValue="") String artifact) {
+        @RequestParam(defaultValue="") String source,@RequestParam(defaultValue="") String sourceId,@RequestParam(defaultValue="") String branch,@RequestParam(defaultValue="") String commit,@RequestParam(defaultValue="verify") String goal,@RequestParam(defaultValue="") String profiles,@RequestParam(defaultValue=".") String directory,@RequestParam(defaultValue="") String artifact,@RequestParam(defaultValue="UNSPECIFIED") String target,@RequestParam(defaultValue="UNKNOWN") String architecture) {
         var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);check(session,s,region,compartment);
+        if(!Set.of("UNSPECIFIED","VM","CONTAINER","FUNCTION").contains(target) || !Set.of("UNKNOWN","X86_64","ARM64").contains(architecture))throw Errors.INVALID.exception();
+        if(runner.equals("FUNCTIONS") && Set.of("CONTAINER","FUNCTION").contains(target))throw Errors.INVALID.exception();
         if(name.isBlank() || name.length()>100 || name.chars().anyMatch(Character::isISOControl))throw Errors.INVALID.exception();
         if(!id.isEmpty() && store.list(c,region,compartment).stream().noneMatch(t->t.id().equals(id)))throw Errors.MISSING.exception();
         var selectedSource=taskSources.resolve(c,region,compartment,sourceId,source,branch);source=selectedSource.url();
@@ -76,7 +78,7 @@ public class BuildTaskPages {
             if(definitions.branches(c,region,matched).stream().noneMatch(b->b.value().equals(branch)))throw Errors.BUILD_PARAMETERS.exception();
             application="";function="";goal="";profiles="";directory="";artifact="";
         }else throw Errors.INVALID.exception();
-        store.save(c,region,compartment,new BuildTaskStore.Task(id.isEmpty()?UUID.randomUUID().toString():id,name.strip(),runner,application,function,pipeline,source,commit,goal,profiles,directory,artifact,sourceId,branch));
+        store.save(c,region,compartment,new BuildTaskStore.Task(id.isEmpty()?UUID.randomUUID().toString():id,name.strip(),runner,application,function,pipeline,source,commit,goal,profiles,directory,artifact,sourceId,branch,target,architecture));
         return "redirect:/builds/tasks";
     }
     @PostMapping("/builds/tasks/delete") String delete(Authentication auth,HttpSession session,@RequestParam String region,@RequestParam String compartment,@RequestParam String id) {

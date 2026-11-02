@@ -4,13 +4,21 @@
   let content='';
   function invalidate(){document.dispatchEvent(new Event('specification-invalidated'));content='';preview.hidden=download.hidden=true;status.textContent='';}
   form.addEventListener('input',invalidate);
+  function outputFields(){
+    const container=form.elements.outputType.value==='DOCKER_IMAGE';
+    form.querySelectorAll('[data-container-field]').forEach(field=>{field.hidden=!container;field.querySelectorAll('input').forEach(input=>{input.disabled=!container;input.required=container;});});
+    form.elements.outputName.required=container;form.elements.location.required=container;
+    document.querySelector('#build-location-label').textContent=container?'로컬 이미지:태그 · 필수':'출력 파일 · 저장 시 필수';
+    form.elements.location.placeholder=container?'application:v1':{maven:'target/application.jar',gradle:'build/libs/application.jar',python:'dist/application.whl',node:'application.tar.gz'}[form.elements.tool.value];
+  }
+  form.elements.outputType.addEventListener('change',()=>{outputFields();invalidate();});outputFields();
   form.elements.tool.addEventListener('change',()=>{
     const tool=form.elements.tool.value;
     form.elements.runtime.replaceChildren(...([['existing','기존 환경 사용'],...({maven:[['jdk17','JDK 17 설치 · Temurin'],['jdk21','JDK 21 설치 · Temurin']],gradle:[['jdk17','JDK 17 설치 · Temurin'],['jdk21','JDK 21 설치 · Temurin']],python:[['python311','Python 3.11 설치']],node:[['node22','Node.js 22 설치']]}[tool])]).map(([value,label])=>new Option(label,value)));
     const values={maven:['Goal','verify',['test','package','verify']],gradle:['Task','build',['test','build','assemble']],python:['pytest 옵션','--junitxml=reports/tests.xml',['--junitxml=reports/tests.xml','-q']],node:['npm script','test build',['test','build','test build']]}[tool];
     document.querySelector('#build-tasks-label').textContent=values[0];form.elements.tasks.value=values[1];
     document.querySelector('#build-task-options').replaceChildren(...values[2].map(value=>new Option(value,value)));
-    form.elements.launcher.disabled=!['maven','gradle'].includes(tool);form.elements.launcher.closest('label').hidden=form.elements.launcher.disabled;form.elements.profiles.closest('label').hidden=tool!=='maven';form.elements.location.placeholder={maven:'target/application.jar',gradle:'build/libs/application.jar',python:'dist/application.whl',node:'application.tar.gz'}[tool];form.elements.profiles.disabled=tool!=='maven';if(tool!=='maven')form.elements.profiles.value='';invalidate();
+    form.elements.launcher.disabled=!['maven','gradle'].includes(tool);form.elements.launcher.closest('label').hidden=form.elements.launcher.disabled;form.elements.profiles.closest('label').hidden=tool!=='maven';form.elements.location.placeholder={maven:'target/application.jar',gradle:'build/libs/application.jar',python:'dist/application.whl',node:'application.tar.gz'}[tool];form.elements.profiles.disabled=tool!=='maven';if(tool!=='maven')form.elements.profiles.value='';outputFields();invalidate();
   });
   form.addEventListener('submit',async event=>{
     event.preventDefault();status.textContent='생성 중';

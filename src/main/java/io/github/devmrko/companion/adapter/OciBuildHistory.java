@@ -31,7 +31,7 @@ public class OciBuildHistory implements BuildHistory {
         try(var client=client(c,region)) {
             var result=new ArrayList<Pipeline>();var projects=new HashMap<String,String>();
             for(var p:client.getPaginators().listBuildPipelinesRecordIterator(ListBuildPipelinesRequest.builder().compartmentId(compartment).build()))
-                result.add(new Pipeline(p.getId(),p.getDisplayName(),p.getLifecycleState().getValue(),p.getProjectId(),projects.computeIfAbsent(p.getProjectId(),id->{ try { return client.getProject(GetProjectRequest.builder().projectId(id).build()).getProject().getName(); } catch(Exception e) { return id; } })));
+                result.add(new Pipeline(p.getId(),p.getDisplayName(),p.getLifecycleState().getValue(),p.getProjectId(),projects.computeIfAbsent(p.getProjectId(),id->{ try { return client.getProject(GetProjectRequest.builder().projectId(id).build()).getProject().getName(); } catch(Exception e) { return id; } }),p.getDescription()));
             result.sort(Comparator.comparing(p->Objects.toString(p.name(),"")));return result;
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }

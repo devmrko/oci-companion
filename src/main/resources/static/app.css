@@ -220,17 +220,22 @@ small {
   width: 100%;
   border: 1px solid #b9c8c0;
   border-radius: 3px;
-  padding: 8px 10px;
+  padding: 4px 10px;
   background: #fff;
   color: var(--ink);
   font: inherit;
   margin-top: 0;
   min-width: 0;
   max-width: 100%;
-  height: 42px;
-  font-size: 14px;
+  height: 34px;
+  font-size: 13px;
   line-height: 24px;
   margin: 0;
+}
+.ui-control:where(textarea, select[multiple]) {
+  height: 42px;
+  padding: 8px 10px;
+  font-size: 14px;
 }
 .ui-control:focus {
   outline:2px solid #95b6a7;
@@ -573,12 +578,17 @@ details>summary {
 }
 
 .ui-button {
-  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
   white-space: nowrap;
   border-radius: 3px;
-  height: 42px;
-  padding: 8px 14px;
+  height: 34px;
+  padding: 4px 12px;
   line-height: 24px;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 .form-toolbar, .scope-bar, .list-filters {
   display: flex;
@@ -864,6 +874,9 @@ a:focus-visible, .ui-button:focus-visible {
 .build-execution > .form-field { max-width:560px; }
 .build-execution[aria-busy="true"] { opacity:.65; pointer-events:none; }
 
+.section-stack { display:flex; flex-direction:column; gap:20px; min-width:0; }
+.section-stack > * { margin-block:0; }
+.section-stack > details[open] > .form-toolbar { padding-top:16px; }
 .section-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .section-title h2, .section-title h3 { margin:0; }
 .field-badge { display:inline-block; font-size:12px; font-weight:normal; background:#edf2f3; border:1px solid #d6dfe1; border-radius:4px; padding:2px 7px; }
@@ -930,3 +943,10 @@ a:focus-visible, .ui-button:focus-visible {
 
 /* Honor semantic visibility even when a component defines display. */
 [hidden] { display:none !important; }
+
+.resource-description { margin: 6px 0 0; color: var(--muted); font-size: 13px; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.resource-description--row { flex-basis: 100%; margin-top: 0; }
+.resource-description:empty { display: none; }
+
+.ui-button[aria-pressed="true"] { background:var(--accent); color:white; border-color:var(--accent); }
