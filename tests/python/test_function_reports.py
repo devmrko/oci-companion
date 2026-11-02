@@ -28,6 +28,7 @@ class ReportsTest(unittest.TestCase):
                     if args[0] == 'mvn':
                         path = pathlib.Path(cwd) / 'target' / 'surefire-reports'; path.mkdir(parents=True)
                         (path / 'TEST.xml').write_text('<testsuite><testcase name="failed"><failure>expected</failure></testcase></testsuite>')
+                        (path.parent / 'pmd.xml').write_text('<pmd version="7.17.0"><file name="Example.java"><violation rule="Rule" beginline="1">issue</violation></file></pmd>')
                         self.returncode = 1
                 def poll(self): return self.returncode
             request = {'action': 'build', 'runId': '12345678-1234-1234-1234-123456789abc', 'source': 'https://github.com/example/project', 'commit': 'a'*40, 'goal': 'test'}
@@ -37,6 +38,6 @@ class ReportsTest(unittest.TestCase):
             result = json.loads(result['response_data']); self.assertEqual('FAILED', result['status'])
             archive = objects[result['testReports']]
             with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as reports:
-                self.assertEqual(['target/surefire-reports/TEST.xml'], reports.getnames())
+                self.assertEqual({'target/surefire-reports/TEST.xml', 'target/pmd.xml'}, set(reports.getnames()))
             stored = json.loads(objects['test-builder/'+request['runId']+'/result.json'])
             self.assertEqual('FAILED', stored['status'])

@@ -66,7 +66,23 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 - verify 실행 ID: `59e06df0-8f03-4634-97e3-2658fed699f3`.
 - JAR: `db-manage-companion-0.1.0-alpha.17.jar`, 61,111,723 bytes, SHA256 `42dfa20220c131fab428690e042e21d980599e428330175338fc7fc7c8e67101`.
 - 화면의 JUnit 집계 1,444건과 Maven 최종 로그의 1,444건이 일치했다.
-- PMD 실행은 로그로 검증했다. PMD 위반 전용 목록·집계 화면은 미구현이다. PMD 위반으로 빌드가 실패하는 사례와 `package` 단독 실행은 이번 범위에 포함하지 않았다.
+- PMD 실행은 로그로 검증했다. 이후 아래 보고서 표시 기능을 추가했다. 실제 PMD 위반으로 빌드가 실패하는 사례와 `package` 단독 실행은 이번 범위에 포함하지 않았다.
 - 실시간 실행 상세는 자동 갱신되며 하단 실행 이력 목록은 새로 고침이 필요하다.
 
 재현: `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-maven-goals.cjs`. 기존 작업에서 두 번의 실제 Function 빌드를 실행한다. 화면 조작만 사용하며 `.tools/ui-maven-*`에 실행 ID·로그·산출물 정보·캡처를 남긴다.
+
+## PMD 보고서 표시
+
+실행 상세 → **보고서 보기** → **PMD 보고서**. Functions와 OCI DevOps가 같은 보고서 컴포넌트를 사용한다.
+
+- 위반 수·분석 오류 수·보고서에 기록된 제외 항목 수, 파일·줄·규칙·우선순위·내용 표시.
+- XML 원문 보기와 다운로드. 위반 목록은 500건, 오류 내용은 100건까지 표시하며 전체 내용은 XML로 확인한다.
+- 보고서 없음과 위반 0건을 구분한다. JUnit 테스트 수와 PMD 위반 수를 합산하지 않는다.
+- HTML 실행 대신 PMD XML을 읽고 화면의 텍스트·표로 표시한다. 외부 XML 엔티티는 차단한다.
+- 신규 DevOps 명세와 Functions 템플릿도 `pmd.xml`을 보고서 압축 파일에 수집한다. 기존 배포된 Function·Git 명세를 자동 교체하지 않는다.
+
+실제 검증: 위 verify 실행의 `target/pmd.xml`(PMD 7.17.0)을 조회해 위반 0·분석 오류 0, XML 원문과 다운로드 파일 일치를 확인했다. test 실행은 PMD 보고서 없음으로 표시했다. 기존 DevOps Ruby 3건 보고서도 조회했다. 390/768/1440px 화면 확인. 재현 스크립트: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-pmd-reports.cjs`(실제 조회만 수행).
+
+보조 검사: Java 86개, Python 4개 통과. PMD 위반·분석 오류·제외 항목 파싱과 실패 시 PMD 파일 보존은 단위 테스트로 검증했다. 실제 빌드의 위반 목록 사례는 아직 검증하지 않았다.
+
+형식 근거: [PMD XML 보고서](https://pmd.github.io/pmd/pmd_userdocs_report_formats.html).

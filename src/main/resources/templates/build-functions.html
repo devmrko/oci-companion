@@ -52,7 +52,7 @@
 <p class="small muted" id="function-log-notice">5초마다 갱신 · 빌드 종료 시 자동 중지</p>
 <label><input type="checkbox" id="function-log-follow" checked> 마지막 로그 따라가기</label>
 <pre class="code-block function-live-log" id="function-live-log" tabindex="0" aria-label="빌드 진행 로그">로그를 불러오는 중입니다.</pre>
-<div class="form-toolbar"><button type="button" class="ui-button" id="function-reports-refresh">테스트 보고서 조회</button></div><p id="function-reports-status" role="status"></p><pre class="code-block" id="function-reports-details" hidden></pre>
+<div class="form-toolbar"><button type="button" class="ui-button" id="function-reports-refresh">보고서 보기</button></div><p id="function-reports-status" role="status"></p><pre class="code-block" id="function-reports-details" hidden></pre><div id="pmd-reports" class="section-stack"></div>
 <details><summary>실행 결과·산출물</summary><pre class="code-block" id="function-live-result"></pre></details>
 </section>
 <section class="card" th:if="${tab == 'history' and builder != null and builder.compatible()}"><div class="section-title"><h2>실행 이력</h2><a class="ui-button" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function},run=${selectedRun},cursor=${cursor})}">새로 고침</a></div>
@@ -64,4 +64,4 @@
 <details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → Functions → 애플리케이션 → Functions / 로그</p><pre class="code-block">oci fn application list --profile '&lt;프로파일&gt;' --region '&lt;리전&gt;' --compartment-id '&lt;구획 OCID&gt;' --all
 oci fn function list --application-id '&lt;애플리케이션 OCID&gt;' --all
 oci fn function invoke --function-id '&lt;Function OCID&gt;' --fn-invoke-type detached --body file://request.json --file response.json</pre><p>HTTP202는 접수입니다. 결과 JSON의 SUCCEEDED와 산출물을 확인하세요.</p><a href="https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionscreatingfunctions.htm" target="_blank" rel="noopener noreferrer">Functions 구성 문서</a></details>
-<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}"></footer><script src="/function-selection.js" defer></script><script src="/function-progress.js" defer></script></body></html>
+<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}"></footer><script src="/function-selection.js" defer></script><script src="/pmd-reports.js" defer></script><script src="/function-progress.js" defer></script></body></html>

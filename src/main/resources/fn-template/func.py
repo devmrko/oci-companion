@@ -148,7 +148,7 @@ def handler(ctx, data=None):
                 if directory is not None and directory.is_dir():
                     import tarfile
                     files = [p for p in directory.rglob("*.xml")
-                             if any(x in ("surefire-reports", "failsafe-reports") for x in p.parts)
+                             if (any(x in ("surefire-reports", "failsafe-reports") for x in p.parts) or p.name == "pmd.xml")
                              and p.is_file() and not p.is_symlink()
                              and p.resolve().is_relative_to(directory)]
                     if files:

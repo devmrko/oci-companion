@@ -25,6 +25,19 @@ class TestReportsTest {
         assertThrows(Exception.class,()->TestReports.read(new ByteArrayInputStream(xxe)));
         byte[] malformed=archive("<testsuite>");assertThrows(Exception.class,()->TestReports.read(new ByteArrayInputStream(malformed)));
     }
+    @Test void pmdSeparatesViolationsErrorsAndSuppressionsFromJUnit() throws Exception {
+        String xml="<pmd xmlns='http://pmd.sourceforge.net/report/2.0.0' version='7.17.0'><file name='src/Example.java'><violation beginline='12' rule='UnusedLocalVariable' priority='3'>unused &lt;value&gt;</violation></file><error filename='Broken.java' msg='parse error'>details</error><configerror rule='Rule' msg='invalid configuration'/><suppressedviolation filename='Ignored.java'/></pmd>";
+        var result=TestReports.read(new ByteArrayInputStream(archive(xml)));
+        assertEquals(0,result.tests());assertEquals("MISSING",result.state());
+        var pmd=result.pmd().getFirst();assertEquals(1,pmd.violations());assertEquals(2,pmd.errors());assertEquals(1,pmd.suppressed());
+        assertEquals("src/Example.java",pmd.findings().getFirst().file());assertEquals("12",pmd.findings().getFirst().line());
+        assertEquals("unused <value>",pmd.findings().getFirst().message());assertEquals(xml,pmd.xml());
+        assertTrue(pmd.problems().getFirst().contains("parse error"));
+    }
+    @Test void zeroViolationPmdStillHasAViewableReport() throws Exception {
+        var result=TestReports.read(new ByteArrayInputStream(archive("<pmd version='7.17.0'/>")));
+        assertEquals(1,result.pmd().size());assertEquals(0,result.pmd().getFirst().violations());assertEquals(0,result.pmd().getFirst().errors());
+    }
     @Test void actualArchiveWhenExplicitlyProvided() throws Exception {
         String path=System.getProperty("companion.report-fixture");if(path==null)return;
         try(var in=new FileInputStream(path)){var summary=TestReports.read(in);System.out.println("ACTUAL_REPORT "+summary);assertTrue(summary.tests()>0);}

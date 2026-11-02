@@ -86,7 +86,7 @@ public final class BuildSpecTemplates {
         String collect="""
             report_root="${OCI_PRIMARY_SOURCE_DIR:-$PWD}"
             collect_reports() {
-              find "$report_root" -type f \\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' \\) -print0 | tar --null -T - -czf "$report_root/test-reports.tar.gz"
+              find "$report_root" -type f \\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' -o -name 'pmd.xml' \\) -print0 | tar --null -T - -czf "$report_root/test-reports.tar.gz"
             }
             trap 'build_status=$?; collect_reports || { if [ "$build_status" -eq 0 ]; then build_status=1; fi; }; exit "$build_status"' EXIT
             """;
