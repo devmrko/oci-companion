@@ -10,6 +10,12 @@
 | 입력·선택 | `ui-control`, `ui-control--compact` |
 | 필드 | `form-field`, `form-field--compact`, `form-field--inline` |
 | 폼 도구 모음 | `form-toolbar` |
+| 필드 라벨 높이 정렬 | `build-field-grid form-grid--aligned` |
+| 입력창·버튼 묶음 | `form-control-row` |
+| 하단 실행 영역 | `form-toolbar form-actions` |
+| 체크박스·라벨 | `form-check` |
+| 빈 결과 영역 숨김 | `form-result` |
+| 영역 간 세로 간격 | `section-stack` |
 | 표 | `data-table`, `table-heading`, `table-cell`, `table-scroll` |
 | 코드 | `code-block` |
 | 본문·푸터 | `page-content`, `app-content`, `page-footer`, `app-footer` |
@@ -41,3 +47,5 @@
 
 상단 흐름은 `build-flow` 공통 fragment와 CSS 클래스로 구현한다. 큰 단계의 상자·화살표와 현재 단계만 표시한다.
 `aria-current="step"`, 키보드 포커스, 좁은 화면의 흐름 영역 스크롤을 지원한다. 완료 상태를 추정한 체크 표시는 사용하지 않는다.
+
+2026-11-02 예약 폼은 위 공통 클래스를 조합한다. cron 입력창과 미리보기 버튼을 같은 행에 두고, 결과와 실행 확인은 별도 행으로 분리한다. 라벨 유무 때문에 버튼에 개별 margin/padding을 넣지 않는다. 화면별 ID·인라인 스타일로 위치를 보정하지 않는다.
