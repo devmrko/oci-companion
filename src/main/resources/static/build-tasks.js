@@ -73,11 +73,16 @@
 })();
 
 (() => {
- const filters=document.querySelectorAll('[data-target-filter]');
- filters.forEach(button=>button.addEventListener('click',()=>{
-   filters.forEach(other=>other.setAttribute('aria-pressed',String(other===button)));
-   const cards=[...document.querySelectorAll('.task-card[data-target]')];
-   cards.forEach(card=>card.hidden=button.dataset.targetFilter!=='ALL' && card.dataset.target!==button.dataset.targetFilter);
-   document.getElementById('task-type-empty').hidden=cards.some(card=>!card.hidden);
- }));
+ const filters=[...document.querySelectorAll('[data-target-filter]')];
+ const cards=[...document.querySelectorAll('.task-card[data-target]')];
+ const matches=(card,type)=>type==='ALL' || card.dataset.target===type;
+ filters.forEach(button=>{
+   const type=button.dataset.targetFilter;
+   button.textContent+=` (${cards.filter(card=>matches(card,type)).length})`;
+   button.addEventListener('click',()=>{
+     filters.forEach(other=>other.setAttribute('aria-pressed',String(other===button)));
+     cards.forEach(card=>card.hidden=!matches(card,type));
+     document.getElementById('task-type-empty').hidden=cards.some(card=>!card.hidden);
+   });
+ });
 })();

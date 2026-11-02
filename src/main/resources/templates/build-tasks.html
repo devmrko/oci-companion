@@ -3,9 +3,9 @@
 <section class="section-stack" th:if="${taskView == 'tasks' or taskView == 'history'}">
 <div class="section-title"><h2 th:text="${taskView == 'history' ? '작업별 실행 이력' : '빌드 작업'}"></h2><a class="ui-button primary" href="/builds/tasks?view=new">새 빌드 작업</a></div>
 <div class="card task-empty" th:if="${tasks.isEmpty()}"><h3>저장된 빌드 작업이 없습니다</h3><p>소스·빌드 설정·실행 환경을 묶어 저장하세요.</p><a class="ui-button primary" href="/builds/tasks?view=new">첫 빌드 작업 만들기</a></div>
-<div class="form-toolbar" id="task-type-filters" role="group" aria-label="산출물 유형"><button type="button" class="ui-button" data-target-filter="ALL" aria-pressed="true">전체</button><button type="button" class="ui-button" data-target-filter="FILE" aria-pressed="false">파일 (JAR·압축 파일 등)</button><button type="button" class="ui-button" data-target-filter="CONTAINER" aria-pressed="false">컨테이너 이미지</button><button type="button" class="ui-button" data-target-filter="FUNCTION" aria-pressed="false">Function 패키지·이미지</button></div>
+<div class="form-toolbar" id="task-type-filters" role="group" aria-label="산출물 유형"><button type="button" class="ui-button" data-target-filter="ALL" aria-pressed="true">전체</button><button type="button" class="ui-button" data-target-filter="FILE" aria-pressed="false">파일 (JAR·압축 파일 등)</button><button type="button" class="ui-button" data-target-filter="CONTAINER" aria-pressed="false">컨테이너 이미지</button><button type="button" class="ui-button" data-target-filter="FUNCTION" aria-pressed="false">Function 패키지·이미지</button><button type="button" class="ui-button" data-target-filter="UNSPECIFIED" aria-pressed="false">미지정</button></div>
 <p class="small muted">소스 → 언어·빌드 설정 → 산출물 → 저장소 → 배포 대상</p>
-<p id="task-type-empty" hidden>등록된 작업 없음</p>
+<p id="task-type-empty" role="status" hidden>선택한 유형의 작업 없음</p>
 <div class="task-grid"><article class="card task-card" th:each="t : ${tasks}" th:attr="data-target=${t.target()}"><div class="section-title"><h3 th:text="${t.name()}"></h3><span class="field-badge" th:text="${t.runner() == 'FUNCTIONS' ? '빌드 실행: Functions · Maven' : '빌드 실행: OCI DevOps'}"></span></div>
 <p class="resource-description"><strong th:text="${t.targetLabel()}"></strong> · <span th:text="${t.architectureLabel()}"></span><span class="small muted"> · 작업 설정 기준</span></p>
 <p class="small muted" th:text="${t.deploymentHint()}"></p>

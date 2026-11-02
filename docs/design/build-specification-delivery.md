@@ -121,3 +121,9 @@ Managed Build 실패 시 후속 전달 단계가 실행되지 않을 수 있다.
 - 기존 Maven/Gradle/Python/npm 설정에 언어별 런타임·의존성·시작 명령 안내를 추가했다. Python 기본 명세는 pytest 테스트이며 wheel 자동 생성은 구현하지 않았다. Node는 정적 파일과 서버의 실행 조건을 구분해 안내한다.
 - 일반 Java 바이트코드 JAR는 아키텍처 미지정이 가능하나 Java 버전과 네이티브 의존성을 확인한다. 이미지·네이티브 파일은 실행 대상 아키텍처를 확인한다.
 - Function 패키지·이미지는 분류이며 새 패키징 생성기를 추가한 것은 아니다. 기존 실행기는 그대로 사용한다.
+
+### 기존 작업 분류 보정·필터 검증 — 2026-11-02
+
+기존 작업 3개가 UNSPECIFIED로 남아 파일 필터에서 빠졌었다. 실제 DevOps 전달 artifact `db-companion-jar`가 GENERIC_FILE임을 SDK로 확인하고, 같은 파이프라인을 사용하는 두 작업과 artifact=target/*.jar인 Functions Maven 작업을 FILE로 보정했다. 실행 서비스가 Functions라는 이유로 Function 패키지로 분류하지 않는다. 다른 미확인 작업에 이 보정을 일괄 적용하지 않는다.
+
+필터마다 건수를 표시하고 미지정 필터를 추가했다. 실제 DEFAULT/서울/Joungmin.Ko 화면에서 전체4 → 파일3 → 컨테이너1 → Function0 → 미지정0 → 전체4와 빈 결과 안내를 검증했다. Java81 테스트 통과.
