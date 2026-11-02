@@ -97,6 +97,49 @@ public final class BuildSpecTemplates {
         var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         return "# test-reports 출력은 별도 Registry 전달 연결이 필요합니다. 실패한 단계에서는 전달이 실행되지 않을 수 있습니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
     }
+    /** Run the application build in a reusable image; keep image packaging on the OCI runner. */
+    public static String builder(String yaml,String image,String directory) {
+        if(!image.matches("[a-z0-9][a-z0-9./:_-]*(?:@sha256:[a-f0-9]{64})?") || image.length()>1024 || (!image.contains(":") && !image.contains("@")))throw Errors.BUILD_STAGE_INPUT.exception();
+        containerPath(directory);
+        Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
+        var step=steps.getFirst();String command=step.get("command").toString();
+        String prefix="set -euo pipefail\ncd -- "+quote(directory)+"\n";
+        if(!command.startsWith(prefix))throw Errors.BUILD_STAGE_INPUT.exception();
+        command=command.substring(prefix.length());
+        String packaging="";int split=command.indexOf("\ndocker info >/dev/null");
+        if(split>=0){packaging=command.substring(split);command=command.substring(0,split);}
+        var flags=new StringBuilder();
+        @SuppressWarnings("unchecked") var env=(Map<String,Map<String,String>>)spec.getOrDefault("env",Map.of());
+        for(var group:env.values())for(String name:group.keySet())flags.append(" --env ").append(quote(name));
+        String script="set -eu\ncd /workspace\n"+command;
+        // Copy, rather than bind-mount: OCI's Docker-compatible engine may be remote.
+        String wrapper="""
+            set -euo pipefail
+            (
+            cd -- %s
+            docker info >/dev/null
+            docker pull %s
+            docker image inspect %s --format 'Builder image: {{.Id}} {{json .RepoDigests}}'
+            builder_id=$(docker create%s --workdir /workspace --entrypoint /bin/sh %s -c %s)
+            cleanup_builder() { docker rm -f "$builder_id" >/dev/null 2>&1 || true; }
+            trap cleanup_builder EXIT
+            docker cp . "$builder_id:/workspace"
+            build_status=0
+            docker start -a "$builder_id" || build_status=$?
+            container_status=$(docker inspect "$builder_id" --format '{{.State.ExitCode}}')
+            if [ "$container_status" -ne 0 ]; then build_status=$container_status; fi
+            docker cp "$builder_id:/workspace/." .
+            cleanup_builder
+            trap - EXIT
+            test "$build_status" -eq 0 || exit "$build_status"
+            )
+            cd -- %s
+            """.formatted(quote(directory),quote(image),quote(image),flags,quote(image),quote(script),quote(directory));
+        step.put("command",wrapper+packaging);
+        var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        return "# 빌더 이미지 재사용 · 런타임/도구 설치 불필요 · 이미지 인증/네트워크 필요\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
     public static String runtime(String yaml,String tool,String runtime) {
         if(runtime.equals("existing"))return yaml;
         boolean java=Set.of("maven","gradle").contains(tool);

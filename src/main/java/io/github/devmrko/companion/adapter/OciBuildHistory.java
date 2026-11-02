@@ -72,7 +72,15 @@ public class OciBuildHistory implements BuildHistory {
                     if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress build && build.getSteps()!=null)
                         for(var step:build.getSteps()) steps.add(new Step(step.getName(),step.getState()==null?"—":step.getState().getValue()));
                 }
-            return new Detail(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),r.getLifecycleDetails(),steps,artifacts);
+            var source=r.getBuildRunSource();String origin="기록 없음";
+            if(source instanceof com.oracle.bmc.devops.model.ManualBuildRunSource)origin="수동 / API";
+            else if(source instanceof com.oracle.bmc.devops.model.DevopsCodeRepositoryBuildRunSource x)origin="OCI Git 트리거 · "+(x.getTriggerInfo()==null?x.getTriggerId():x.getTriggerInfo().getDisplayName());
+            else if(source instanceof com.oracle.bmc.devops.model.GithubBuildRunSource)origin="GitHub 트리거";
+            else if(source instanceof com.oracle.bmc.devops.model.GitlabBuildRunSource)origin="GitLab 트리거";
+            else if(source!=null)origin="외부 소스 트리거";
+            var commit=r.getCommitInfo();
+            return new Detail(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),r.getLifecycleDetails(),steps,artifacts,origin,
+                commit==null?"":Objects.toString(commit.getRepositoryUrl(),""),commit==null?"":Objects.toString(commit.getRepositoryBranch(),""),commit==null?"":Objects.toString(commit.getCommitHash(),""));
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
 }

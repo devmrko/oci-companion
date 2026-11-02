@@ -10,6 +10,13 @@ class BuildSchedulesTest {
         assertEquals("2026-10-26T00:00:00Z · 서울 2026-10-26T09:00",times.getFirst());
         for(String cron:List.of("0 0 0 * * *","0 24 * * *","0 0 1 * 1","@daily","0 0 * * MON","0 0 * * *;echo hi"))assertThrows(RuntimeException.class,()->BuildSchedules.cron(cron));
     }
+    @Test void schedulerRejectsSubhourIntervalsBeforeCloudSubmission() {
+        for(String cron:List.of("*/5 * * * *","0,30 * * * *","* 12 * * *","0-10 12 * * *"))
+            assertThrows(RuntimeException.class,()->BuildSchedules.cron(cron));
+        var times=BuildSchedules.next("15 * * * *",Instant.parse("2026-11-02T00:00:00Z"));
+        assertEquals("2026-11-02T00:15:00Z · 서울 2026-11-02T09:15",times.getFirst());
+        assertEquals("2026-11-02T01:15:00Z · 서울 2026-11-02T10:15",times.get(1));
+    }
     @Test void generatedSpecificationSeparatesSecretsAndKeepsArgumentsLiteral() {
         var yaml=BuildSpecTemplates.configured("maven","verify","quality",".","app","target/app.jar","system","MODE=ci\nNOTE=$(whoami)","TOKEN=ocid1.vaultsecret.oc1.test","BINARY");
         Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(yaml);var env=(Map<?,?>)spec.get("env");assertEquals("$(whoami)",((Map<?,?>)env.get("variables")).get("NOTE"));

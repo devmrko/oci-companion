@@ -31,10 +31,10 @@ OCI_CONFIG_FILE=/absolute/path/config PORT=8092 ./scripts/run.sh
 - 화면별 콘솔 경로, 현재 범위의 CLI, 권한·오류 안내.
 - 루프백 바인딩, CSRF, 세션 분리, 이전 화면의 범위 변경 감지.
 
-소스 등록은 로컬 참조 저장입니다. 외부 Git 인증·연결 검증·브랜치 조회는 후속 범위입니다.
+소스 등록 자체는 로컬 참조 저장입니다. Git 인증과 OCI 외부 연결은 별도 설정입니다.
 DEFAULT 프로파일의 실제 인증·리전·구획·DevOps 목록 조회를 검증했습니다.
 검증 범위: us-ashburn-1 접근 가능 구획 307개. 프로젝트 3개·저장소 5개 조회.
-빌드·배포 실행은 미검증입니다.
+빌드는 [6개 언어 x86 컨테이너 예제](examples/rest-hello/README.md)와 Registry 전달·로그·보고서를 실제 검증했습니다. 배포 대상별 검증은 별도입니다.
 
 ## 메뉴
 
@@ -70,6 +70,9 @@ DB Companion과 같은 좌측 그룹 메뉴·접기/펼치기·상단 연결 정
 ## 개발
 
 - [설계](docs/design/resource-catalog.md)
+- [CI/CD 품질 기준·완료 조건](docs/design/cicd-quality-criteria.md)
+- [재사용 빌더 이미지](docs/design/reusable-builders.md)
+- [트리거·예약 실행과 검증 범위](docs/design/build-automation.md)
 - [검증](docs/validation.md)
 - [Redmine #977](https://redmine.cloud-handson.com/issues/977)
 - [GitHub](https://github.com/devmrko/oci-companion)

@@ -12,7 +12,8 @@ public interface BuildHistory {
     record Run(String id,String name,String state,String createdAt) {}
     record Step(String name,String state,String type) { public Step(String name,String state) { this(name,state,""); } }
     record StoredArtifact(String name,String kind,String location,String version,String id) {}
-    record Detail(String id,String name,String state,String message,List<Step> steps,List<StoredArtifact> artifacts) {
+    record Detail(String id,String name,String state,String message,List<Step> steps,List<StoredArtifact> artifacts,String origin,String repository,String branch,String commit) {
+        public Detail(String id,String name,String state,String message,List<Step> steps,List<StoredArtifact> artifacts) { this(id,name,state,message,steps,artifacts,"기록 없음","","",""); }
         public Detail(String id,String name,String state,String message,List<Step> steps) { this(id,name,state,message,steps,List.of()); }
         public String buildState() { return phase("BUILD"); }
         public String storageState() { return phase("DELIVER"); }

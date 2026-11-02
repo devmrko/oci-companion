@@ -4,6 +4,32 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class BuildSpecTemplatesTest {
+    @Test void builderFailureStillCopiesReportsAndCleansContainer() throws Exception {
+        var root=java.nio.file.Files.createTempDirectory("builder-failure-");
+        var executable=root.resolve("docker");
+        java.nio.file.Files.writeString(executable,"""
+            #!/bin/sh
+            case "$1" in
+              create) echo test-container;;
+              start) exit 0;;
+              inspect) echo 7;;
+              cp) if [ "$2" = 'test-container:/workspace/.' ]; then
+                    mkdir -p reports
+                    echo '<testsuite><testcase name="failure"><failure>expected</failure></testcase></testsuite>' > reports/test.xml
+                  fi;;
+              rm) touch cleaned;;
+            esac
+            """);executable.toFile().setExecutable(true);
+        String yaml=BuildSpecTemplates.reports(BuildSpecTemplates.builder(BuildSpecTemplates.render("go","./...","",".","",""),"golang:1.27.3","."),true);
+        Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        String command=((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("command").toString();
+        var builder=new ProcessBuilder("bash","-c",command).directory(root.toFile()).redirectErrorStream(true);
+        builder.environment().put("PATH",root+":"+System.getenv("PATH"));
+        var process=builder.start();process.getInputStream().readAllBytes();assertEquals(7,process.waitFor());
+        assertTrue(java.nio.file.Files.exists(root.resolve("cleaned")));
+        try(var input=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){assertEquals(1,io.github.devmrko.companion.service.TestReports.read(input).failures());}
+        assertThrows(RuntimeException.class,()->BuildSpecTemplates.builder(yaml,"image:$(id)","."));
+    }
     @Test void selectedTasksBecomeQuotedArgumentsAndOutputsAreOptional() {
         String draft=BuildSpecTemplates.render("maven","verify","ci",".","application","target/app.jar");
         Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(draft);

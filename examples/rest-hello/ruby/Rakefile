@@ -1,0 +1,41 @@
+require 'rake'
+require 'net/http'
+require 'json'
+require 'fileutils'
+require 'rbconfig'
+
+desc 'Check the actual HTTP server and write JUnit results'
+task :test do
+  pid = Process.spawn(RbConfig.ruby, 'app.rb')
+  failures = []
+  checks = [['hello', Net::HTTP::Get, '/hello', '200'], ['missing', Net::HTTP::Get, '/missing', '404'], ['method', Net::HTTP::Post, '/hello', '405']]
+  begin
+    30.times do
+      begin
+        Net::HTTP.start('127.0.0.1', 8080, nil) { |http| http.get('/hello') }
+        break
+      rescue Errno::ECONNREFUSED
+        sleep 0.2
+      end
+    end
+    checks.each do |name, method, path, code|
+      begin
+        result = Net::HTTP.start('127.0.0.1', 8080, nil) { |http| http.request(method.new(path)) }
+        raise 'HTTP status mismatch' unless result.code == code
+        body = JSON.parse(result.body)
+        raise 'JSON response mismatch' unless code == '200' ? body == {'message'=>'hello', 'language'=>'ruby'} : body.key?('error')
+        puts "PASS ruby #{name} #{code}"
+      rescue StandardError => error
+        failures << name
+        warn "FAIL ruby #{name}: #{error.class}"
+      end
+    end
+  ensure
+    Process.kill('TERM', pid) rescue nil
+    Process.wait(pid) rescue nil
+    FileUtils.mkdir_p('reports')
+    cases = checks.map { |name, *_| "<testcase name=\"#{name}\">#{failures.include?(name) ? '<failure>HTTP contract failed</failure>' : ''}</testcase>" }.join
+    File.write('reports/ruby.xml', "<testsuite name=\"ruby-http\" tests=\"3\" failures=\"#{failures.size}\">#{cases}</testsuite>")
+  end
+  abort 'HTTP tests failed' unless failures.empty?
+end
