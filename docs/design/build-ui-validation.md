@@ -50,3 +50,23 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 ## 검증 범위
 
 기존 작업의 실행 흐름을 검증한다. 소스 저장소·프로젝트·파이프라인·IAM을 처음부터 화면으로 생성하는 전체 온보딩 검증은 별도다. Go·Ruby 설정 화면의 빌더 선택·명세 미리보기는 별도로 확인했다. 이 미리보기 결과를 이번 실행에서 새로 Git에 저장하지는 않았다.
+
+## Maven Goal·PMD 추가 검증
+
+화면: 빌드 → `db-companion 검증 · Functions` → 설정 확인·실행. 기존 ARM `maven-builder-998`을 사용했다. 이 결과는 OCI Managed Build의 Maven 경로 검증과 구분한다.
+
+소스는 `devmrko/db-companion`, 커밋 `7a5cb34b68d8dae90f9c398667a0db976bb2f6d2`. 이 버전의 pom.xml은 `quality` 프로파일의 `verify` 단계에 Maven PMD Plugin 3.28.0 `check`를 연결한다.
+
+| 화면 설정 | 실제 실행 명령의 끝부분 | 화면에서 확인한 결과 |
+| --- | --- | --- |
+| Goal `test`, 프로파일·산출물 경로 비움 | `clean test` | SUCCEEDED, 테스트 1,444건·실패/오류/건너뜀 0, PMD 미실행, JAR 없음 |
+| Goal `verify`, 프로파일 `quality`, 산출물 `target/*.jar` | `-Pquality clean verify` | SUCCEEDED, 테스트 1,444건·실패/오류/건너뜀 0, `pmd:3.28.0:check` 실행 성공, JAR 저장 |
+
+- test 실행 ID: `8bfcd094-4617-40d7-bda5-7962095ced95`.
+- verify 실행 ID: `59e06df0-8f03-4634-97e3-2658fed699f3`.
+- JAR: `db-manage-companion-0.1.0-alpha.17.jar`, 61,111,723 bytes, SHA256 `42dfa20220c131fab428690e042e21d980599e428330175338fc7fc7c8e67101`.
+- 화면의 JUnit 집계 1,444건과 Maven 최종 로그의 1,444건이 일치했다.
+- PMD 실행은 로그로 검증했다. PMD 위반 전용 목록·집계 화면은 미구현이다. PMD 위반으로 빌드가 실패하는 사례와 `package` 단독 실행은 이번 범위에 포함하지 않았다.
+- 실시간 실행 상세는 자동 갱신되며 하단 실행 이력 목록은 새로 고침이 필요하다.
+
+재현: `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-maven-goals.cjs`. 기존 작업에서 두 번의 실제 Function 빌드를 실행한다. 화면 조작만 사용하며 `.tools/ui-maven-*`에 실행 ID·로그·산출물 정보·캡처를 남긴다.
