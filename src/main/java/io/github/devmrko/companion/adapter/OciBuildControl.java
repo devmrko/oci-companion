@@ -57,8 +57,14 @@ public class OciBuildControl implements BuildControl {
             var source=definition.sources().stream().filter(v->v.key().equals(override.source())).findFirst().orElseThrow(Errors.BUILD_PARAMETERS::exception);
             if(override.branch().isBlank() || override.branch().length()>255) throw Errors.BUILD_PARAMETERS.exception();
             if(definitions.branches(c,r,source).stream().noneMatch(v->v.value().equals(override.branch()))) throw Errors.BUILD_PARAMETERS.exception();
-            if(!override.commit().isEmpty() && definitions.commits(c,r,source,override.branch()).stream().noneMatch(v->v.value().equals(override.commit())) && !definitions.validCommit(c,r,source,override.commit())) throw Errors.BUILD_PARAMETERS.exception();
-            commit=CommitInfo.builder().repositoryUrl(source.url()).repositoryBranch(override.branch()).commitHash(override.commit().isEmpty()?null:override.commit()).build();
+            var commits=definitions.commits(c,r,source,override.branch());
+            String hash=override.commit();
+            if(hash.isEmpty()) {
+                if(commits.isEmpty()) throw Errors.SOURCE_READ.exception();
+                hash=commits.getFirst().value();
+            } else if(commits.stream().noneMatch(v->v.value().equals(override.commit())) && !definitions.validCommit(c,r,source,hash)) throw Errors.BUILD_PARAMETERS.exception();
+            // OCI requires commitHash whenever commitInfo is supplied, even for a branch's latest commit.
+            commit=CommitInfo.builder().repositoryUrl(source.url()).repositoryBranch(override.branch()).commitHash(hash).build();
         } else if(!override.branch().isEmpty() || !override.commit().isEmpty()) throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,r)) {
             return client.createBuildRun(CreateBuildRunRequest.builder().opcRetryToken(token)

@@ -56,5 +56,13 @@ class OciBuildControlTest {
         assertEquals("https://example.com/repo",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getRepositoryUrl());
         assertEquals("hash",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getCommitHash());
         assertEquals("token",capture.getValue().getOpcRetryToken());
+        clearInvocations(client);
+        assertEquals("run",adapter.start(c,"region","comp","p","etag","latest",List.of(),"latest-token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main",""),"rev"));
+        verify(client).createBuildRun(capture.capture());
+        assertEquals("hash",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getCommitHash());
+        clearInvocations(client);
+        when(definitions.commits(c,"region",source,"main")).thenReturn(List.of());
+        assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","unresolved",List.of(),"unresolved-token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main",""),"rev"));
+        verify(client,never()).createBuildRun(any());
     }
 }
