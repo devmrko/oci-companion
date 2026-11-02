@@ -6,7 +6,7 @@ import java.util.*;
 public final class BuildSpecTemplates {
     private BuildSpecTemplates() {}
     public static String render(String tool,String tasks,String profiles,String directory,String output,String location) {
-        if(!Set.of("maven","gradle","python","node").contains(tool) || tasks.isBlank() || tasks.length()>1000 || profiles.length()>255
+        if(!Set.of("maven","gradle","python","node","typescript","go","ruby").contains(tool) || tasks.isBlank() || tasks.length()>1000 || profiles.length()>255
             || directory.isBlank() || directory.length()>1024 || output.length()>255 || location.length()>1024
             || List.of(tasks,profiles,directory,output,location).stream().anyMatch(s->s.chars().anyMatch(Character::isISOControl)))throw Errors.BUILD_STAGE_INPUT.exception();
         if(!profiles.isEmpty() && !tool.equals("maven"))throw Errors.BUILD_STAGE_INPUT.exception();
@@ -18,6 +18,8 @@ public final class BuildSpecTemplates {
             case "maven" -> "./mvnw -B "+arguments+(profiles.isEmpty()?"":" "+quote("-P"+profiles));
             case "gradle" -> "./gradlew --no-daemon "+arguments;
             case "python" -> "python3 -m venv .venv\n. .venv/bin/activate\nexport PIP_CONFIG_FILE=\"${PIP_CONFIG_FILE:-/dev/null}\"\nexport PIP_CACHE_DIR=\"${PIP_CACHE_DIR:-$PWD/.cache/pip}\"\npython -m pip install -r requirements.txt\npython -m pytest "+arguments;
+            case "go" -> "go version\ngo mod download\ngo test "+arguments+"\nmkdir -p dist\ngo build -o dist/application .";
+            case "ruby" -> "ruby --version\nbundle install\nbundle exec rake "+arguments;
             default -> "npm ci\n"+Arrays.stream(tasks.trim().split("\\s+")).map(task->"npm run "+quote(task)).collect(java.util.stream.Collectors.joining("\n"));
         };
         var step=new LinkedHashMap<String,Object>();step.put("type","Command");step.put("name","Build and test");
@@ -124,7 +126,7 @@ public final class BuildSpecTemplates {
                 """.formatted(version);
         } else if(tool.equals("python") && runtime.equals("python311")) {
             install="if ! command -v python3.11 >/dev/null 2>&1; then\n  test \"$(id -u)\" -eq 0 || { echo 'Runtime installation requires root' >&2; exit 1; }\n  dnf install -y python3.11 python3.11-pip\nfi\npython3.11 --version\n";
-        } else if(tool.equals("node") && runtime.equals("node22")) {
+        } else if(Set.of("node","typescript").contains(tool) && runtime.equals("node22")) {
             install="if ! node -e \"process.exit(process.versions.node.split('.')[0] === '22' ? 0 : 1)\" 2>/dev/null; then\n  test \"$(id -u)\" -eq 0 || { echo 'Runtime installation requires root' >&2; exit 1; }\n  dnf module reset -y nodejs\n  dnf module enable -y nodejs:22\n  dnf install -y nodejs npm\n  export PATH=/usr/bin:$PATH\nfi\nnode --version\nnpm --version\n";
         } else throw Errors.BUILD_STAGE_INPUT.exception();
         Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);

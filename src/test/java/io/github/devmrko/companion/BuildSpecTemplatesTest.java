@@ -61,9 +61,19 @@ class BuildSpecTemplatesTest {
         assertEquals(1,process.waitFor());assertTrue(output.contains("Architecture mismatch"));assertFalse(output.contains("mvnw:"));
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.architecture(yaml,"MULTI"));
     }
+    @Test void additionalLanguageToolsUseTheirOwnCommands() {
+        for(var choice:List.of(List.of("go","./...","go test './...'"),List.of("ruby","test","bundle exec rake 'test'"),List.of("typescript","build","npm run 'build'"))) {
+            String yaml=BuildSpecTemplates.render(choice.get(0),choice.get(1),"",".","","");
+            Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+            String command=((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("command").toString();
+            assertTrue(command.contains(choice.get(2)));
+            assertFalse(command.contains("./mvnw"));
+        }
+        assertThrows(RuntimeException.class,()->BuildSpecTemplates.runtime(BuildSpecTemplates.render("go","./...","",".","",""),"go","node22"));
+    }
     @Test void invalidOutputPairAndUnsupportedToolAreRejected() {
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.render("maven","verify","",".","app",""));
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.render("shell","echo hi","",".","",""));
-        for(String tool:List.of("maven","gradle","python","node"))assertNotNull(new org.yaml.snakeyaml.Yaml().load(BuildSpecTemplates.render(tool,"test","",".","","")));
+        for(String tool:List.of("maven","gradle","python","node","typescript","go","ruby"))assertNotNull(new org.yaml.snakeyaml.Yaml().load(BuildSpecTemplates.render(tool,"test","",".","","")));
     }
 }

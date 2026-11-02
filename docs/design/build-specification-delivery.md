@@ -127,3 +127,34 @@ Managed Build 실패 시 후속 전달 단계가 실행되지 않을 수 있다.
 기존 작업 3개가 UNSPECIFIED로 남아 파일 필터에서 빠졌었다. 실제 DevOps 전달 artifact `db-companion-jar`가 GENERIC_FILE임을 SDK로 확인하고, 같은 파이프라인을 사용하는 두 작업과 artifact=target/*.jar인 Functions Maven 작업을 FILE로 보정했다. 실행 서비스가 Functions라는 이유로 Function 패키지로 분류하지 않는다. 다른 미확인 작업에 이 보정을 일괄 적용하지 않는다.
 
 필터마다 건수를 표시하고 미지정 필터를 추가했다. 실제 DEFAULT/서울/Joungmin.Ko 화면에서 전체4 → 파일3 → 컨테이너1 → Function0 → 미지정0 → 전체4와 빈 결과 안내를 검증했다. Java81 테스트 통과.
+
+## REST hello 예제 — 2026-11-02
+
+- 소스: `examples/rest-hello/{python,javascript,typescript,go,ruby,java}`. 예제는 앱 런타임에 의존하지 않으며 Dockerfile로 독립 빌드한다.
+- 공통 계약: GET /hello → 200 JSON `{"message":"hello","language":"언어"}`, GET /missing → 404 JSON, POST /hello → 405 JSON. 포트 8080, 이미지 실행 사용자 non-root.
+- 런타임: Python3.11, Node22(JS·TS), TypeScript5.8.3, Go1.24(CGO 비활성), Ruby3.4/WEBrick1.9.1, Java21/Maven. 기반 이미지는 태그를 사용하므로 정확한 재사용에는 최종 OCIR digest를 사용한다.
+- TypeScript는 tsc 컴파일 후 JavaScript를 실행한다. Go는 테스트 후 단일 실행 파일, Java는 Maven JAR, Python·Ruby·JavaScript는 소스와 필요한 런타임을 이미지에 넣는다.
+- OCI 소스는 기존 build-config의 별도 `examples/rest-hello-20261102` 브랜치이며 예제 폴더를 `rest-hello/`로 복사한다. 각 명세의 경로는 OCI 브랜치 배치 기준이다.
+- 실행은 언어별 DevOps 파이프라인, 저장소는 `companion/hello-<language>` 비공개 OCIR 및 별도 Artifact Registry 테스트 보고서이다. 앱 작업 이름은 `Hello REST · <language> · x86`.
+- HTTP 검증기는 별도 Python 컨테이너에서 앱 컨테이너의 네트워크를 공유한다. OCI 원격 Docker/Podman 환경에서 빌드 호스트의 localhost 포트가 앱 컨테이너에 연결되지 않는 문제를 피한다. 보고서는 docker cp로 회수한다.
+- 테스트 컨테이너는 검증 후 삭제한다. VM·OKE·Container Instances에 상시 서비스를 배포한 것은 아니다. ARM·Functions 배포도 이번 검증 대상이 아니다.
+- 명세 작성 화면에 TypeScript·Go·Ruby를 추가했다. Go·Ruby의 직접 명세 실행은 사전 설치 런타임이 필요하다. 예제 파이프라인은 Dockerfile 내부에서 런타임을 준비하므로 그 설치 기능과 구별한다.
+- Go 기본 명세는 go test 후 dist/application을 생성한다. Ruby 기본 명세는 bundle install 및 bundle exec rake이며 Gemfile·Rakefile이 필요하다. 테스트 보고서 자동 변환 기능을 새로 추가한 것은 아니다.
+
+### 실제 검증 결과
+
+- 2026-11-02 DEFAULT / ap-seoul-1 / Joungmin.Ko. OCI 소스 커밋 `f0481b9da6abbe082c52ef9f50dee425b9075ada`.
+- 6개 실행 모두 Managed Build·Deliver Artifacts SUCCEEDED. 실제 앱에서 언어별 HTTP 로그, JUnit 3건 통과, OCIR Available 및 digest 확인. HTTP 검사 총 18건 통과.
+- 앱 테스트 82개 통과. 명세 화면의 TypeScript·Go·Ruby 선택과 생성 명령도 브라우저에서 확인.
+- 최초 실행은 호스트 loopback 연결 실패. 앱 네트워크를 공유하는 테스트 컨테이너와 프록시 우회를 적용해 재실행했다. 실패 이력은 보존했다.
+- 보고서는 immutable `companion-rest-hello-reports`의 `<언어>/test-reports.tar.gz`에 저장한다. 재실행 시 `REPORT_VERSION`에 새 값을 입력한다.
+- IAM은 6개 파이프라인 principal로 제한. OCIR use는 각 저장소 이름으로 제한. Generic Artifact는 구획 내 읽기·생성만 허용하며 삭제 권한은 없다.
+
+| 언어 | OCIR 이미지 digest (태그: x86-20261102-v1) |
+| --- | --- |
+| Python | `sha256:f77423f9a0d567f5854225a7949e894ed2f28b729c2dfef7a658ceaa922cc48b` |
+| JavaScript | `sha256:3bbd8b5ad11520ea6a502d2e0efc6febeab7750121cf833482aa42cca3d85aab` |
+| TypeScript | `sha256:7f66f46aaeed82eaaf4d93ed1a3e4fe95a4693f66f5e8cd8e53028bba45d733d` |
+| Go | `sha256:8dc809bafcf2dddbef5ff36bf569159f0507eb671e7ba2531f43a31d609510f5` |
+| Ruby | `sha256:cf6c24e4fb8b6a6089290f61223cd39c1c6255126f8263d020358b0457a4b485` |
+| Java | `sha256:587ba21f3ed5e392850f5284c2b26206ee98b0ee7f377eb8da1b04681575e9a7` |

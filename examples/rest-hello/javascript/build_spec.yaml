@@ -1,0 +1,23 @@
+version: '0.1'
+component: build
+timeoutInSeconds: 1800
+shell: bash
+failImmediatelyOnError: true
+steps:
+- type: Command
+  name: javascript build and HTTP contract
+  command: 'set -euo pipefail
+
+    root="${OCI_PRIMARY_SOURCE_DIR:-$PWD}"
+
+    trap ''result=$?; tar -czf "$root/test-reports.tar.gz" -C "$root/rest-hello" reports
+    || true; exit "$result"'' EXIT
+
+    bash rest-hello/build.sh javascript'
+outputArtifacts:
+- name: hello-image
+  type: DOCKER_IMAGE
+  location: hello-rest:x86-v1
+- name: test-reports
+  type: BINARY
+  location: test-reports.tar.gz
