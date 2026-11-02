@@ -14,6 +14,7 @@
   form.elements.outputType.addEventListener('change',()=>{outputFields();invalidate();});outputFields();
   form.elements.tool.addEventListener('change',()=>{
     const tool=form.elements.tool.value;
+    document.getElementById('build-language-requirements').textContent={maven:'Java: JAR/WAR 형식·실행할 JDK 버전·네이티브 의존성을 확인하세요.',gradle:'Java: JAR/WAR 형식·실행할 JDK 버전·네이티브 의존성을 확인하세요.',python:'Python: 버전·의존성·실행 명령이 필요합니다. 기본 명세는 pytest 테스트이며 wheel·소스 패키징은 프로젝트 명세에 추가하세요.',node:'JavaScript/TypeScript: 정적 파일은 웹 서버, Node 서버는 Node 버전·의존성·시작 명령이 필요합니다. package.json의 script를 사용합니다.'}[tool];
     form.elements.runtime.replaceChildren(...([['existing','기존 환경 사용'],...({maven:[['jdk17','JDK 17 설치 · Temurin'],['jdk21','JDK 21 설치 · Temurin']],gradle:[['jdk17','JDK 17 설치 · Temurin'],['jdk21','JDK 21 설치 · Temurin']],python:[['python311','Python 3.11 설치']],node:[['node22','Node.js 22 설치']]}[tool])]).map(([value,label])=>new Option(label,value)));
     const values={maven:['Goal','verify',['test','package','verify']],gradle:['Task','build',['test','build','assemble']],python:['pytest 옵션','--junitxml=reports/tests.xml',['--junitxml=reports/tests.xml','-q']],node:['npm script','test build',['test','build','test build']]}[tool];
     document.querySelector('#build-tasks-label').textContent=values[0];form.elements.tasks.value=values[1];

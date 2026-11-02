@@ -11,6 +11,7 @@ class BuildTaskStoreTest {
     @Test void taskClassificationPersistsAndOlderRecordsStayUnclassified() throws Exception {
         var mapper=tools.jackson.databind.json.JsonMapper.builder().build();
         var old=mapper.readValue("{\"id\":\"old\",\"runner\":\"FUNCTIONS\"}",Task.class);
+        assertEquals("FILE",mapper.readValue("{\"id\":\"old-vm\",\"target\":\"VM\"}",Task.class).target());
         assertEquals("UNSPECIFIED",old.target());assertEquals("UNKNOWN",old.architecture());
         var c=new Connection("DEFAULT","tenant","user","region","test",false);
         var store=new JsonBuildTaskStore(root.toString());
