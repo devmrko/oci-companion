@@ -66,7 +66,7 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 - verify 실행 ID: `59e06df0-8f03-4634-97e3-2658fed699f3`.
 - JAR: `db-manage-companion-0.1.0-alpha.17.jar`, 61,111,723 bytes, SHA256 `42dfa20220c131fab428690e042e21d980599e428330175338fc7fc7c8e67101`.
 - 화면의 JUnit 집계 1,444건과 Maven 최종 로그의 1,444건이 일치했다.
-- PMD 실행은 로그로 검증했다. 이후 아래 보고서 표시 기능을 추가했다. 실제 PMD 위반으로 빌드가 실패하는 사례와 `package` 단독 실행은 이번 범위에 포함하지 않았다.
+- PMD 실행은 로그로 검증했다. 이후 아래 보고서 표시·실패 경로 검증을 추가했다. `package` 단독 실행은 아직 검증하지 않았다.
 - 실시간 실행 상세는 자동 갱신되며 하단 실행 이력 목록은 새로 고침이 필요하다.
 
 재현: `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-maven-goals.cjs`. 기존 작업에서 두 번의 실제 Function 빌드를 실행한다. 화면 조작만 사용하며 `.tools/ui-maven-*`에 실행 ID·로그·산출물 정보·캡처를 남긴다.
@@ -83,6 +83,25 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 
 실제 검증: 위 verify 실행의 `target/pmd.xml`(PMD 7.17.0)을 조회해 위반 0·분석 오류 0, XML 원문과 다운로드 파일 일치를 확인했다. test 실행은 PMD 보고서 없음으로 표시했다. 기존 DevOps Ruby 3건 보고서도 조회했다. 390/768/1440px 화면 확인. 재현 스크립트: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-pmd-reports.cjs`(실제 조회만 수행).
 
-보조 검사: Java 86개, Python 4개 통과. PMD 위반·분석 오류·제외 항목 파싱과 실패 시 PMD 파일 보존은 단위 테스트로 검증했다. 실제 빌드의 위반 목록 사례는 아직 검증하지 않았다.
+보조 검사: Java 86개, Python 4개 통과. PMD 위반·분석 오류·제외 항목 파싱과 실패 시 PMD 파일 보존은 단위 테스트로 검증했다. 실제 위반 사례는 아래와 같다.
 
 형식 근거: [PMD XML 보고서](https://pmd.github.io/pmd/pmd_userdocs_report_formats.html).
+
+## PMD 실패 경로 — 2026-11-02
+
+전용 Function `maven-builder-998`의 기존 0.0.1 빌드 소스는 성공 후에만 보고서를 저장했다. 최신 독립 템플릿을 반영한 ARM 이미지 `0.0.2-pmd-reports`로 이 검증용 Function을 갱신했다. digest: `sha256:039e6e846e2f78b0917f4197c047db29f8e1b6d434682b1af2a5373e20c5b560`. Function의 버킷·권한·기타 설정은 유지했다.
+
+소스: [격리된 테스트 모듈](https://github.com/devmrko/db-companion/tree/6e93238821d4fc02e5a92f7e623ace2fdc2002d3/validation/pmd-failure). 브랜치 `validation/oci-companion-pmd-failure-20261102`, 커밋 `6e93238821d4fc02e5a92f7e623ace2fdc2002d3`. main에는 반영하지 않았다.
+
+화면에서 기존 Functions 작업의 커밋·작업 경로를 위 모듈로 지정하고 `verify` + `quality` 실행:
+
+- 실행 `7b6fdf46-f52d-477c-8cdc-2879d144437a`: **FAILED**.
+- JUnit: 테스트 1건, 실패·오류·건너뜀 0.
+- PMD: 위반 1건, 분석 오류 0. `QualityFailureFixture.java:4`, `UnusedLocalVariable`, 우선순위 3.
+- 실패 후에도 보고서 압축 파일이 Object Storage에 남고 화면에서 위반 표·XML을 조회했다. XML 다운로드 내용 일치 확인.
+- 배포용 JAR는 게시되지 않았다. `verify` 중 로컬에 만들어진 JAR를 실패 후 게시하지 않는 것을 확인했다.
+- 390/768/1440px 화면에서 가로 넘침 없음.
+
+초기 예제 커밋 `4f3800296146d4afef6dd64aed63c063af612d59`은 변수명이 `unused`여서 PMD 제외 규칙에 해당했다. 실행 `7f7d3664-a992-4dd3-a2b3-1e895330438f`는 정상 성공했으며 실패 검증 근거에서 제외했다. `calculatedValue`로 수정한 위 커밋이 최종 검증 대상이다.
+
+재현: `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-pmd-failure.cjs`. 실제 실패 빌드를 1회 실행한다. 빌드 실행·상태·보고서 검증은 브라우저 화면으로 수행했다. 테스트 소스 준비는 GitHub API, 빌더 준비는 기존 로컬 ARM Colima/Docker, Function 갱신은 OCI SDK를 사용했다. 업로드 임시 토큰 삭제 및 검증용 로컬 Colima 중지 완료. 전체 환경 준비를 UI만으로 수행한 것은 아니다.
