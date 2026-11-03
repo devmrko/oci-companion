@@ -4,6 +4,7 @@
   let content='';
   function invalidate(){document.dispatchEvent(new Event('specification-invalidated'));content='';preview.hidden=download.hidden=true;status.textContent='';}
   form.addEventListener('input',invalidate);
+  form.elements.buildCommand.addEventListener('input',()=>{document.getElementById('build-command-mode').textContent=form.elements.buildCommand.value.trim()?'직접 입력 명령 사용 · Goal·profile 미적용':'도구 기본 명령 사용';});
   function outputFields(){
     const container=form.elements.outputType.value==='DOCKER_IMAGE';
     form.querySelectorAll('[data-container-field]').forEach(field=>{field.hidden=!container;field.querySelectorAll('input').forEach(input=>{input.disabled=!container;input.required=container;});});
@@ -46,7 +47,7 @@
  form.addEventListener('input',invalidate);
  function source(){const option=form.elements.source.selectedOptions[0];form.elements.branch.value=option.dataset.branch||'';form.elements.username.value=(option.dataset.url||'').includes('github.com')?'x-access-token':(option.dataset.url||'').includes('gitlab.com')?'oauth2':'';invalidate();}
  form.elements.source.addEventListener('change',source);source();
- function summary(){const panel=document.getElementById('configure-selection');if(!panel)return;const recipe=document.getElementById('build-specification-form');panel.textContent=[form.elements.source.selectedOptions[0].textContent,form.elements.branch.value,recipe.elements.tool.selectedOptions[0].textContent,recipe.elements.runtime.selectedOptions[0].textContent,recipe.elements.tasks.value,form.elements.path.value].filter(Boolean).join(' · ');for(const link of document.querySelectorAll('.configure-pipeline-link')){const url=new URL(link.href);url.searchParams.set('registeredSource',form.elements.source.value);link.href=url;}}
+ function summary(){const panel=document.getElementById('configure-selection');if(!panel)return;const recipe=document.getElementById('build-specification-form');panel.textContent=[form.elements.source.selectedOptions[0].textContent,form.elements.branch.value,recipe.elements.tool.selectedOptions[0].textContent,recipe.elements.runtime.selectedOptions[0].textContent,recipe.elements.buildCommand.value.trim()?'직접 입력 명령':recipe.elements.tasks.value,form.elements.path.value].filter(Boolean).join(' · ');for(const link of document.querySelectorAll('.configure-pipeline-link')){const url=new URL(link.href);url.searchParams.set('registeredSource',form.elements.source.value);link.href=url;}}
  document.addEventListener('input',summary);document.addEventListener('change',summary);summary();
  document.addEventListener('specification-invalidated',()=>{content='';compare.disabled=true;invalidate();});
  document.addEventListener('specification-ready',event=>{content=event.detail;compare.disabled=false;invalidate();});

@@ -1,0 +1,15 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
+<section th:fragment="fields" class="report-storage-fields section-stack" data-report-storage th:attr="data-region=${selection.region()},data-compartment=${selection.compartment()},data-csrf=${_csrf.token},data-csrf-name=${_csrf.parameterName}">
+<input type="hidden" name="reportRegion" th:value="${selection.region()}"><input type="hidden" name="reportNamespace">
+<div class="resource-picker-row">
+<label class="form-field">Object Storage 버킷 · 필수<select name="reportBucket" class="ui-control"><option value="">버킷 목록을 조회하세요</option></select></label>
+<button type="button" class="ui-button" data-storage-refresh>버킷 조회</button>
+<label class="form-field">저장 접두어 · 필수<input name="reportPrefix" class="ui-control" value="build-reports" maxlength="200" pattern="[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*"></label>
+</div>
+<p class="small muted" data-storage-status role="status"></p>
+<details><summary>버킷 생성</summary><div class="form-toolbar"><label class="form-field">새 버킷 이름<input class="ui-control" data-bucket-name maxlength="256" pattern="[A-Za-z0-9_-]+"></label><button type="button" class="ui-button" data-storage-create>비공개 버킷 생성</button></div><p class="small muted">현재 리전·구획에 Standard 버킷을 생성합니다. 보존 기간은 OCI 수명 주기 정책에서 설정하세요.</p></details>
+<details><summary>Object Storage · 권한 ?</summary><p class="small">OCI 콘솔 → 스토리지 → Object Storage → 버킷. 사용자: 버킷 조회·생성, 객체 조회 권한. 빌드 파이프라인: 대상 버킷의 객체 생성·덮어쓰기 권한이 필요합니다.</p><p class="small">OCI 콘솔 → ID 및 보안 → 정책에서 관리자가 적용합니다. 동적 그룹에는 해당 DevOps 빌드 파이프라인을 지정하세요.</p><pre class="code-block">Allow group &lt;사용자 그룹&gt; to read buckets in compartment &lt;구획&gt;
+Allow group &lt;사용자 그룹&gt; to manage buckets in compartment &lt;구획&gt; where request.permission = 'BUCKET_CREATE'
+Allow group &lt;사용자 그룹&gt; to read objects in compartment &lt;구획&gt; where target.bucket.name = '&lt;버킷&gt;'
+Allow dynamic-group &lt;빌드 동적 그룹&gt; to manage objects in compartment &lt;구획&gt; where all {target.bucket.name = '&lt;버킷&gt;', any {request.permission = 'OBJECT_CREATE', request.permission = 'OBJECT_OVERWRITE'}}</pre><pre class="code-block">oci os bucket list --profile '&lt;프로파일&gt;' --region '&lt;리전&gt;' --compartment-id '&lt;구획 OCID&gt;' --all</pre></details>
+</section></body></html>

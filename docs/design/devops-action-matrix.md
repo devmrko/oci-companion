@@ -176,3 +176,25 @@ VM·Functions·OKE는 기본 배포 경로만 대조했으며 Canary/Blue-Green/
 | [deploy-stage/create-deploy-oke-stage](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/devops/deploy-stage/create-deploy-oke-stage.html) | `--kubernetes-manifest-artifact-ids`, `--oke-cluster-environment-id`, `--pipeline-id`, `--stage-predecessor-collection` | `--description`, `--display-name`, `--namespace`, `--rollback-policy` |
 | [deployment/create-pipeline-deployment](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/devops/deployment/create-pipeline-deployment.html) | `--pipeline-id` | `--artifact-override-arguments`, `--deployment-arguments`, `--display-name`, `--dry-run`, `--stage-override-arguments` |
 | [deploy-pipeline/create](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/devops/deploy-pipeline/create.html) | `--project-id` | `--description`, `--display-name`, `--pipeline-parameters` |
+
+## 범용 빌드 설정과 네이티브 저장 — 2026-11-03
+
+| 화면 설정 | OCI 표현·원본 | 앱 역할 |
+| --- | --- | --- |
+| 도구별 일반 빌드 | Git `build_spec.yaml`의 `steps[].command` | 기본 명령 생성 |
+| 고급 빌드 명령 | 같은 `command` | 사용자가 입력한 스크립트로 대체, Git 비교 후 저장 |
+| 환경변수 | `env.variables` | 이름·값 입력 |
+| 비밀값 | `env.vaultVariables` | Secret OCID 참조 입력 |
+| 실행 기본값·설명 | OCI `BuildPipelineParameter` | 기존 조회·수정 기능 재사용 |
+| 이번 실행 값 | OCI `BuildRunArgument` | 기존 실행별 재정의 기능 재사용 |
+| 성공 보고서 보관 | `Command` 단계 | 원본 XML 압축·업로드 명령 생성 |
+| 실패 보고서 보관 | `steps[].onFailure` | 같은 수집·업로드 명령 생성 |
+| Registry 보관 | `outputArtifacts` + Deliver Artifacts | 기존 출력·전달 연결 재사용 |
+
+명령과 환경변수는 앱 전용 실행 엔진에 저장하지 않는다. Git에 저장한 OCI 명세를 OCI가 실행한다. POM의 임의 치환이나 PMD 전용 프로퍼티 입력은 제공하지 않는다. Maven `-D` 등의 도구별 인자는 사용자가 고급 명령에 지정한다. 기본 Goal·profile은 직접 입력 명령이 없을 때 적용한다.
+
+Object Storage는 독립 `ReportStorage` 포트와 OCI SDK 어댑터로 버킷 조회·비공개 Standard 버킷 생성·보고서 조회를 제공한다. 업로드는 빌드 실행기의 Resource Principal로 OCI CLI를 호출한다. 경로는 `접두어/파이프라인 OCID/실행 OCID/단계 OCID/test-reports.tar.gz`. 같은 버킷에서도 실행·단계를 분리한다. 조회는 현재 구획과 실행 소속을 확인하며 앱에 로그·보고서 본문을 영속 복제하지 않는다.
+
+`onFailure`는 정상적인 명령 실패 처리다. 강제 종료·시간 초과·보고서 생성 전 실패·Object Storage 권한/통신 실패는 보관을 보장하지 않는다. 보고서 조회 실패와 보고서 없음은 구분하며 보고서가 없는 실행을 테스트 통과로 표시하지 않는다.
+
+근거: [OCI 빌드 명세](https://docs.oracle.com/en-us/iaas/Content/devops/using/build_specs.htm), [파이프라인 파라미터](https://docs.oracle.com/en-us/iaas/Content/devops/using/configuring_parameters.htm), [실행기 인증·런타임](https://docs.oracle.com/en-us/iaas/Content/devops/using/runtime_details.htm).

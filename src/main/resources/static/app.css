@@ -959,3 +959,14 @@ a:focus-visible, .ui-button:focus-visible {
 .form-check { display:inline-flex; align-items:center; gap:8px; }
 .form-check input { margin:0; }
 .form-result:empty { display:none; }
+
+/* Shared report configuration spans the build form and uses standard controls. */
+.report-storage-fields, .report-configuration { grid-column: 1 / -1; min-width: 0; }
+
+.resource-picker-row { display:grid; grid-template-columns:minmax(0,2fr) auto minmax(0,1fr); align-items:end; gap:12px; }
+.resource-picker-row > .form-field { min-width:0; }
+.ui-control--multiline { height:auto; min-height:5rem; resize:vertical; }
+@media (max-width:700px) {
+  .resource-picker-row { grid-template-columns:minmax(0,1fr) auto; }
+  .resource-picker-row > .form-field:last-child { grid-column:1 / -1; }
+}

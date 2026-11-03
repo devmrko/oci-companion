@@ -27,6 +27,7 @@ class BuildSpecTemplatesTest {
         builder.environment().put("PATH",root+":"+System.getenv("PATH"));
         var process=builder.start();process.getInputStream().readAllBytes();assertEquals(7,process.waitFor());
         assertTrue(java.nio.file.Files.exists(root.resolve("cleaned")));
+        preserveAfterFailure(spec,root);
         try(var input=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){assertEquals(1,io.github.devmrko.companion.service.TestReports.read(input).failures());}
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.builder(yaml,"image:$(id)","."));
     }
@@ -56,6 +57,7 @@ class BuildSpecTemplatesTest {
         Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(BuildSpecTemplates.reports(BuildSpecTemplates.render("maven","verify","",".","",""),true));
         String command=((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("command").toString();
         var process=new ProcessBuilder("bash","-c",command).directory(root.toFile()).redirectErrorStream(true).start();process.getInputStream().readAllBytes();assertEquals(7,process.waitFor());
+        preserveAfterFailure(spec,root);
         try(var input=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){assertEquals(1,io.github.devmrko.companion.service.TestReports.read(input).failures());}
     }
     @Test void containerOutputBuildsTheExactImageAfterApplicationBuild() throws Exception {
@@ -101,5 +103,39 @@ class BuildSpecTemplatesTest {
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.render("maven","verify","",".","app",""));
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.render("shell","echo hi","",".","",""));
         for(String tool:List.of("maven","gradle","python","node","typescript","go","ruby"))assertNotNull(new org.yaml.snakeyaml.Yaml().load(BuildSpecTemplates.render(tool,"test","",".","","")));
+    }
+    @Test void advancedCommandUsesNativeEnvironmentAndPreservesContainerPackaging() throws Exception {
+        String yaml=BuildSpecTemplates.configured("maven","verify","",".","app","app:v1","system","BUILD_PROFILE=quality","","DOCKER_IMAGE","Dockerfile",".");
+        yaml=BuildSpecTemplates.command(yaml,"mvn -B verify -P\"$BUILD_PROFILE\"\nprintf 'done\\n'",".");
+        Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        assertEquals("quality",((Map<?,?>)((Map<?,?>)spec.get("env")).get("variables")).get("BUILD_PROFILE"));
+        String command=((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("command").toString();
+        assertTrue(command.contains("mvn -B verify -P\"$BUILD_PROFILE\""));assertTrue(command.contains("docker build"));
+        var process=new ProcessBuilder("bash","-n").start();try(var out=process.getOutputStream()){out.write(command.getBytes());}assertEquals(0,process.waitFor());
+    }
+    @Test void nativeFailureHandlerReportsUploadFailureSeparately() throws Exception {
+        var root=java.nio.file.Files.createTempDirectory("report-upload-");
+        var reports=java.nio.file.Files.createDirectories(root.resolve("custom/reports"));
+        java.nio.file.Files.writeString(reports.resolve("analysis.xml"),"<pmd version='7'><file name='App.java'><violation beginline='1' rule='Rule'>finding</violation></file></pmd>");
+        var cli=root.resolve("oci");java.nio.file.Files.writeString(cli,"#!/bin/sh\nprintf '%s\\n' \"$@\" > upload-args\nexit 9\n");cli.toFile().setExecutable(true);
+        for(int exitCode:List.of(0,7)){
+            String yaml=BuildSpecTemplates.command(BuildSpecTemplates.render("maven","verify","",".","",""),"exit "+exitCode,".");
+            yaml=BuildSpecTemplates.reports(yaml,true,"custom/reports","namespace","bucket","reports","ap-seoul-1");
+            Map<?,?> spec=new org.yaml.snakeyaml.Yaml().load(yaml);String command=((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("command").toString();
+            var builder=new ProcessBuilder("bash","-c",command).directory(root.toFile()).redirectErrorStream(true);
+            builder.environment().putAll(Map.of("PATH",root+":"+System.getenv("PATH"),"OCI_PRIMARY_SOURCE_DIR",root.toString(),"OCI_PIPELINE_ID","pipeline","OCI_BUILD_RUN_ID","run","OCI_STAGE_ID","stage"));
+            var process=builder.start();process.getInputStream().readAllBytes();assertEquals(exitCode,process.waitFor());
+            String handler=((Map<?,?>)((List<?>)((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("onFailure")).getFirst()).get("command").toString();
+            builder.command("bash","-c",handler);var upload=builder.start();upload.getInputStream().readAllBytes();assertNotEquals(0,upload.waitFor());
+            assertTrue(java.nio.file.Files.readString(root.resolve("upload-args")).contains("reports/pipeline/run/stage/test-reports.tar.gz"));
+            try(var in=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){assertEquals(1,io.github.devmrko.companion.service.TestReports.read(in).pmd().getFirst().violations());}
+        }
+        assertThrows(RuntimeException.class,()->BuildSpecTemplates.reports("",true,"../escape","namespace","bucket","reports","ap-seoul-1"));
+    }
+    private static void preserveAfterFailure(Map<?,?> spec,java.nio.file.Path root) throws Exception {
+        var step=(Map<?,?>)((List<?>)spec.get("steps")).getFirst();
+        String handler=((Map<?,?>)((List<?>)step.get("onFailure")).getFirst()).get("command").toString();
+        var process=new ProcessBuilder("bash","-c",handler).directory(root.toFile()).redirectErrorStream(true).start();
+        String output=new String(process.getInputStream().readAllBytes());assertEquals(0,process.waitFor(),output);
     }
 }

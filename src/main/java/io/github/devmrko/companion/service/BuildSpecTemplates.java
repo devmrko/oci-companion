@@ -56,6 +56,18 @@ public final class BuildSpecTemplates {
         var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
         return "# 소스에 커밋 후 빌드 단계의 명세 경로를 지정하세요. 런타임은 실행 환경에서 준비합니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
     }
+    /** User-authored build script, emitted into Git YAML; never executed by the application. */
+    public static String command(String yaml,String script,String directory) {
+        if(script.isBlank())return yaml;
+        if(script.length()>16000||script.indexOf('\0')>=0)throw Errors.INVALID.exception();
+        containerPath(directory);
+        Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
+        @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
+        String previous=steps.getFirst().get("command").toString();int packaging=previous.indexOf("\ndocker info >/dev/null");
+        steps.getFirst().put("command","set -euo pipefail\ncd -- "+quote(directory)+"\n"+script+(packaging<0?"":previous.substring(packaging)));
+        var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
+        return new org.yaml.snakeyaml.Yaml(options).dump(spec);
+    }
     public static String architecture(String yaml,String architecture) {
         if(architecture.equals("NATIVE"))return yaml;
         String expected=switch(architecture){case "X86_64" -> "x86_64";case "ARM64" -> "aarch64";default -> throw Errors.BUILD_STAGE_INPUT.exception();};
@@ -79,23 +91,38 @@ public final class BuildSpecTemplates {
             || path.chars().anyMatch(Character::isISOControl) || Arrays.asList(path.split("/",-1)).contains(".."))throw Errors.BUILD_STAGE_INPUT.exception();
     }
     public static String reports(String yaml,boolean enabled) {
+        return reports(yaml,enabled,"","","","","");
+    }
+    public static String reports(String yaml,boolean enabled,String path,String namespace,String bucket,String prefix,String region) {
         if(!enabled)return yaml;
+        if(!path.isEmpty())ReportSettings.path(path);
+        boolean store=!bucket.isEmpty();
+        if(store){ReportSettings.prefix(prefix);if(!namespace.matches("[A-Za-z0-9_-]+")||!bucket.matches("[A-Za-z0-9_-]{1,256}")||!region.matches("[a-z0-9-]+"))throw Errors.INVALID.exception();}
         Map<String,Object> spec=new org.yaml.snakeyaml.Yaml().load(yaml);
         @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
-        var step=steps.getFirst();String command=step.get("command").toString();
-        String collect="""
-            report_root="${OCI_PRIMARY_SOURCE_DIR:-$PWD}"
-            collect_reports() {
-              find "$report_root" -type f \\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' -o -name 'pmd.xml' \\) -print0 | tar --null -T - -czf "$report_root/test-reports.tar.gz"
-            }
-            trap 'build_status=$?; collect_reports || { if [ "$build_status" -eq 0 ]; then build_status=1; fi; }; exit "$build_status"' EXIT
-            """;
-        step.put("command",command.replace("set -euo pipefail\n","set -euo pipefail\n"+collect));
+        var step=steps.getFirst();
+        String filter="\\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' -o -name 'pmd.xml' \\)";
+        if(!path.isEmpty())filter="\\( "+filter+" -o -path "+quote("./"+path+"/*.xml")+" \\)";
+        String collect="report_root=\"${OCI_PRIMARY_SOURCE_DIR:-$PWD}\"\ncollect_reports() {\n"
+            +"  ( cd -- \"$report_root\" || exit 1\n"
+            +"    report_path="+quote(".")+"\n"
+            +"    resolved=$(realpath -- \"$report_path\") || exit 1\n"
+            +"    case \"$resolved/\" in \"$(pwd -P)/\"*) ;; *) echo 'Report path outside source'; exit 1;; esac\n"
+            +"    find \"$report_path\" -type f "+filter+" -print0 | tar --null -T - -czf test-reports.tar.gz\n"
+            +"  ) || return 1\n";
+        if(store)collect+="  oci os object put --auth resource_principal --region "+quote(region)+" --namespace-name "+quote(namespace)+" --bucket-name "+quote(bucket)
+            +" --name "+quote(prefix)+"/\"${OCI_PIPELINE_ID:?}/${OCI_BUILD_RUN_ID:?}/${OCI_STAGE_ID:?}/test-reports.tar.gz\" --file \"$report_root/test-reports.tar.gz\" --force || return 1\n";
+        collect+="}\ncollect_reports\n";
+        String preserve="set -euo pipefail\n"+collect;
+        step.put("onFailure",List.of(Map.of("type","Command","command",preserve,"timeoutInSeconds",300)));
+        var withReports=new ArrayList<Map<String,Object>>(steps);
+        withReports.add(Map.of("type","Command","name","Preserve reports","command",preserve,"timeoutInSeconds",300));
+        spec.put("steps",withReports);
         @SuppressWarnings("unchecked") var outputs=new ArrayList<Map<String,Object>>((List<Map<String,Object>>)spec.getOrDefault("outputArtifacts",List.of()));
         if(outputs.stream().anyMatch(a->"test-reports".equals(a.get("name"))))throw Errors.BUILD_STAGE_INPUT.exception();
         outputs.add(Map.of("name","test-reports","type","BINARY","location","test-reports.tar.gz"));spec.put("outputArtifacts",outputs);
         var options=new org.yaml.snakeyaml.DumperOptions();options.setDefaultFlowStyle(org.yaml.snakeyaml.DumperOptions.FlowStyle.BLOCK);
-        return "# test-reports 출력은 별도 Registry 전달 연결이 필요합니다. 실패한 단계에서는 전달이 실행되지 않을 수 있습니다.\n"+new org.yaml.snakeyaml.Yaml(options).dump(spec);
+        return (store?"# 종료 시 Object Storage에 보고서 보존. 강제 종료·시간 초과·업로드 권한 오류 시 보존을 보장하지 않습니다.\n":"# test-reports 출력은 별도 Registry 전달 연결이 필요합니다. 실패한 단계에서는 전달이 실행되지 않을 수 있습니다.\n")+new org.yaml.snakeyaml.Yaml(options).dump(spec);
     }
     /** Run the application build in a reusable image; keep image packaging on the OCI runner. */
     public static String builder(String yaml,String image,String directory) {

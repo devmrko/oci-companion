@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.ReportStorage reportStorage;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.GitSpecifications gitSpecifications;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.FunctionBuilds functions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.SourceVersions sourceVersions;
@@ -31,6 +32,16 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void reportStorageRejectsStaleScopeCsrfAndOtherRunObjects() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/sources"));
+        mvc.perform(post("/builds/report-storage/buckets").session(session).param("region","us-ashburn-1").param("compartment","demo-development").param("name","reports")).andExpect(status().isForbidden());
+        mvc.perform(get("/builds/report-storage").session(session).param("region","wrong-region").param("compartment","demo-development")).andExpect(status().isConflict());
+        mvc.perform(get("/builds/report-storage/report").session(session).param("region","us-ashburn-1").param("compartment","demo-development").param("pipeline","p").param("run","r").param("bucket","reports").param("prefix","reports").param("object","reports/p/another-run/stage/test-reports.tar.gz")).andExpect(status().isConflict());
+        org.mockito.Mockito.verifyNoInteractions(reportStorage);
+        mvc.perform(post("/builds/report-storage/buckets").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("name","reports")).andExpect(status().isOk());
+        org.mockito.Mockito.verify(reportStorage).createBucket(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.eq("us-ashburn-1"),org.mockito.ArgumentMatchers.eq("demo-development"),org.mockito.ArgumentMatchers.eq("reports"));
+    }
     @Test void automationShowsRealServiceErrorsAndConsumesMutationTicketOnce() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(builds.pipelines(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildHistory.Pipeline("p","pipeline","ACTIVE","project","project")));

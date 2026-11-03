@@ -105,3 +105,37 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 초기 예제 커밋 `4f3800296146d4afef6dd64aed63c063af612d59`은 변수명이 `unused`여서 PMD 제외 규칙에 해당했다. 실행 `7f7d3664-a992-4dd3-a2b3-1e895330438f`는 정상 성공했으며 실패 검증 근거에서 제외했다. `calculatedValue`로 수정한 위 커밋이 최종 검증 대상이다.
 
 재현: `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-pmd-failure.cjs`. 실제 실패 빌드를 1회 실행한다. 빌드 실행·상태·보고서 검증은 브라우저 화면으로 수행했다. 테스트 소스 준비는 GitHub API, 빌더 준비는 기존 로컬 ARM Colima/Docker, Function 갱신은 OCI SDK를 사용했다. 업로드 임시 토큰 삭제 및 검증용 로컬 Colima 중지 완료. 전체 환경 준비를 UI만으로 수행한 것은 아니다.
+
+## 네이티브 명령·환경변수·보고서 저장 — 2026-11-03
+
+화면: **빌드 → 새 파이프라인 구성 → 빌드 명세 → 고급 설정 · 명령·환경변수**. 직접 명령이 비어 있으면 기존 도구별 Goal·profile을 사용한다. 직접 명령이 있으면 이를 `steps[].command`로 저장한다. 환경변수는 `env.variables`, 비밀값 참조는 `env.vaultVariables`다. POM은 변경하지 않는다.
+
+보고서 영역에서 선택 구획의 Object Storage 버킷 조회·생성·선택과 저장 접두어를 설정한다. 성공 시 `Preserve reports` 단계, 실패 시 OCI `onFailure`가 원본 XML 압축 파일을 업로드한다. 실행 상세 → **Object Storage 보고서**에서 버킷·접두어 선택 → **이 실행의 보고서 조회** → **Object Storage 보고서 보기**.
+
+실제 DEFAULT / ap-seoul-1 / Joungmin.Ko 검증:
+
+- 화면에서 비공개 Standard 버킷 `companion-build-reports-validation` 생성·선택.
+- 고급 명령과 `BUILD_PROFILE=quality` 환경변수를 입력하고 Gitea 검증 저장소의 `native-report-build.yaml`에 비교·커밋. 명세는 앱 실행 파일에 종속되지 않는다.
+- 전용 파이프라인 `companion-native-reports-validation`, 빌드 목록의 **일반 명령·환경변수 · 보고서 보관 검증** 작업으로 확인 가능.
+- OCI 소스 브랜치 `validation/native-report-storage-20261103`. Maven 컨테이너에서 고정된 db-companion 테스트 모듈 커밋 `6e93238821d4fc02e5a92f7e623ace2fdc2002d3` 사용. 앱의 PMD 전용 설정 없이 일반 명령 `mvn -B verify -P"$BUILD_PROFILE"`로 실행했다.
+
+| 실행 | 명세 커밋 | 빌드 결과 | 보고서 |
+| --- | --- | --- | --- |
+| `native-reports-failure-2026-11-03T01-17-57-883Z` | `877c2203fd317729026cccc9419ba7dbac4c9098` | FAILED | JUnit 1건 통과, PMD 위반 1건·오류 0. `onFailure` 성공, 원본 XML 조회·다운로드 일치 |
+| `native-reports-succeeded-2026-11-03T01-24-52-831Z` | `cc709cc99bc606ea358838434b605f68622d1c1b` | SUCCEEDED | `test` 명령으로 JUnit 1건 통과. PMD는 실행되지 않아 보고서 없음으로 표시. 성공 보관 단계 완료 |
+
+실패 실행 OCID: `ocid1.devopsbuildrun.oc1.ap-seoul-1.amaaaaaavsea7yiars3xu2z64xfqpgtbq2radtzla5szwjy6bdyxgbz2wwya`.
+성공 실행 OCID: `ocid1.devopsbuildrun.oc1.ap-seoul-1.amaaaaaavsea7yiac6fespl47fm2ep3ayznfbajhpmhhxizbst72wru4sspq`.
+
+두 실행 모두 **앱 화면으로 제출하고 결과·Object Storage 보고서·빌드 로그를 검증**했다. 390/768/1440px 가로 넘침 없음. 보고서 표·명령 입력·저장소 선택은 공통 CSS 클래스를 사용한다. 최종 Java 89개 검사와 JavaScript 구문 검사가 통과했다.
+
+환경 준비 범위: 전용 OCI 파이프라인·빌드 단계·해당 파이프라인과 보고서 버킷으로 제한한 IAM 정책은 SDK로 준비했다. OCI Git 명세 복사는 기존 SSH 연결을 사용했다. 화면에서는 Gitea 저장, 버킷 생성·선택, 빌드 작업 등록, 실행·결과 조회를 수행했다. HTTPS 준비 과정에서 생성한 임시 Auth Token은 모두 삭제했다. 기존 VM·Function·다른 파이프라인은 변경하지 않았다.
+
+재현:
+
+- `COMPANION_UI_STORAGE_WRITE=1 node scripts/browser-report-storage.cjs`: 실제 버킷 조회·필요 시 생성, 명세 생성·반응형 화면 검사.
+- `COMPANION_UI_STORAGE_WRITE=1 COMPANION_NATIVE_BUILD_VALIDATION=1 node scripts/browser-report-storage.cjs`: 추가로 실제 Gitea 검증 저장소에 명세 저장. `COMPANION_BUILD_GOAL=test`로 성공 명령 선택.
+- 전용 검증 파이프라인 메타데이터 준비 후 `COMPANION_UI_BUILD_WRITE=1 node scripts/browser-native-report-run.cjs`: 실제 실패 실행·보관 검증. `COMPANION_BUILD_GOAL=test`는 성공 명세 커밋을 준비한 경우 사용한다.
+- `COMPANION_REPORT_RUN_URL` 지정 시 새 실행 없이 해당 기존 실행의 보고서·로그를 검증한다.
+
+한계: 정상 명령 실패와 성공을 검증했다. 강제 종료·시간 초과 시 보관은 보장하지 않는다. 현재 화면 집계는 JUnit·PMD XML에 한정한다. Functions 실행기 계약은 이번 변경 대상이 아니다.

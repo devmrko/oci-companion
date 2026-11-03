@@ -15,9 +15,23 @@
 <label class="form-field" data-container-field hidden>Dockerfile 경로 · 필수<input name="dockerfile" class="ui-control" value="Dockerfile" maxlength="1024" disabled><span class="small muted">작업 경로 기준 · 기존 파일 사용</span></label>
 <label class="form-field" data-container-field hidden>빌드 컨텍스트 · 필수<input name="context" class="ui-control" value="." maxlength="1024" disabled><span class="small muted">작업 경로 기준 · COPY에 포함할 디렉터리</span></label>
 <p class="small muted" data-container-field hidden>앱 빌드 후 Docker 이미지를 생성합니다. 실행 환경의 아키텍처를 사용합니다. OCIR 저장 후 VM(Docker·Podman)·OKE·Container Instances 배포에 사용할 수 있습니다. Function은 별도 규격을 확인하세요.</p>
-<label class="form-field">환경 변수 · 선택<textarea name="variables" class="ui-control" rows="3" maxlength="8192" placeholder="APP_ENV=ci"></textarea><span class="small muted">한 줄에 이름=값 · 비밀값은 Vault 참조 사용</span></label>
-<label class="form-field">Vault 참조 · 선택<textarea name="vaultVariables" class="ui-control" rows="3" maxlength="8192" placeholder="TOKEN=ocid1.vaultsecret.…"></textarea><span class="small muted">한 줄에 이름=Secret OCID</span></label>
-<label class="form-field"><span><input type="checkbox" name="reports" value="true" checked> JUnit 보고서 수집</span><span class="small muted">Surefire·Failsafe·test-results·reports의 XML → test-reports.tar.gz. Registry 전달은 별도 설정.</span></label>
+<details class="report-configuration"><summary>고급 설정 · 명령·환경변수</summary>
+<p class="small muted">비워두면 선택한 도구의 기본 명령을 사용합니다. 직접 입력한 명령은 Goal·profile 대신 작업 경로에서 실행됩니다.</p>
+<label class="form-field">빌드 명령 · 선택<textarea name="buildCommand" class="ui-control ui-control--multiline" rows="6" maxlength="16000" placeholder="mvn -B verify -Pci"></textarea><span class="small muted" id="build-command-mode" role="status">도구 기본 명령 사용</span></label>
+<div class="build-field-grid"><label class="form-field">환경 변수 · 선택<textarea name="variables" class="ui-control ui-control--multiline" rows="3" maxlength="8192" placeholder="APP_ENV=ci"></textarea><span class="small muted">한 줄에 이름=값 · 비밀값은 Vault 참조 사용</span></label>
+<label class="form-field">Vault 참조 · 선택<textarea name="vaultVariables" class="ui-control ui-control--multiline" rows="3" maxlength="8192" placeholder="TOKEN=ocid1.vaultsecret.…"></textarea><span class="small muted">한 줄에 이름=Secret OCID</span></label>
+</div><p class="small muted">명령·환경변수는 생성한 빌드 명세에 포함됩니다. 아래 Git 저장으로 재사용할 수 있습니다. 비밀값은 Vault 참조를 사용하세요.</p></details>
+<section class="report-configuration section-stack">
+<h3>보고서</h3>
+<label><input type="checkbox" name="reports" value="true" checked> JUnit·PMD 보고서 수집</label>
+<div class="build-field-grid">
+<label class="form-field">추가 XML 수집 경로 · 선택<input name="reportPath" class="ui-control" placeholder="reports" maxlength="500"><span class="small muted">소스 루트 기준. 기본 JUnit·pmd.xml은 자동 수집합니다.</span></label>
+<label class="form-field">보고서 보관<select name="reportDestination" class="ui-control"><option value="registry">Registry 전달 사용</option><option value="object">Object Storage · 실패 시에도 보관</option></select></label>
+</div>
+
+<div data-object-storage-fields hidden><section th:replace="~{report-storage :: fields}"></section></div>
+<p class="small muted">XML 원본을 test-reports.tar.gz로 보관합니다. Object Storage 경로: 접두어/파이프라인/실행/단계. 강제 종료·시간 초과 시 보관되지 않을 수 있습니다.</p>
+</section>
 <div class="form-toolbar"><button class="ui-button">명세 미리보기</button></div></form>
 <p class="small muted">명세 작성 → build_spec.yaml 커밋 → 파이프라인에 연결. 이미지 빌드는 Docker 실행 환경이 필요합니다.</p>
 <p id="build-specification-status" role="status"></p><pre class="code-block" id="build-specification-preview" hidden></pre><button type="button" class="ui-button" id="build-specification-download" hidden>build_spec.yaml 다운로드</button>
@@ -35,4 +49,4 @@
 <details><summary>인증·권한 ?</summary><p class="small">OCI 프로파일은 Vault 읽기에 사용합니다. Gitea는 서버에 등록한 env:GITEA와 Gitea 사용자명을 사용할 수 있습니다. GitHub는 x-access-token, GitLab은 oauth2, OCI는 tenancy/[domain/]username을 입력하세요. 토큰에는 대상 저장소 쓰기 권한이 필요합니다. 보호 브랜치는 별도 브랜치에서 작업하세요.</p><p class="small">OCI 콘솔 → 보안 → Vault → Secret에 토큰 저장. 관리자에게 해당 Secret의 read secret-bundles 권한을 요청하세요. OCI Git Auth Token은 내 프로파일 → Auth tokens에서 생성합니다.</p></details>
 <p id="git-spec-status" role="status"></p><details id="git-spec-before-panel" hidden><summary>현재 Git 내용</summary><pre id="git-spec-before" class="code-block"></pre></details>
 </section>
-</details></section></body></html>
+</details><script src="/report-storage.js" defer></script></section></body></html>
