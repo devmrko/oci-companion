@@ -20,6 +20,17 @@
  form.addEventListener('submit',event=>{event.preventDefault();load();});
  preview.addEventListener('click',async()=>{if(!loaded||busy)return;invalidate();const version=generation;busy=true;preview.disabled=true;status.textContent='원격 변경 확인 중';try{const result=await request('/builds/settings/preview',{token:loaded.token,fields:fields(),username:form.elements.username.value,secret:form.elements.secret.value,message:document.getElementById('native-spec-message').value},true);if(version!==generation)return;ticket=result.ticket;document.getElementById('native-spec-before').textContent=result.before;document.getElementById('native-spec-after').textContent=result.after;comparison.hidden=false;save.disabled=false;status.textContent='변경 비교 완료 · Git 미적용';}catch(e){status.textContent=e.message;}finally{busy=false;preview.disabled=false;}});
  save.addEventListener('click',async()=>{if(!ticket||busy)return;busy=true;save.disabled=preview.disabled=true;const current=ticket;ticket='';let locks=[...editor.querySelectorAll('input,textarea,select,button')].map(el=>({el,disabled:el.disabled}));for(const lock of locks)lock.el.disabled=true;const unlock=()=>{for(const lock of locks)lock.el.disabled=lock.disabled;locks=[];};status.textContent='Git 저장 중';form.querySelectorAll('input,select,button').forEach(e=>e.disabled=true);try{const result=await request('/builds/settings/save',{ticket:current});busy=false;unlock();form.querySelectorAll('input,select,button').forEach(e=>e.disabled=false);await load(result.revision);}catch(e){status.textContent=e.message+' · 재실행 전에 원본을 조회하세요.';}finally{unlock();busy=false;preview.disabled=false;form.querySelectorAll('input,select,button').forEach(e=>e.disabled=false);}});
+ for(const action of ['save','load','delete','export'])document.getElementById(action==='export'?'native-spec-export':'native-spec-local-'+action).addEventListener('click',async()=>{
+  if(!loaded||busy)return;invalidate();const version=generation;busy=true;
+  const locks=[...editor.querySelectorAll('input,textarea,select,button'),...form.querySelectorAll('input,select,button')].map(el=>({el,disabled:el.disabled}));
+  try{const data=(action==='save'||action==='export')?{token:loaded.token,fields:fields()}:{token:loaded.token};for(const lock of locks)lock.el.disabled=true;
+   const result=await request(action==='export'?'/builds/settings/export':'/builds/settings/local/'+action,data,action==='save'||action==='export');if(version!==generation)return;
+   if(action==='load'){show({...loaded,fields:result.fields});status.textContent='로컬 초안 불러옴 · OCI 미적용 · '+result.savedAt;}
+   if(action==='save')status.textContent='로컬 저장 완료 · OCI 미적용 · '+result.savedAt;
+   if(action==='delete')status.textContent='로컬 초안 삭제 완료 · 편집값 유지';
+   if(action==='export'){const url=URL.createObjectURL(new Blob([result.content],{type:'application/yaml;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='build_spec.yaml';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='YAML 다운로드 완료 · OCI 미적용';}
+  }catch(e){status.textContent=e.message;}finally{for(const lock of locks)lock.el.disabled=lock.disabled;busy=false;}
+ });
  if(form.elements.source){const source=()=>{form.elements.branch.value=form.elements.source.selectedOptions[0]?.dataset.branch||'main';targetChanged();};form.elements.source.addEventListener('change',source);source();}
  if(form.elements.pipeline.value&&form.elements.stage?.value)load();
 })();

@@ -160,3 +160,16 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 OCI 경로는 실제 조회를 검증했고, Git 저장·재조회는 실제 Gitea에서 검증했다. 이번 검증에서는 OCI Git에 새 커밋을 쓰거나 빌드를 실행하지 않았다. OCI Git 저장에는 별도 Git 쓰기 인증이 필요하다.
 
 보조 검사: Java 93개 통과. Git 동시 변경·일회성 저장·CSRF·범위 변경 차단, 다른 YAML 필드 보존, 앵커로 공유된 단계의 독립 편집·순환 참조 거부를 확인했다.
+
+## 로컬 명세 초안 — 2026-11-03
+
+기존 명세 편집 화면의 기본 저장은 **로컬 저장**이다. 프로파일·사용자·테넌시·리전·구획·파이프라인·소스·브랜치·명세 경로로 구분한 JSON을 `${companion.data-dir}/build-spec-drafts`에 저장한다. 디렉터리 0700, 파일 0600, 원자적 교체를 사용한다. 저장 포트와 JSON 어댑터를 분리한다. Git 인증 정보는 초안에 저장하지 않는다. 일반 환경변수·명령은 평문이므로 비밀값 대신 Vault 참조를 사용한다.
+
+- 로컬 저장·불러오기·삭제 및 편집값 YAML 다운로드. Git 반영은 선택 펼침 영역이다.
+- 원격 원본을 조회한 뒤 같은 원본 커밋의 초안을 복원한다. 원본 커밋이 달라졌으면 초안을 보존하고 적용을 거부한다. 완전한 오프라인 편집은 이번 범위가 아니다.
+- 로컬 저장은 Git 쓰기나 OCI 실행 설정 변경을 수행하지 않는다. 실행 파라미터의 기존 로컬 프리셋 기능은 유지한다.
+- 새 명세 작성은 기존 YAML 다운로드를 사용하며 Git 저장은 선택임을 표시한다.
+
+네이티브 확인: [빌드 명세](https://docs.oracle.com/en-us/iaas/Content/devops/using/build_specs.htm)는 주 소스 저장소의 YAML 경로를 사용한다. [CreateBuildRunDetails](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/devops/models/oci.devops.models.CreateBuildRunDetails.html)는 파이프라인·커밋·실행 인자를 받고 YAML 본문 업로드 항목은 없다. 따라서 로컬 초안을 저장했다고 원격 실행에 적용됐다고 표시하지 않는다. 명령·명세를 변경해 실행하려면 연결 소스에 반영해야 한다.
+
+실제 화면: `COMPANION_NATIVE_SETTINGS_READ_ONLY=1 node scripts/browser-native-settings.cjs`. OCI 원본 조회 → 명령 수정 → 로컬 저장 → 페이지 재진입 시 원본 미변경 확인 → 초안 복원 → YAML 다운로드 내용 확인 → 검증 초안 삭제. 원격 Git 쓰기·빌드 실행 없음. 390/768/1440px 확인. 자동 검사 94개 통과: 초안 파일 재조회·권한·분리·삭제, CSRF, 원격 Git 호출 없는 로컬 저장·복원·다운로드, 원본 커밋 변경 시 적용 거부 포함.

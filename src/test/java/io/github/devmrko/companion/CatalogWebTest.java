@@ -268,7 +268,16 @@ class CatalogWebTest {
         var response=mvc.perform(post("/builds/settings/load").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("source",source.id()).param("branch","main").param("path","build_spec.yaml").param("username","user").param("secret","env:TEST")).andExpect(status().isOk()).andExpect(jsonPath("$.fields.commands[0].value").value("mvn test")).andReturn().getResponse().getContentAsString();
         var mapper=tools.jackson.databind.json.JsonMapper.builder().build();var loaded=mapper.readTree(response);
         String body=mapper.writeValueAsString(java.util.Map.of("token",loaded.path("token").asString(),"fields",io.github.devmrko.companion.service.BuildSpecDocument.read(yaml),"username","user","secret","env:TEST","message","Edit native build"));
+        String localBody=body.replace("mvn test","mvn verify");
+        mvc.perform(post("/builds/settings/local/save").session(session).contentType("application/json").content(localBody)).andExpect(status().isForbidden());
+        org.mockito.Mockito.clearInvocations(gitSpecifications);
+        mvc.perform(post("/builds/settings/local/save").session(session).with(csrf()).contentType("application/json").content(localBody)).andExpect(status().isOk());
+        mvc.perform(post("/builds/settings/local/load").session(session).with(csrf()).param("token",loaded.path("token").asString())).andExpect(status().isOk()).andExpect(jsonPath("$.fields.commands[0].value").value("mvn verify"));
+        mvc.perform(post("/builds/settings/export").session(session).with(csrf()).contentType("application/json").content(localBody)).andExpect(status().isOk()).andExpect(jsonPath("$.content").value(containsString("mvn verify")));
+        org.mockito.Mockito.verifyNoInteractions(gitSpecifications);
         org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("b".repeat(40),yaml));
+        String newer=mvc.perform(post("/builds/settings/load").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("source",source.id()).param("branch","main").param("path","build_spec.yaml")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        mvc.perform(post("/builds/settings/local/load").session(session).with(csrf()).param("token",mapper.readTree(newer).path("token").asString())).andExpect(status().isConflict()).andExpect(jsonPath("$.message").value(containsString("원본 커밋이 변경")));
         mvc.perform(post("/builds/settings/preview").session(session).with(csrf()).contentType("application/json").content(body)).andExpect(status().isConflict());
         org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("a".repeat(40),yaml));
         String preview=mvc.perform(post("/builds/settings/preview").session(session).with(csrf()).contentType("application/json").content(body)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();

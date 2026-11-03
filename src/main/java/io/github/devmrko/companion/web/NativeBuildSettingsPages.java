@@ -16,8 +16,8 @@ import org.springframework.http.*;
 
 @Controller @Profile("!legacy")
 public class NativeBuildSettingsPages {
-    private final CatalogPages catalog;private final CatalogService sources;private final BuildHistory history;private final BuildDefinition definitions;private final BuildControl control;private final GitSpecifications git;
-    public NativeBuildSettingsPages(CatalogPages catalog,CatalogService sources,BuildHistory history,BuildDefinition definitions,BuildControl control,GitSpecifications git){this.catalog=catalog;this.sources=sources;this.history=history;this.definitions=definitions;this.control=control;this.git=git;}
+    private final CatalogPages catalog;private final CatalogService sources;private final BuildHistory history;private final BuildDefinition definitions;private final BuildControl control;private final GitSpecifications git;private final BuildSpecDraftStore drafts;
+    public NativeBuildSettingsPages(CatalogPages catalog,CatalogService sources,BuildHistory history,BuildDefinition definitions,BuildControl control,GitSpecifications git,BuildSpecDraftStore drafts){this.catalog=catalog;this.sources=sources;this.history=history;this.definitions=definitions;this.control=control;this.git=git;this.drafts=drafts;}
     record Binding(Connection connection,String region,String compartment,String pipeline,String definitionRevision,BuildDefinition.Source nativeSource,GitSpecifications.Target target) {}
     record Snapshot(Binding binding,String revision,String content,Instant expires) {}
     record Proposal(Snapshot snapshot,GitSpecifications.Target target,String content,String message) {}
@@ -68,6 +68,23 @@ public class NativeBuildSettingsPages {
             if(!source.equals(b.target().source()))throw Errors.GIT_CONFLICT.exception();
         }
     }
+    private Snapshot localSnapshot(Authentication auth,HttpSession session,String token){
+        Snapshot snapshot;synchronized(session){snapshot=this.<Snapshot>items(session,"nativeSpecSnapshots").get(token);}
+        if(snapshot==null||snapshot.expires().isBefore(Instant.now()))throw Errors.GIT_CONFLICT.exception();
+        var b=snapshot.binding();scope(auth,session,b.region(),b.compartment());if(!b.connection().equals(SecurityConfig.connection(auth)))throw Errors.SCOPE.exception();return snapshot;
+    }
+    private String draftKey(Snapshot snapshot){var b=snapshot.binding();var c=b.connection();var t=b.target();return String.join("\n",Boolean.toString(c.demo()),c.profile(),c.tenancy(),c.user(),b.region(),b.compartment(),b.pipeline(),t.source().id(),t.source().url(),t.branch(),t.path());}
+    @PostMapping("/builds/settings/local/save") @ResponseBody Map<String,String> saveLocal(Authentication auth,HttpSession session,@RequestBody Edit edit){
+        var snapshot=localSnapshot(auth,session,edit.token());String content=BuildSpecDocument.update(snapshot.content(),edit.fields());String now=Instant.now().toString();
+        drafts.save(draftKey(snapshot),new BuildSpecDraftStore.Draft(snapshot.revision(),content,now));return Map.of("savedAt",now);
+    }
+    @PostMapping("/builds/settings/local/load") @ResponseBody Map<String,Object> loadLocal(Authentication auth,HttpSession session,@RequestParam String token){
+        var snapshot=localSnapshot(auth,session,token);var draft=drafts.read(draftKey(snapshot)).orElseThrow(Errors.DRAFT_MISSING::exception);
+        if(!draft.revision().equals(snapshot.revision()))throw Errors.DRAFT_STALE.exception();
+        return Map.of("fields",BuildSpecDocument.read(draft.content()),"savedAt",draft.savedAt());
+    }
+    @PostMapping("/builds/settings/local/delete") @ResponseBody Map<String,String> deleteLocal(Authentication auth,HttpSession session,@RequestParam String token){var snapshot=localSnapshot(auth,session,token);drafts.delete(draftKey(snapshot));return Map.of("state","DELETED");}
+    @PostMapping("/builds/settings/export") @ResponseBody Map<String,String> export(Authentication auth,HttpSession session,@RequestBody Edit edit){var snapshot=localSnapshot(auth,session,edit.token());return Map.of("content",BuildSpecDocument.update(snapshot.content(),edit.fields()));}
     @PostMapping("/builds/settings/preview") @ResponseBody Map<String,String> preview(Authentication auth,HttpSession session,@RequestBody Edit edit){
         Snapshot snapshot;synchronized(session){snapshot=this.<Snapshot>items(session,"nativeSpecSnapshots").get(edit.token());}check(auth,session,snapshot);
         if(edit.message()==null||edit.message().isBlank()||edit.message().length()>200||edit.message().chars().anyMatch(Character::isISOControl))throw Errors.INVALID.exception();

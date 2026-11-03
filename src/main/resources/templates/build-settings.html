@@ -22,9 +22,14 @@
 <div class="build-field-grid"><section class="section-stack"><h3>환경변수</h3><div id="native-spec-variables" class="section-stack"></div><button type="button" class="ui-button" data-add-variable="variables">환경변수 추가</button></section><section class="section-stack"><h3>Vault 참조</h3><div id="native-spec-vaultVariables" class="section-stack"></div><button type="button" class="ui-button" data-add-variable="vaultVariables">Vault 참조 추가</button></section></div>
 <details><summary>조회한 원문</summary><pre class="code-block" id="native-spec-original"></pre></details>
 <p class="small muted">명령·환경변수만 수정합니다. 다른 설정은 유지하며, 저장 시 YAML 서식·주석은 달라질 수 있습니다.</p>
+<div class="form-toolbar"><button type="button" class="ui-button primary" id="native-spec-local-save">로컬 저장</button><button type="button" class="ui-button" id="native-spec-local-load">로컬 불러오기</button><button type="button" class="ui-button" id="native-spec-export">YAML 다운로드</button><button type="button" class="ui-button" id="native-spec-local-delete">로컬 삭제</button></div>
+<p class="small muted">앱 실행 환경에 JSON 초안으로 저장합니다. 같은 프로파일·리전·구획·소스·브랜치·명세의 초안은 덮어씁니다. 비밀값은 Vault 참조를 사용하세요.</p>
+<p class="small muted">로컬 저장은 OCI에 적용되지 않습니다. Managed Build는 연결된 소스의 명세를 사용합니다.</p>
+<details id="native-spec-git"><summary>Git 반영 · 선택</summary><div class="section-stack">
 <label class="form-field">커밋 메시지<input id="native-spec-message" class="ui-control" value="Update build commands and environment" maxlength="200"></label>
 <div class="form-toolbar"><button type="button" class="ui-button" id="native-spec-preview">변경 비교</button><button type="button" class="ui-button primary" id="native-spec-save" disabled>변경 저장·재조회</button></div>
 <section id="native-spec-comparison" class="section-stack" hidden><h3>변경 비교</h3><div class="build-field-grid"><details open><summary>저장 전</summary><pre class="code-block" id="native-spec-before"></pre></details><details open><summary>저장 후</summary><pre class="code-block" id="native-spec-after"></pre></details></div></section>
+</div></details>
 </section>
 <details><summary>조회·저장 권한 ?</summary><p class="small">OCI 콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인. 현재 OCI 프로파일에 파이프라인·단계·코드 저장소 읽기 권한이 필요합니다. Git 인증에는 대상 브랜치 쓰기 권한이 필요합니다. 보호 브랜치는 해당 Git 서비스의 정책을 확인하세요.</p></details>
 </section></main><footer th:replace="~{layout :: footer}"></footer><script src="/native-build-settings.js" defer></script></body></html>
