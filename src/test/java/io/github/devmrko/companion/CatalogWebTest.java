@@ -256,6 +256,28 @@ class CatalogWebTest {
     }
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     io.github.devmrko.companion.port.BuildHistory builds;
+    @Test void nativeSettingsLoadOriginalAndRejectConcurrentGitChanges() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/sources"));
+        mvc.perform(post("/sources").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("provider","GITEA").param("name","native-edit-test").param("url","https://git.example.test/team/native.git").param("branch","main"));
+        var connection=context.getBean(io.github.devmrko.companion.port.CloudConnection.class).connect("DEMO");
+        var source=context.getBean(io.github.devmrko.companion.service.CatalogService.class).sources(connection,"us-ashburn-1","demo-development").stream().filter(v->v.name().equals("native-edit-test")).findFirst().orElseThrow();
+        String yaml="version: 0.1\ncomponent: build\nsteps:\n- type: Command\n  command: mvn test\n";
+        org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("a".repeat(40),yaml));
+        mvc.perform(get("/builds/settings").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("명세 불러오기")));
+        var response=mvc.perform(post("/builds/settings/load").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("source",source.id()).param("branch","main").param("path","build_spec.yaml").param("username","user").param("secret","env:TEST")).andExpect(status().isOk()).andExpect(jsonPath("$.fields.commands[0].value").value("mvn test")).andReturn().getResponse().getContentAsString();
+        var mapper=tools.jackson.databind.json.JsonMapper.builder().build();var loaded=mapper.readTree(response);
+        String body=mapper.writeValueAsString(java.util.Map.of("token",loaded.path("token").asString(),"fields",io.github.devmrko.companion.service.BuildSpecDocument.read(yaml),"username","user","secret","env:TEST","message","Edit native build"));
+        org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("b".repeat(40),yaml));
+        mvc.perform(post("/builds/settings/preview").session(session).with(csrf()).contentType("application/json").content(body)).andExpect(status().isConflict());
+        org.mockito.Mockito.when(gitSpecifications.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any())).thenReturn(new io.github.devmrko.companion.port.GitSpecifications.File("a".repeat(40),yaml));
+        String preview=mvc.perform(post("/builds/settings/preview").session(session).with(csrf()).contentType("application/json").content(body)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String ticket=mapper.readTree(preview).path("ticket").asString();org.mockito.Mockito.when(gitSpecifications.save(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn("a".repeat(40));
+        mvc.perform(post("/builds/settings/save").session(session).param("ticket",ticket)).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/settings/save").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isOk());
+        mvc.perform(post("/builds/settings/save").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict());
+        mvc.perform(post("/builds/settings/load").session(session).with(csrf()).param("region","other").param("compartment","demo-development")).andExpect(status().isConflict());
+    }
     @Test void gitSaveRequiresPreviewAndCannotBeReplayed() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/sources"));

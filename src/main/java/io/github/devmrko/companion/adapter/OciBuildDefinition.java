@@ -121,7 +121,7 @@ public class OciBuildDefinition implements BuildDefinition {
                             .limit(12).forEach(line->sourceCommands.add(scriptPath+": "+line));
                     } catch(Exception ignored) { sourceCommands.add(scriptPath+": 소스 명령 조회 실패"); }
                 }
-                return new Specification(content,"기본 브랜치 "+source.branch()+"의 빌드 사양",outputs,scripts,sourceCommands);
+                return new Specification(content,"기본 브랜치 "+source.branch()+"의 빌드 사양",outputs,scripts,sourceCommands,commits.getFirst().getCommitId());
             }
         } catch(Exception e) { return new Specification("","빌드 사양 조회 실패 · 저장소 읽기 권한과 파일 경로를 확인하세요.",List.of(),List.of()); }
     }

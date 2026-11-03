@@ -14,7 +14,8 @@ public interface BuildDefinition {
     record SourceOverride(String source,String branch,String commit) {
         public static SourceOverride none() { return new SourceOverride("","",""); }
     }
-    record Specification(String content,String note,List<String> outputs,List<String> scripts,List<String> sourceCommands) {
+    record Specification(String content,String note,List<String> outputs,List<String> scripts,List<String> sourceCommands,String revision) {
+        public Specification(String content,String note,List<String> outputs,List<String> scripts,List<String> sourceCommands) { this(content,note,outputs,scripts,sourceCommands,""); }
         public Specification(String content,String note,List<String> outputs,List<String> scripts) { this(content,note,outputs,scripts,List.of()); }
     }
     Definition read(Connection c,String region,String compartment,String pipeline);

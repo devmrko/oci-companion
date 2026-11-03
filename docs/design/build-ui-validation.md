@@ -139,3 +139,24 @@ Playwright headless Chromium이 실제 화면을 조작한다. OCI CLI/SDK 직�
 - `COMPANION_REPORT_RUN_URL` 지정 시 새 실행 없이 해당 기존 실행의 보고서·로그를 검증한다.
 
 한계: 정상 명령 실패와 성공을 검증했다. 강제 종료·시간 초과 시 보관은 보장하지 않는다. 현재 화면 집계는 JUnit·PMD XML에 한정한다. Functions 실행기 계약은 이번 변경 대상이 아니다.
+
+## 기존 설정 조회·수정 — 2026-11-03
+
+화면: **빌드 작업 → 명세 조회·수정** 또는 `/builds/settings`.
+
+- OCI SDK로 파이프라인·단계·파라미터를 조회한다. 선택 단계의 주 소스·브랜치·명세 경로를 사용한다. OCI Git 명세는 프로파일 권한으로 읽으며 커밋 SHA를 함께 표시한다.
+- 외부 Git은 등록 소스·브랜치·명세 경로와 Git 인증 참조로 읽는다. 새 명세 생성 화면의 기본값을 기존 설정으로 표시하지 않는다.
+- 저장된 `Command` 단계, `onFailure` 명령, `env.variables`, `env.vaultVariables`를 입력 항목에 채운다. 파이프라인 파라미터 수정은 기존 OCI 기본값 편집 기능으로 연결한다.
+- 변경 비교 전에 조회 시점의 Git 커밋과 OCI 단계 구성을 재확인한다. 저장은 기대 커밋·Git ref lease와 일회성 티켓을 사용한다. 저장 후 원본을 다시 읽어 화면을 채운다.
+- 수정하지 않은 단계·입력·출력·exportedVariables 등은 유지한다. YAML 서식·주석과 앵커 표현은 달라질 수 있다. 변경이 없으면 원문을 그대로 유지한다.
+
+실제 화면 검증: `COMPANION_UI_GIT_WRITE=1 node scripts/browser-native-settings.cjs`.
+
+1. 기존 검증 작업에서 OCI 명세를 조회. `validation/native-report-storage-20261103` / `native-report-build.yaml` / 커밋 표시, 실제 Maven 명령과 실패 처리, `BUILD_PROFILE=quality` 입력 확인.
+2. Gitea 검증 저장소의 같은 명세를 읽어 명령과 환경변수를 수정. 변경 비교 → 실제 커밋 → 새 커밋에서 재조회한 입력값 확인.
+3. 검증용 명령·환경변수 변경을 복원하고 다시 원본 조회. 조회한 YAML을 파싱해 원래 설정과의 의미상 일치, 다른 단계·실패 처리·산출물 보존 확인.
+4. 390/768/1440px 가로 넘침 없음. 브라우저 오류 없음.
+
+OCI 경로는 실제 조회를 검증했고, Git 저장·재조회는 실제 Gitea에서 검증했다. 이번 검증에서는 OCI Git에 새 커밋을 쓰거나 빌드를 실행하지 않았다. OCI Git 저장에는 별도 Git 쓰기 인증이 필요하다.
+
+보조 검사: Java 93개 통과. Git 동시 변경·일회성 저장·CSRF·범위 변경 차단, 다른 YAML 필드 보존, 앵커로 공유된 단계의 독립 편집·순환 참조 거부를 확인했다.

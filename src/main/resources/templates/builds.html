@@ -1,6 +1,6 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
-<h1>빌드</h1>
+<h1>빌드</h1><div class="form-toolbar" th:if="${!#strings.isEmpty(pipeline)}"><a class="ui-button" th:href="@{/builds/settings(pipeline=${pipeline})}">명세 조회·수정</a></div>
 <nav th:replace="~{build-projects :: tabs}"></nav>
 <div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card" th:if="${tab == 'pipelines' and adminTicket != null}">
