@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildProjectResources projectResources;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.ReportStorage reportStorage;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.GitSpecifications gitSpecifications;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.FunctionBuilds functions;
@@ -32,6 +33,20 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @Test void projectResourcesCreateOnceAndRejectWrongScope() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildAdministration.Project("p","project","description","ACTIVE","topic")));
+        org.mockito.Mockito.when(projectResources.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.BuildProjectResources.Resources(java.util.List.of(),java.util.List.of(),java.util.List.of()));
+        var page=mvc.perform(get("/builds/project-resources").session(session).param("project","p")).andExpect(status().isOk()).andExpect(content().string(containsString("코드 저장소 생성"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/builds/project-resources").session(session).param("ticket",ticket).param("action","repository").param("name","test")).andExpect(status().isForbidden());
+        mvc.perform(post("/builds/project-resources").session(session).with(csrf()).param("ticket",ticket).param("action","repository").param("name","test")).andExpect(status().is3xxRedirection());
+        mvc.perform(post("/builds/project-resources").session(session).with(csrf()).param("ticket",ticket).param("action","repository").param("name","test")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(projectResources,org.mockito.Mockito.times(1)).createRepository(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("test"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq(ticket));
+        page=mvc.perform(get("/builds/project-resources").session(session).param("project","p")).andReturn();ticket=(String)page.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
+        mvc.perform(post("/builds/project-resources").session(session).with(csrf()).param("ticket",ticket).param("action","log").param("name","test")).andExpect(status().isConflict());
+    }
     @Test void reportStorageRejectsStaleScopeCsrfAndOtherRunObjects() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back","/sources"));

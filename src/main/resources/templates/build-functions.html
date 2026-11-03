@@ -52,7 +52,7 @@
 <p class="small muted" id="function-log-notice">5초마다 갱신 · 빌드 종료 시 자동 중지</p>
 <label><input type="checkbox" id="function-log-follow" checked> 마지막 로그 따라가기</label>
 <pre class="code-block function-live-log" id="function-live-log" tabindex="0" aria-label="빌드 진행 로그">로그를 불러오는 중입니다.</pre>
-<div class="form-toolbar"><button type="button" class="ui-button" id="function-reports-refresh">보고서 보기</button></div><p id="function-reports-status" role="status"></p><pre class="code-block" id="function-reports-details" hidden></pre><div id="pmd-reports" class="section-stack"></div>
+<div class="form-toolbar"><button type="button" class="ui-button" id="function-reports-refresh">보고서 보기</button></div><p id="function-reports-status" role="status"></p><pre class="code-block" id="function-reports-details" hidden></pre><div id="report-files" class="section-stack"></div><div id="pmd-reports" class="section-stack"></div>
 <details><summary>실행 결과·산출물</summary><pre class="code-block" id="function-live-result"></pre></details>
 </section>
 <section class="card" th:if="${tab == 'history' and builder != null and builder.compatible()}"><div class="section-title"><h2>실행 이력</h2><a class="ui-button" th:href="@{/builds/functions(view='history',application=${functionApplication},function=${function},run=${selectedRun},cursor=${cursor})}">새로 고침</a></div>

@@ -9,13 +9,13 @@
 <a class="build-tab" th:classappend="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'} ? 'is-active'" href="/builds/tasks?view=environments">환경 관리</a>
 </nav>
 <nav class="form-toolbar build-management-links" aria-label="OCI 리소스 관리" th:if="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'}">
-<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
+<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds/project-resources">코드 저장소·로그</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
 </nav></div><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
 <section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
 <p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>
 <p th:if="${projectItems.isEmpty()}">프로젝트 없음 또는 조회 실패</p>
 <div class="table-scroll" th:if="${!projectItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명·알림 주제</th><th class="table-heading">파이프라인</th></tr></thead><tbody>
-<tr th:each="p : ${projectItems}"><td class="table-cell"><strong th:text="${p.name()}"></strong><details><summary>OCID</summary><code th:text="${p.id()}"></code></details></td><td class="table-cell" th:text="${p.state()}"></td><td class="table-cell"><p th:text="${#strings.isEmpty(p.description()) ? '설명 없음' : p.description()}"></p><details><summary>알림 주제 OCID</summary><code th:text="${p.topic()}"></code></details></td><td class="table-cell"><a th:href="@{/builds(tab='pipelines',project=${p.id()})}">조회·추가</a></td></tr>
+<tr th:each="p : ${projectItems}"><td class="table-cell"><strong th:text="${p.name()}"></strong><details><summary>OCID</summary><code th:text="${p.id()}"></code></details></td><td class="table-cell" th:text="${p.state()}"></td><td class="table-cell"><p th:text="${#strings.isEmpty(p.description()) ? '설명 없음' : p.description()}"></p><details><summary>알림 주제 OCID</summary><code th:text="${p.topic()}"></code></details></td><td class="table-cell"><a th:href="@{/builds/project-resources(project=${p.id()})}">코드 저장소·로그</a> · <a th:href="@{/builds(tab='pipelines',project=${p.id()})}">조회·추가</a></td></tr>
 </tbody></table></div></section>
 <section class="card" th:if="${adminTicket != null}"><h2>프로젝트 추가</h2>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">

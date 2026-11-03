@@ -38,6 +38,13 @@ class TestReportsTest {
         var result=TestReports.read(new ByteArrayInputStream(archive("<pmd version='7.17.0'/>")));
         assertEquals(1,result.pmd().size());assertEquals(0,result.pmd().getFirst().violations());assertEquals(0,result.pmd().getFirst().errors());
     }
+    @Test void genericReportsAreDownloadableAndUnsafePathsExcluded() throws Exception {
+        var bytes=new ByteArrayOutputStream();
+        try(var tar=new TarArchiveOutputStream(new GZIPOutputStream(bytes))){for(String name:java.util.List.of("reports/summary.html","../outside.txt","reports/large.bin")){
+            byte[] content=name.endsWith(".bin")?new byte[1024*1024+1]:"<script>not executed</script>".getBytes(StandardCharsets.UTF_8);var entry=new TarArchiveEntry(name);entry.setSize(content.length);tar.putArchiveEntry(entry);tar.write(content);tar.closeArchiveEntry();
+        }}
+        var summary=TestReports.read(new ByteArrayInputStream(bytes.toByteArray()));assertEquals("MISSING",summary.state());assertEquals(2,summary.attachments().size());assertEquals("<script>not executed</script>",new String(java.util.Base64.getDecoder().decode(summary.attachments().getFirst().base64()),StandardCharsets.UTF_8));assertTrue(summary.attachments().get(1).base64().isEmpty());assertFalse(summary.attachments().get(1).note().isBlank());
+    }
     @Test void actualArchiveWhenExplicitlyProvided() throws Exception {
         String path=System.getProperty("companion.report-fixture");if(path==null)return;
         try(var in=new FileInputStream(path)){var summary=TestReports.read(in);System.out.println("ACTUAL_REPORT "+summary);assertTrue(summary.tests()>0);}

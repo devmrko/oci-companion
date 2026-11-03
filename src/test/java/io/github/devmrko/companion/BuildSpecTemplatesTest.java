@@ -116,6 +116,7 @@ class BuildSpecTemplatesTest {
     @Test void nativeFailureHandlerReportsUploadFailureSeparately() throws Exception {
         var root=java.nio.file.Files.createTempDirectory("report-upload-");
         var reports=java.nio.file.Files.createDirectories(root.resolve("custom/reports"));
+        java.nio.file.Files.writeString(reports.resolve("summary.txt"),"report summary");
         java.nio.file.Files.writeString(reports.resolve("analysis.xml"),"<pmd version='7'><file name='App.java'><violation beginline='1' rule='Rule'>finding</violation></file></pmd>");
         var cli=root.resolve("oci");java.nio.file.Files.writeString(cli,"#!/bin/sh\nprintf '%s\\n' \"$@\" > upload-args\nexit 9\n");cli.toFile().setExecutable(true);
         for(int exitCode:List.of(0,7)){
@@ -128,7 +129,7 @@ class BuildSpecTemplatesTest {
             String handler=((Map<?,?>)((List<?>)((Map<?,?>)((List<?>)spec.get("steps")).getFirst()).get("onFailure")).getFirst()).get("command").toString();
             builder.command("bash","-c",handler);var upload=builder.start();upload.getInputStream().readAllBytes();assertNotEquals(0,upload.waitFor());
             assertTrue(java.nio.file.Files.readString(root.resolve("upload-args")).contains("reports/pipeline/run/stage/test-reports.tar.gz"));
-            try(var in=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){assertEquals(1,io.github.devmrko.companion.service.TestReports.read(in).pmd().getFirst().violations());}
+            try(var in=java.nio.file.Files.newInputStream(root.resolve("test-reports.tar.gz"))){var summary=io.github.devmrko.companion.service.TestReports.read(in);assertEquals(1,summary.pmd().getFirst().violations());assertTrue(summary.attachments().stream().anyMatch(a->a.path().endsWith("summary.txt")));}
         }
         assertThrows(RuntimeException.class,()->BuildSpecTemplates.reports("",true,"../escape","namespace","bucket","reports","ap-seoul-1"));
     }

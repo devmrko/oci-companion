@@ -241,8 +241,9 @@ public class OciBuildSetup implements BuildSetup {
         var definition=definitions.read(c,region,comp,pipeline);
         if(!definition.revision().equals(revision))throw Errors.BUILD_CHANGED.exception();
         var stage=definition.stages().stream().filter(s->s.id().equals(predecessor) && !s.spec().isEmpty()).findFirst().orElseThrow(Errors.BUILD_PARAMETERS::exception);
-        // Do not silently branch around existing tests/approvals/deployment. Only append after a terminal managed build.
-        if(definition.stages().stream().anyMatch(s->s.after().contains(stage.name()))) throw Errors.DELIVERY_ORDER.exception();
+        // Add mappings to an existing direct delivery stage without changing execution order.
+        var successors=definition.stages().stream().filter(s->s.after().contains(stage.name())).toList();
+        if(successors.size()>1)throw Errors.DELIVERY_ORDER.exception();
         var source=stage.sources().stream().filter(BuildDefinition.Source::primary).findFirst().orElse(stage.sources().isEmpty()?null:stage.sources().getFirst());
         if(source==null)throw Errors.BUILD_PARAMETERS.exception();
         var outputs=definitions.specification(c,region,source,stage.spec()).outputs();
@@ -253,6 +254,14 @@ public class OciBuildSetup implements BuildSetup {
             if(!p.getProjectId().equals(a.getProjectId()) || a.getLifecycleState()!=DeployArtifact.LifecycleState.Active)throw Errors.SCOPE.exception();
             if(!(match[1].equals("BINARY") && a.getDeployArtifactType()==DeployArtifact.DeployArtifactType.GenericFile
                 || match[1].equals("DOCKER_IMAGE") && a.getDeployArtifactType()==DeployArtifact.DeployArtifactType.DockerImage))throw Errors.BUILD_PARAMETERS.exception();
+            if(!successors.isEmpty()){
+                var response=client.getBuildPipelineStage(GetBuildPipelineStageRequest.builder().buildPipelineStageId(successors.getFirst().id()).build());
+                if(!(response.getBuildPipelineStage() instanceof DeliverArtifactStage delivery)||!pipeline.equals(delivery.getBuildPipelineId())||!comp.equals(delivery.getCompartmentId())||delivery.getBuildPipelineStagePredecessorCollection()==null||delivery.getBuildPipelineStagePredecessorCollection().getItems().size()!=1||!predecessor.equals(delivery.getBuildPipelineStagePredecessorCollection().getItems().getFirst().getId()))throw Errors.DELIVERY_ORDER.exception();
+                var items=new ArrayList<>(delivery.getDeliverArtifactCollection().getItems());
+                if(items.stream().anyMatch(item->item.getArtifactName().equals(output)))throw Errors.BUILD_PARAMETERS.exception();
+                items.add(DeliverArtifact.builder().artifactName(output).artifactId(artifact).build());
+                client.updateBuildPipelineStage(UpdateBuildPipelineStageRequest.builder().buildPipelineStageId(delivery.getId()).ifMatch(response.getEtag()).updateBuildPipelineStageDetails(UpdateDeliverArtifactStageDetails.builder().deliverArtifactCollection(DeliverArtifactCollection.builder().items(items).build()).build()).build());return delivery.getId();
+            }
             return client.createBuildPipelineStage(CreateBuildPipelineStageRequest.builder().opcRetryToken(token).createBuildPipelineStageDetails(
                 CreateDeliverArtifactStageDetails.builder().buildPipelineId(pipeline).displayName("Registry · "+output)
                     .buildPipelineStagePredecessorCollection(BuildPipelineStagePredecessorCollection.builder().items(List.of(BuildPipelineStagePredecessor.builder().id(predecessor).build())).build())

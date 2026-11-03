@@ -12,7 +12,9 @@ public final class TestReports {
     public record Failure(String suite,String test,String message) {}
     public record Finding(String file,String line,String rule,String priority,String message) {}
     public record PmdReport(String path,String version,int violations,int errors,int suppressed,List<Finding> findings,List<String> problems,String xml) {}
-    public record Summary(String state,int files,int tests,int failures,int errors,int skipped,List<Failure> details,List<PmdReport> pmd) {
+    public record ReportFile(String path,long bytes,String base64,String note) {}
+    public record Summary(String state,int files,int tests,int failures,int errors,int skipped,List<Failure> details,List<PmdReport> pmd,List<ReportFile> attachments) {
+        public Summary(String state,int files,int tests,int failures,int errors,int skipped,List<Failure> details,List<PmdReport> pmd) {this(state,files,tests,failures,errors,skipped,details,pmd,List.of());}
         public Summary(String state,int files,int tests,int failures,int errors,int skipped,List<Failure> details) {this(state,files,tests,failures,errors,skipped,details,List.of());}
     }
     private static final class LimitedInput extends FilterInputStream {
@@ -32,13 +34,17 @@ public final class TestReports {
         factory.setXIncludeAware(false);factory.setExpandEntityReferences(false);factory.setNamespaceAware(true);
         int files=0,tests=0,failures=0,errors=0,skipped=0,entries=0;long total=0;
         var details=new ArrayList<Failure>();
-        var pmd=new ArrayList<PmdReport>();
+        var pmd=new ArrayList<PmdReport>();var attachments=new ArrayList<ReportFile>();long attachedBytes=0;
         try(var tar=new TarArchiveInputStream(new LimitedInput(new GZIPInputStream(input)))) {
             for(var entry=tar.getNextEntry();entry!=null;entry=tar.getNextEntry()) {
                 if(++entries>10000 || entry.getSize()<0 || (total+=entry.getSize())>64*1024*1024L)throw new IOException("보고서 크기 제한 초과");
-                if(!entry.isFile() || !entry.getName().endsWith(".xml") || entry.getName().contains("/__MACOSX/") || entry.getName().substring(entry.getName().lastIndexOf('/')+1).startsWith("._"))continue;
-                if(entry.getSize()>4*1024*1024)throw new IOException("XML 크기 제한 초과");
-                byte[] content=tar.readNBytes((int)entry.getSize());
+                if(!entry.isFile() || entry.getName().startsWith("/") || Arrays.asList(entry.getName().split("/")).contains("..") || entry.getName().contains("/__MACOSX/") || entry.getName().substring(entry.getName().lastIndexOf('/')+1).startsWith("._"))continue;
+                boolean xml=entry.getName().endsWith(".xml");
+                if(xml&&entry.getSize()>4*1024*1024)throw new IOException("XML 크기 제한 초과");
+                boolean download=entry.getSize()<=1024*1024&&attachedBytes+entry.getSize()<=4*1024*1024&&attachments.size()<100;
+                byte[] content=xml||download?tar.readNBytes((int)entry.getSize()):new byte[0];
+                if(attachments.size()<100){attachments.add(new ReportFile(entry.getName(),entry.getSize(),download?Base64.getEncoder().encodeToString(content):"",download?"":"다운로드 제한 · 파일 1 MiB / 전체 4 MiB"));if(download)attachedBytes+=content.length;}
+                if(!xml)continue;
                 var document=factory.newDocumentBuilder().parse(new ByteArrayInputStream(content));
                 if("pmd".equals(document.getDocumentElement().getLocalName())) {
                     var findings=new ArrayList<Finding>();var problems=new ArrayList<String>();
@@ -78,6 +84,6 @@ public final class TestReports {
                 }
             }
         }
-        return new Summary(files==0?"MISSING":tests==0?"EMPTY":"AVAILABLE",files,tests,failures,errors,skipped,List.copyOf(details),List.copyOf(pmd));
+        return new Summary(files==0?"MISSING":tests==0?"EMPTY":"AVAILABLE",files,tests,failures,errors,skipped,List.copyOf(details),List.copyOf(pmd),List.copyOf(attachments));
     }
 }

@@ -87,6 +87,15 @@ class OciBuildSetupTest {
         assertEquals("stage",details.getBuildPipelineStagePredecessorCollection().getItems().getFirst().getId());
         assertEquals("jar",details.getDeliverArtifactCollection().getItems().getFirst().getArtifactName());
         assertEquals("token",captor.getValue().getOpcRetryToken());
+        var successor=new BuildDefinition.Stage("deliver","store","전달","ACTIVE",List.of("build"),"","",0,List.of(),List.of());
+        when(defs.read(c,"region","comp","pipe")).thenReturn(new BuildDefinition.Definition("pipeline","project","ACTIVE","","rev",List.of(stage,successor)));
+        var previous=DeliverArtifact.builder().artifactName("report").artifactId("existing-report").build();
+        var existing=DeliverArtifactStage.builder().id("deliver").buildPipelineId("pipe").compartmentId("comp").buildPipelineStagePredecessorCollection(BuildPipelineStagePredecessorCollection.builder().items(List.of(BuildPipelineStagePredecessor.builder().id("stage").build())).build()).deliverArtifactCollection(DeliverArtifactCollection.builder().items(List.of(previous)).build()).build();
+        when(client.getBuildPipelineStage(any())).thenReturn(GetBuildPipelineStageResponse.builder().etag("delivery-etag").buildPipelineStage(existing).build());
+        assertEquals("deliver",adapter.deliver(c,"region","comp","pipe","rev","stage","jar","artifact","next-token"));
+        var update=org.mockito.ArgumentCaptor.forClass(UpdateBuildPipelineStageRequest.class);verify(client).updateBuildPipelineStage(update.capture());assertEquals("delivery-etag",update.getValue().getIfMatch());
+        var change=(UpdateDeliverArtifactStageDetails)update.getValue().getUpdateBuildPipelineStageDetails();assertEquals(previous,change.getDeliverArtifactCollection().getItems().getFirst());assertEquals(2,change.getDeliverArtifactCollection().getItems().size());assertNull(change.getBuildPipelineStagePredecessorCollection());
+
     }
     @Test void replacingDeliveryDestinationPreservesOtherMappingsAndGraph() throws Exception {
         var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);when(clients.client(c,"region")).thenReturn(client);

@@ -23,3 +23,16 @@
     }
   }};
 })();
+
+(() => {
+ window.CompanionReportFiles={render(files=[]) {
+  const root=document.getElementById('report-files');if(!root)return;root.replaceChildren();if(!files.length)return;
+  const panel=document.createElement('details'),heading=document.createElement('summary');heading.textContent='보고서 파일 · '+files.length;panel.append(heading);
+  const list=document.createElement('div');list.className='section-stack';
+  for(const file of files){const row=document.createElement('div');row.className='form-toolbar';const label=document.createElement('span');label.className='source-url';label.textContent=file.path+' · '+file.bytes+' bytes';row.append(label);
+   const button=document.createElement('button');button.type='button';button.className='ui-button';button.textContent='다운로드';button.disabled=!!file.note;
+   button.addEventListener('click',()=>{const bytes=Uint8Array.from(atob(file.base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));const link=document.createElement('a');link.href=url;link.download=file.path.split('/').pop().replace(/[^a-zA-Z0-9._-]/g,'_')||'report';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});row.append(button);
+   if(file.note){const note=document.createElement('span');note.className='small muted';note.textContent=file.note;row.append(note);}list.append(row);
+  }panel.append(list);const note=document.createElement('p');note.className='small muted';note.textContent='최대 100개 표시 · 파일 1 MiB / 전체 4 MiB까지 다운로드. HTML은 화면에서 실행하지 않습니다.';panel.append(note);root.append(panel);
+ }};
+})();

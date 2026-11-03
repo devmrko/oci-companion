@@ -102,7 +102,7 @@ public final class BuildSpecTemplates {
         @SuppressWarnings("unchecked") var steps=(List<Map<String,Object>>)spec.get("steps");
         var step=steps.getFirst();
         String filter="\\( -path '*/surefire-reports/*.xml' -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path '*/reports/*.xml' -o -name 'pmd.xml' \\)";
-        if(!path.isEmpty())filter="\\( "+filter+" -o -path "+quote("./"+path+"/*.xml")+" \\)";
+        if(!path.isEmpty())filter="\\( "+filter+" -o -path "+quote("./"+path+"/*")+" \\)";
         String collect="report_root=\"${OCI_PRIMARY_SOURCE_DIR:-$PWD}\"\ncollect_reports() {\n"
             +"  ( cd -- \"$report_root\" || exit 1\n"
             +"    report_path="+quote(".")+"\n"

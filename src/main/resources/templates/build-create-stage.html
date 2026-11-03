@@ -1,5 +1,5 @@
 <!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines' and setupTicket != null}" id="build-stage-create" data-flow-step="settings">
-<h2>빌드 단계 추가</h2><p th:if="${handoffSource != null}">선택한 등록 소스: <strong th:text="${handoffSource.name()}"></strong> · <span th:text="${handoffSource.url()}"></span></p>
+<h2>빌드 단계 추가</h2><a class="ui-button" th:href="@{/builds/project-resources(project=${project})}">코드 저장소·로그 준비</a><p th:if="${handoffSource != null}">선택한 등록 소스: <strong th:text="${handoffSource.name()}"></strong> · <span th:text="${handoffSource.url()}"></span></p>
 <p class="notice" th:if="${buildOptionsError != null}" th:text="${buildOptionsError}"></p>
 <th:block th:if="${buildOptions != null}">
 <p class="notice" th:each="warning : ${buildOptions.warnings()}" th:text="${warning}"></p>

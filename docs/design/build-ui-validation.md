@@ -173,3 +173,36 @@ OCI 경로는 실제 조회를 검증했고, Git 저장·재조회는 실제 Git
 네이티브 확인: [빌드 명세](https://docs.oracle.com/en-us/iaas/Content/devops/using/build_specs.htm)는 주 소스 저장소의 YAML 경로를 사용한다. [CreateBuildRunDetails](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/devops/models/oci.devops.models.CreateBuildRunDetails.html)는 파이프라인·커밋·실행 인자를 받고 YAML 본문 업로드 항목은 없다. 따라서 로컬 초안을 저장했다고 원격 실행에 적용됐다고 표시하지 않는다. 명령·명세를 변경해 실행하려면 연결 소스에 반영해야 한다.
 
 실제 화면: `COMPANION_NATIVE_SETTINGS_READ_ONLY=1 node scripts/browser-native-settings.cjs`. OCI 원본 조회 → 명령 수정 → 로컬 저장 → 페이지 재진입 시 원본 미변경 확인 → 초안 복원 → YAML 다운로드 내용 확인 → 검증 초안 삭제. 원격 Git 쓰기·빌드 실행 없음. 390/768/1440px 확인. 자동 검사 94개 통과: 초안 파일 재조회·권한·분리·삭제, CSRF, 원격 Git 호출 없는 로컬 저장·복원·다운로드, 원본 커밋 변경 시 적용 거부 포함.
+
+
+## 새 프로젝트 준비·일반 보고서 — 2026-11-03
+
+화면: **빌드 → 환경 관리 → 프로젝트 → 코드 저장소·로그**.
+
+- 선택 프로젝트의 OCI 코드 저장소·로그를 실제 조회한다. 코드 저장소, 로그 그룹, DevOps 서비스 로그를 생성할 수 있다. 로그 보존 기간은 30일이다.
+- 프로파일·리전·구획·프로젝트와 일회성 요청을 검사한다. 조회 실패를 빈 목록으로 표시하지 않는다. 생성 응답이 불확실하면 재생성 전에 OCI 목록을 확인한다.
+- 같은 빌드 단계 바로 뒤의 전달 단계에 출력 연결을 추가한다. 기존 연결과 실행 순서를 보존하고 ETag로 동시 변경을 검사한다. 여러 후속 단계나 합류 단계는 자동 변경하지 않는다.
+- 사용자가 지정한 보고서 경로는 XML 외 파일도 수집한다. JUnit·PMD 집계와 별도로 원본 파일을 다운로드한다. 최대 100개 표시, 파일 1 MiB·합계 4 MiB 다운로드 제한. HTML은 앱에서 실행하지 않는다. 경로 이탈·링크 파일을 제외하며 압축 해제 크기는 64 MiB로 제한한다.
+
+검증 준비와 화면 조작을 구분한다.
+
+- Gitea의 전용 비공개 예제 저장소 생성, 제한된 IAM 정책은 API/SDK로 준비했다. Python 표준 라이브러리 HTTP API와 실제 HTTP 테스트 2개를 사용한다.
+- Gitea 커밋 `6f73d56dfc472d9af3b0151fb04eb20d1c7e71ff`를 기존 SSH 인증으로 전용 OCI 저장소의 `validation/gitea-main` 브랜치에 한 번 전송했다. 초기 main은 보존했다. 자동 동기화 검증이 아니다.
+- 실제 브라우저에서 알림 주제 → 새 프로젝트 → 코드 저장소·로그 그룹·로그 → 파이프라인·Managed Build → Artifact Registry → application/test-reports 전달 연결 → 작업 등록을 수행했다.
+- 프로젝트 준비 화면 390/768/1440px에서 가로 넘침 없음. 자동 검사 96개 통과. 실제 신규 사용자가 참여한 사용성 시험은 아니다.
+- 최초 실행에서 예제의 exportedVariables 형식 오류를 확인하고 수정했다. 두 번째 실행은 테스트까지 통과했지만 Registry 전달에서 403이 발생했다. 잘못된 저장소 IAM 조건을 제거하고 전용 파이프라인·구획의 산출물 조회·생성 권한으로 재검증해 성공했다. 삭제·수정 권한은 부여하지 않는다.
+
+Gitea Push 자동화는 미완료다. OCI Managed Build에 Gitea 기본 연결이 없어 Gitea Push Mirror → 전용 OCI Git → DevOps 구성을 검토했다. `.env`에서 Gitea 인증은 확인했지만 OCI Git 쓰기 인증은 없고, 현재 OCI 사용자의 Auth Token 2개를 유지했다. 임시 토큰·미러·트리거는 생성하지 않았다.
+
+재현 스크립트는 로컬 검증 메타데이터를 필요로 한다. `COMPANION_UI_BUILD_WRITE=1`은 실제 리소스를 생성한다.
+
+- `scripts/browser-build-onboarding.cjs`: 프로젝트·저장소·로그·파이프라인·Registry 생성. 상태 파일을 유지해 중복 생성을 피한다.
+- `scripts/browser-onboarding-build.cjs`: 소스 등록·단계·전달 연결. `COMPANION_ONBOARDING_RUN=1`이면 화면에서 빌드를 실행한다. 상태 파일에 실행이 있으면 해당 실행만 조회한다.
+- `scripts/browser-onboarding-task.cjs`: 준비된 파이프라인을 빌드 작업으로 등록한다.
+
+근거: [OCI 소스 연결](https://docs.oracle.com/en-us/iaas/Content/devops/using/getting_started.htm), [Gitea Push Mirror](https://docs.gitea.com/1.25/usage/repository/repo-mirror/), [Artifact Registry 정책 변수](https://docs.oracle.com/en-us/iaas/Content/artifacts/iam-policies-supported-variables.htm).
+
+최종 화면 검증: 빌드·전달 모두 SUCCEEDED, HTTP 테스트 2건·실패 0·오류 0, 로그의 test_hello 확인. Registry의 hello/app.tar.gz와 hello/test-reports.tar.gz 조회, 보고서 목록에서 summary.txt 다운로드와 PASS 내용 확인. 작업 목록의 **Gitea 첫 빌드 · Python HTTP API → 실행 이력·로그**에서 확인할 수 있다.
+
+성공 실행 OCID: `ocid1.devopsbuildrun.oc1.ap-seoul-1.amaaaaaavsea7yiaobqlbbgx2ga5eqhjhljjyd3nrool3k6btk3b4mhdeoyq`.
+증거: `.tools/ui-onboarding-result.png`, `.tools/ui-onboarding-artifacts.png`, `.tools/ui-onboarding-report.txt` (로컬 검증 산출물, Git 제외).
