@@ -33,6 +33,26 @@ class CatalogWebTest {
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentEnvironments deploymentEnvironments;
+    @Test void environmentPreparationUsesNativePortAndRejectsReplayAndScopeChange() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildAdministration.Project("p","project","description","ACTIVE","topic")));
+        org.mockito.Mockito.when(deploymentEnvironments.instances(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.DeploymentEnvironments.Vm("vm","test VM","STOPPED","shape")));
+        org.mockito.Mockito.when(deploymentEnvironments.create(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString())).thenReturn("env");
+        var page=mvc.perform(get("/environments").session(session).param("tab","new")).andExpect(status().isOk()).andExpect(content().string(containsString("test VM"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/environments").session(session).param("ticket",ticket).param("project","p").param("name","test").param("instances","vm")).andExpect(status().isForbidden());
+        mvc.perform(post("/environments").session(session).with(csrf()).param("ticket",ticket).param("project","p").param("name","test").param("instances","vm")).andExpect(redirectedUrl("/environments?environment=env"));
+        mvc.perform(post("/environments").session(session).with(csrf()).param("ticket",ticket).param("project","p").param("name","test").param("instances","vm")).andExpect(status().isConflict());
+        page=mvc.perform(get("/environments").session(session).param("tab","new")).andReturn();ticket=(String)page.getModelAndView().getModel().get("ticket");session.setAttribute("region","changed");
+        mvc.perform(post("/environments").session(session).with(csrf()).param("ticket",ticket).param("project","p").param("name","test").param("instances","vm")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(deploymentEnvironments,org.mockito.Mockito.times(1)).create(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("test"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq(java.util.List.of("vm")),org.mockito.ArgumentMatchers.anyString());
+    }
+    @Test void environmentReadFailureIsNotAnEmptyEnvironmentList() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(deploymentEnvironments.environments(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        mvc.perform(get("/deployments").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString(io.github.devmrko.companion.service.Errors.CLOUD.safeMessage()))).andExpect(content().string(org.hamcrest.Matchers.not(containsString("선택 구획에 VM 배포 환경이 없습니다."))));
+    }
     @Test void projectResourcesCreateOnceAndRejectWrongScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.BuildAdministration.Project("p","project","description","ACTIVE","topic")));

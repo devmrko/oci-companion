@@ -972,3 +972,8 @@ a:focus-visible, .ui-button:focus-visible {
 }
 .native-variable-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr) auto; align-items:start; gap:8px; }
 @media (max-width:700px) { .native-variable-row { grid-template-columns:minmax(0,1fr) auto; } .native-variable-row textarea { grid-column:1; grid-row:2; } .native-variable-row button { grid-column:2; grid-row:1 / 3; } }
+
+/* Reusable field groups and long resource lists. */
+.form-group { min-width:0; max-width:100%; margin:0; padding:16px; border:1px solid var(--border,#ddd); }
+.form-group > legend { max-width:100%; padding:0 6px; overflow-wrap:anywhere; }
+.table-scroll--bounded { max-height:420px; overflow:auto; }

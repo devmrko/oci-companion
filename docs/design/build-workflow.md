@@ -255,3 +255,33 @@ SourceProvider, BuildSpecService, PreflightService, OperationStore는 추가 설
 9. 320/390/768/1024/1440/2048 너비에서 공통 CSS·라벨·버튼·표 정렬 확인.
 
 단일 db-companion 성공만으로 전체 흐름 완료를 판정하지 않는다. 설계 검토와 실제 OCI 검증 결과를 별도 기록한다.
+
+
+## 배포 환경 준비 — 2026-11-04 구현
+
+배포 환경 선택은 필수, 신규 생성은 선택이다. 기존 환경을 조회·재사용하고 없을 때만 구성한다. 운영 환경 준비가 빌드의 선행 조건은 아니다.
+
+- 메뉴 **배포 환경**(`/environments`): 기존 환경 / 새 환경 구성 / VM 조회·확인.
+- 메뉴 **배포**(`/deployments`): 환경 선택 → 배포본 선택 → 설정 확인 → 실행. 이번 구현은 환경 선택까지이며 이후 단계는 화면에 미구현으로 표시한다.
+- `DeploymentEnvironments` 포트와 OCI SDK 어댑터를 분리했다. OCI DevOps Compute Instance Group 환경을 원본으로 사용하며 앱 전용 환경 DB를 만들지 않는다.
+- 기존 VM을 1–50개 선택해 OCI 환경 참조를 생성한다. 프로젝트·VM은 현재 구획으로 제한하고 쓰기 직전에 다시 조회한다. 중지된 VM도 환경에 연결할 수 있지만 준비 상태는 조치 필요로 표시한다.
+- 기존 환경의 ID 선택·쿼리 선택 조건을 표시한다. 쿼리 결과는 배포 시 결정되므로 현재 대상 VM·준비 완료를 단정하지 않는다. 다른 구획 VM의 상세 조회는 현재 범위에서 거부한다.
+- VM 상태·기반 이미지 OS·Run Command 설정값을 조회한다. OS는 이미지 메타데이터이며 실제 VM 내부 검사가 아니다. 플러그인의 실행 상태, 실행 IAM, 네트워크·Registry 접근, 런타임·서비스 계정은 미확인으로 표시한다.
+- 조회 실패와 빈 목록을 구분한다. 생성은 CSRF·일회성 티켓·프로파일/리전/구획 검증·OCI retry token을 사용한다. 불명확한 생성 응답은 재생성 전에 목록 확인을 안내한다.
+- 공통 `.form-group`, `.table-scroll--bounded`로 VM 선택 표의 너비와 스크롤을 처리한다. 상단 글로벌 범위 변경은 배포 화면으로 돌아오며 이전 환경 선택을 지운다.
+- 화면 도움말에 OCI 콘솔 경로·CLI·사용자 조회/생성 IAM 예시와 배포 서비스 권한 문서 링크를 제공한다.
+
+실제 검증: DEFAULT / ap-seoul-1 / Joungmin.Ko, `scripts/browser-deployment-environments.cjs`.
+
+1. 화면에서 `codex-test-vm` 조회. STOPPED·Oracle Linux 8과 미확인 조건 확인.
+2. 기존 검증 프로젝트에 `companion-vm-preparation-20261104` 환경을 화면으로 생성. VM은 참조만 연결했다.
+3. 기존 환경 목록 → 상세 → 이 환경으로 배포 준비 → 선택한 환경 표시 확인.
+4. 390/768/1440px 가로 넘침·브라우저 오류 없음. VM은 계속 STOPPED.
+5. 자동 검사 100개 통과. 새 검사: CSRF·티켓 재사용·범위 변경, 조회 오류 표시, 다른 구획 VM의 생성 거부, Run Command 설정과 실행 상태 구분.
+
+검증 환경: `ocid1.devopsdeployenvironment.oc1.ap-seoul-1.amaaaaaavsea7yiaxxc32udqgvshndpufsakyjk5axkqrwfuvchppys3rqlq`.
+기본 스크립트는 기존 검증 상태 파일을 읽는다. `COMPANION_TEST_PROFILE=DEFAULT`로 조회 검증하며, `COMPANION_UI_ENVIRONMENT_WRITE=1`은 전용 환경 참조를 실제 생성한다. VM 시작·설치·배포는 수행하지 않는다.
+
+남은 구현: VM 이미지·인스턴스 구성 기반 신규 VM 준비, 실행 플러그인 상태·접속 검증, 배포본 연결, 배포 명세·롤아웃·헬스 체크·롤백, 실제 서비스 배포. OKE·Container Instances·Functions 환경 화면도 후속 범위다.
+
+공식 근거: [환경 생성](https://docs.oracle.com/en-us/iaas/Content/devops/using/create_instancegroup_environment.htm), [VM 배포 조건](https://docs.oracle.com/en-us/iaas/Content/devops/using/deploy_instancegroups.htm), [IAM](https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm).
