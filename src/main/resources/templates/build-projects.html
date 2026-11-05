@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 프로젝트')}"></head><body>
+<header th:replace="~{layout :: header}"></header>
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
+<div th:fragment="tabs">
+<nav class="build-tabs" aria-label="빌드 메뉴">
+<a class="build-tab" th:classappend="${tab == 'tasks' or tab == 'execute'} ? 'is-active'" href="/builds/tasks">빌드 작업</a>
+<a class="build-tab" th:classappend="${tab == 'history'} ? 'is-active'" href="/builds/tasks?view=history">실행 이력</a>
+<a class="build-tab" th:classappend="${tab == 'automation'} ? 'is-active'" href="/builds/automation">자동 실행</a>
+<a class="build-tab" th:classappend="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'} ? 'is-active'" href="/builds/tasks?view=environments">환경 관리</a>
+</nav>
+<nav class="form-toolbar build-management-links" aria-label="OCI 리소스 관리" th:if="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'}">
+<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds/project-resources">코드 저장소·로그</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
+</nav></div><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
+<section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
+<p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>
+<p th:if="${projectItems.isEmpty()}">프로젝트 없음 또는 조회 실패</p>
+<div class="table-scroll" th:if="${!projectItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명·알림 주제</th><th class="table-heading">파이프라인</th></tr></thead><tbody>
+<tr th:each="p : ${projectItems}"><td class="table-cell"><strong th:text="${p.name()}"></strong><details><summary>OCID</summary><code th:text="${p.id()}"></code></details></td><td class="table-cell" th:text="${p.state()}"></td><td class="table-cell"><p th:text="${#strings.isEmpty(p.description()) ? '설명 없음' : p.description()}"></p><details><summary>알림 주제 OCID</summary><code th:text="${p.topic()}"></code></details></td><td class="table-cell"><a th:href="@{/builds/project-resources(project=${p.id()})}">코드 저장소·로그</a> · <a th:href="@{/builds(tab='pipelines',project=${p.id()})}">조회·추가</a></td></tr>
+</tbody></table></div></section>
+<section class="card" th:if="${adminTicket != null}"><h2>프로젝트 추가</h2>
+<form th:action="@{/builds/create}" method="post" class="build-field-grid">
+<input type="hidden" name="ticket" th:value="${adminTicket}">
+<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255"><span class="small muted">생성 후 변경할 수 없습니다.</span></label>
+<label class="form-field">알림 주제 · 필수<select class="ui-control" name="topic" required><option value="">선택</option><option th:each="t : ${topics}" th:value="${t.id()}" th:text="${t.name()}" th:selected="${t.id() == selectedTopic}"></option></select><span class="small muted">빌드·배포 상태 알림을 구독자에게 전달합니다. 로그 저장과는 별개입니다.</span><a href="/builds?tab=topics">알림 주제 조회·생성</a></label>
+<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<div class="form-toolbar"><button class="ui-button" th:disabled="${topics.isEmpty()}">프로젝트 생성</button></div>
+</form><p class="notice" th:if="${topicError != null}" th:text="${topicError}"></p>
+<p class="small muted" th:if="${topics.isEmpty()}">선택 가능한 알림 주제가 없습니다. 알림 주제 탭에서 생성하세요.</p>
+<p class="small muted">실행 전 프로젝트 로그 활성화와 빌드 리소스의 IAM 권한 설정이 필요합니다.</p></section>
+<details class="card"><summary>OCI에서 확인</summary>
+<p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → DevOps 프로젝트 생성</p>
+<pre class="code-block">oci devops project list --compartment-id &lt;구획 OCID&gt; --all
+oci devops project create --compartment-id &lt;구획 OCID&gt; --name &lt;이름&gt; --notification-config file://notification.json</pre>
+<p class="small muted">현재 프로파일·리전은 --profile, --region으로 지정합니다.</p>
+<pre class="code-block">notification.json: {"topicId":"알림 주제 OCID"}</pre>
+<p>로그 활성화: DevOps → 프로젝트 → 로그 → 로그 사용. 프로젝트 생성만으로 활성화되지는 않습니다.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/create_project.htm" target="_blank" rel="noopener noreferrer">OCI 프로젝트 문서</a>
+</details><div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

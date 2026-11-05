@@ -13,7 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest @ActiveProfiles("demo")
+@SpringBootTest @ActiveProfiles({"demo","legacy"})
 class WorkspaceIntegrationTest {
     private static final Path DB;
     static { try { DB=Files.createTempFile("companion-test-",".db"); DB.toFile().deleteOnExit(); } catch(Exception e) { throw new ExceptionInInitializerError(e); } }

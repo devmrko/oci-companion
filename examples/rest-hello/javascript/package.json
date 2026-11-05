@@ -1,0 +1,11 @@
+{
+  "name": "hello-javascript",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --check app.mjs",
+    "start": "node app.mjs",
+    "test": "npm run build"
+  }
+}

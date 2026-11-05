@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@org.springframework.context.annotation.Profile("legacy")
 public class JdbcWorkspaceRepository implements WorkspaceRepository {
     private final JdbcTemplate db;
     private static final RowMapper<Workspace> MAPPER = (r, i) -> new Workspace(r.getString("id"),

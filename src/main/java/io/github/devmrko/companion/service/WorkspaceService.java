@@ -8,6 +8,7 @@ import java.util.*;
 import org.springframework.stereotype.Service;
 
 @Service
+@org.springframework.context.annotation.Profile("legacy")
 public class WorkspaceService {
     private final WorkspaceRepository workspaces;
     private final RunRepository runs;

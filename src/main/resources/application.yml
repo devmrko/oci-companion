@@ -13,23 +13,15 @@ server:
 spring:
   application:
     name: oci-companion
-  datasource:
-    url: ${DATABASE_URL:jdbc:sqlite:.data/companion.db}
-    driver-class-name: org.sqlite.JDBC
-    hikari:
-      maximum-pool-size: 2
-      connection-timeout: 5000
-      data-source-properties:
-        foreign_keys: true
-        busy_timeout: 5000
-        journal_mode: WAL
-  jpa:
-    open-in-view: false
-    database-platform: org.hibernate.community.dialect.SQLiteDialect
-    hibernate:
-      ddl-auto: none
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+      - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
+      - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
 foundation:
   jobs:
     enabled: false
 companion:
+  git-hosts: ${COMPANION_GIT_HOSTS:}
   oci-config: ${OCI_CONFIG_FILE:${user.home}/.oci/config}
+  data-dir: ${COMPANION_DATA_DIR:.data/catalog}

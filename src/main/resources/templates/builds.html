@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
+<header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
+<h1>빌드</h1><div class="form-toolbar" th:if="${!#strings.isEmpty(pipeline)}"><a class="ui-button" th:href="@{/builds/settings(pipeline=${pipeline})}">명세 조회·수정</a></div>
+<nav th:replace="~{build-projects :: tabs}"></nav>
+<div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
+<section class="card" th:if="${tab == 'pipelines' and adminTicket != null}">
+<h2>파이프라인 추가</h2><p class="small muted">빌드·테스트·산출물 전달 단계를 저장합니다. 생성 후 빌드 단계 등록이 필요합니다.</p>
+<form th:action="@{/builds/create}" method="post" class="build-field-grid">
+<input type="hidden" name="ticket" th:value="${adminTicket}">
+<label class="form-field">프로젝트 · 필수<select class="ui-control" name="project" data-resource-description required><option value="">선택</option><option th:each="p : ${projectItems}" th:attr="data-description=${p.description()}" th:if="${p.state() == 'ACTIVE'}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == project}"></option></select></label>
+<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255"></label>
+<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<div class="form-toolbar"><button class="ui-button" th:disabled="${projectItems.isEmpty()}">파이프라인 생성</button></div>
+</form></section>
+
+<section class="card"><h2>파이프라인 선택 <span class="field-badge">필수</span></h2>
+<p class="small muted">소스, 빌드·테스트, 산출물 전달 단계를 묶은 실행 설정입니다.</p>
+<p th:if="${pipelines.isEmpty()}">파이프라인 없음 · 프로젝트·리전·구획을 확인하세요.</p>
+<form action="/builds" method="get" class="scope-bar" id="pipeline-picker">
+<input type="hidden" name="tab" th:value="${tab}"><input type="hidden" name="registeredSource" th:if="${handoffSource != null}" th:value="${handoffSource.id()}"><input type="hidden" name="repository" th:if="${tab == 'pipelines'}" th:value="${repository}">
+<label class="form-field">프로젝트<select name="project" class="ui-control"><option value="">전체 프로젝트</option><option th:each="p : ${projects}" th:value="${p.key}" th:text="${p.value}" th:selected="${p.key == project}"></option></select></label>
+<label class="form-field">파이프라인<select name="pipeline" class="ui-control" data-resource-description><option th:each="p : ${pipelines}" th:attr="data-description=${p.description()}" th:value="${p.id()}" th:text="${p.name()}" th:selected="${p.id() == pipeline}"></option></select></label>
+<button class="ui-button">다시 조회</button></form>
+</section>
+<div th:replace="~{build-specification :: form}"></div><script src="/build-specification.js" defer></script><div th:replace="~{build-create-stage :: form}"></div><div th:replace="~{build-setup :: form}"></div>
+<section id="build-source-area" data-flow-step="source" class="card pipeline-definition" th:if="${definition != null}">
+<div class="section-title"><h2 th:text="${definition.name()}"></h2><span class="field-badge" th:text="${definition.state()}"></span></div>
+<p class="small muted" th:text="${definition.project()}"></p><p class="resource-description" th:text="${#strings.isEmpty(definition.description()) ? '설명 없음' : definition.description()}"></p>
+<p th:if="${definition.stages().isEmpty()}">등록된 단계 없음 · 실행할 수 없습니다.</p>
+<ol class="pipeline-stages">
+<li class="pipeline-stage" th:each="stage : ${definition.stages()}">
+<div class="section-title"><h3 th:text="${stage.name()}"></h3><span class="field-badge" th:text="${stage.type()}"></span><span class="small muted" th:text="${stage.state()}"></span></div>
+<p class="small muted">선행 단계: <span th:text="${#strings.listJoin(stage.after(), ', ')}"></span></p>
+<dl class="build-facts" th:if="${!stage.spec().isEmpty()}">
+<div><dt>실행 이미지</dt><dd th:text="${stage.image().isEmpty() ? 'OCI 기본값' : stage.image()}"></dd></div>
+<div><dt>제한 시간</dt><dd th:text="${stage.timeout() > 0 ? stage.timeout() + '초' : 'OCI 기본값'}"></dd></div>
+<div><dt>빌드 사양</dt><dd th:text="${stage.spec()}"></dd></div>
+</dl>
+<div class="source-facts" th:each="src : ${stage.sources()}">
+<strong th:text="${src.name()}"></strong> <span class="field-badge" th:text="${src.provider()}"></span>
+<span class="field-badge" th:if="${src.primary()}">빌드 사양 소스</span>
+<dl class="build-facts"><div><dt>저장소</dt><dd th:text="${src.url()}"></dd></div><div><dt>기본 브랜치</dt><dd th:text="${src.branch()}"></dd></div></dl>
+</div>
+<div th:if="${specifications.containsKey(stage.id())}" th:with="spec=${specifications.get(stage.id())}">
+<p class="small muted" th:text="${spec.note()}"></p>
+<div th:if="${!spec.scripts().isEmpty()}"><h4>실행 명령</h4><pre class="code-block" th:each="command : ${spec.scripts()}" th:text="${command}"></pre></div>
+<div th:if="${!spec.sourceCommands().isEmpty()}"><h4>스크립트의 추가 소스</h4><p class="small muted">스크립트에서 추가로 가져오는 소스입니다. 실행 폼의 소스 선택은 위 저장소에만 적용됩니다.</p><pre class="code-block" th:text="${#strings.listJoin(spec.sourceCommands(), '&#10;')}"></pre></div>
+<div th:if="${!spec.outputs().isEmpty()}"><h4>빌드 출력</h4><ul><li th:each="output : ${spec.outputs()}" th:text="${output}"></li></ul></div>
+<details th:if="${!spec.content().isEmpty()}"><summary>빌드 사양 원문</summary><pre class="code-block" th:text="${spec.content()}"></pre></details>
+</div>
+<ul th:if="${!stage.artifacts().isEmpty()}"><li th:each="artifact : ${stage.artifacts()}" th:text="${artifact}"></li></ul>
+</li></ol>
+<p th:if="${tab == 'pipelines' and definition.runnable()}"><a class="ui-button" th:href="@{/builds(tab='execute',project=${project},pipeline=${pipeline})}">이 파이프라인으로 실행</a></p>
+<p class="small muted" th:if="${tab == 'pipelines' and !definition.runnable()}">ACTIVE 상태의 빌드 단계가 필요합니다. 위 빌드 단계 추가에서 소스와 명세를 지정하세요.</p>
+</section>
+<div th:replace="~{build-destinations :: form}"></div>
+<section class="card" th:if="${tab == 'history'}"><h2>실행 이력</h2><p th:if="${runs.isEmpty()}">실행 이력 없음</p>
+<div class="table-scroll" th:if="${!runs.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">실행</th><th class="table-heading">상태</th><th class="table-heading">시작 요청 (UTC)</th></tr></thead><tbody><tr th:each="r : ${runs}"><td class="table-cell"><a th:href="@{/builds(pipeline=${pipeline},run=${r.id()})}" th:text="${r.name()}"></a><details><summary>OCID</summary><code th:text="${r.id()}"></code></details></td><td th:text="${r.state()}" class="table-cell"></td><td th:text="${r.createdAt()}" class="table-cell"></td></tr></tbody></table></div>
+</section>
+<section class="card" th:if="${detail != null}"><h2>실행 상세</h2><div class="form-toolbar"><a class="ui-button" th:href="@{/builds(tab='execute',pipeline=${pipeline})}">새 실행 설정</a><a th:href="@{/builds/automation(pipeline=${pipeline})}">자동 실행</a></div><details th:if="${detail.state() == 'IN_PROGRESS' or detail.state() == 'ACCEPTED'}"><summary>실행 취소</summary><form th:action="@{/builds/cancel}" method="post" class="form-toolbar"><input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="pipeline" th:value="${pipeline}"><input type="hidden" name="run" th:value="${detail.id()}"><label><input type="checkbox" name="confirmed" value="true" required> 이 빌드 실행을 취소합니다</label><button class="ui-button">취소 요청</button></form></details><p><strong th:text="${detail.name()}"></strong> · <span th:text="${detail.state()}"></span></p>
+<p th:if="${detail.message() != null and !detail.message().isEmpty()}" th:text="${detail.message()}"></p>
+<dl class="build-facts" id="build-run-source"><div><dt>실행 요청</dt><dd th:text="${detail.origin()}"></dd></div><div th:if="${!detail.repository().isEmpty()}"><dt>소스</dt><dd th:text="${detail.repository()}"></dd></div><div th:if="${!detail.branch().isEmpty()}"><dt>브랜치</dt><dd th:text="${detail.branch()}"></dd></div><div><dt>요청 커밋</dt><dd th:text="${detail.commit().isEmpty() ? 'OCI 요청 정보 없음 · 다운로드 소스는 로그 확인' : detail.commit()}"></dd></div></dl>
+<p th:if="${detail.steps().isEmpty()}">단계 진행 기록 없음 · 빌드 산출물 생성 여부를 확인하세요.</p>
+<div class="table-scroll" th:if="${!detail.steps().isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">단계</th><th class="table-heading">상태</th></tr></thead><tbody><tr th:each="s : ${detail.steps()}"><td th:text="${s.name()}" class="table-cell"></td><td th:text="${s.state()}" class="table-cell"></td></tr></tbody></table></div>
+<dl class="build-facts"><div><dt>빌드·테스트</dt><dd th:text="${detail.buildState()}"></dd></div><div><dt>Registry 전달</dt><dd th:text="${detail.storageState()}"></dd></div></dl>
+<p class="small muted">빌드 성공과 Registry 저장은 별도 단계입니다. 전달 기록이 없으면 저장 성공으로 표시하지 않습니다.</p>
+<h3>빌드 보고서</h3><p class="small muted">전달된 JUnit·PMD XML 압축 파일(.tar.gz)을 선택하세요. 보고서가 없으면 테스트 통과 여부를 판단할 수 없습니다.</p>
+<form id="build-report-form" class="form-toolbar" th:action="@{/builds/reports}" method="get"><input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="pipeline" th:value="${pipeline}"><input type="hidden" name="run" th:value="${detail.id()}"><label class="form-field">보고서<select name="artifact" class="ui-control" required><option value="">전달된 보고서 선택</option><option th:each="a : ${detail.artifacts()}" th:if="${a.kind() == 'Artifact Registry' and #strings.endsWith(a.location(), '.tar.gz')}" th:value="${a.id()}" th:text="${a.name() + ' · ' + a.location()}"></option></select></label><button class="ui-button">보고서 보기</button></form><details class="build-advanced"><summary>Object Storage 보고서</summary>
+<form id="object-report-form" class="section-stack" th:action="@{/builds/report-storage/report}" method="get">
+<input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="pipeline" th:value="${pipeline}"><input type="hidden" name="run" th:value="${detail.id()}">
+<section th:replace="~{report-storage :: fields}"></section>
+<div class="form-toolbar"><button type="button" class="ui-button" id="object-report-list">이 실행의 보고서 조회</button><label class="form-field">단계별 보고서<select name="object" class="ui-control" required><option value="">보고서 목록을 조회하세요</option></select></label><button class="ui-button">Object Storage 보고서 보기</button></div>
+<p class="small muted" id="object-report-status" role="status"></p>
+</form></details><script src="/report-storage.js" defer></script>
+<p id="build-report-status" role="status"></p><pre class="code-block" id="build-report-details" hidden></pre><div id="report-files" class="section-stack"></div><div id="pmd-reports" class="section-stack"></div><script src="/pmd-reports.js" defer></script><script src="/build-reports.js" defer></script>
+<h3>전달된 산출물</h3><p th:if="${detail.artifacts().isEmpty()}">전달된 산출물 기록 없음</p>
+<div class="table-scroll" th:if="${!detail.artifacts().isEmpty()}"><table class="data-table"><thead><tr><th>이름</th><th>저장소</th><th>경로·버전</th><th>식별자</th></tr></thead><tbody><tr th:each="a : ${detail.artifacts()}"><td th:text="${a.name()}"></td><td th:text="${a.kind()}"></td><td><span th:text="${#strings.isEmpty(a.location()) ? 'OCI 전달 기록에 경로 없음' : a.location()}"></span><br><span th:text="${#strings.isEmpty(a.version()) ? 'OCI 전달 기록에 버전·digest 없음' : a.version()}"></span><div class="form-toolbar" th:if="${a.kind() == 'Container Registry'}"><a class="ui-button" th:href="@{/builds(tab='registry',kind='CONTAINER',pipeline=${pipeline})}">이미지·태그 조회</a></div></td><td><code th:text="${a.id()}"></code></td></tr></tbody></table></div>
+<details open id="build-logs" th:attr="data-region=${selection.region()},data-compartment=${selection.compartment()},data-pipeline=${pipeline},data-run=${detail.id()}">
+<summary>로그</summary><div class="form-toolbar">
+<label class="form-field">자동 갱신<select class="ui-control" id="log-interval"><option value="0" th:selected="${detail.state() != 'IN_PROGRESS' and detail.state() != 'ACCEPTED'}">중지</option><option value="10000" th:selected="${detail.state() == 'IN_PROGRESS' or detail.state() == 'ACCEPTED'}">10초</option><option value="30000">30초</option></select></label>
+<label class="form-field">단계<select class="ui-control" id="log-stage"><option value="">전체</option></select></label>
+<label class="form-field">현재 조회 로그 검색<input class="ui-control" id="log-search" placeholder="오류·메시지"></label>
+<button type="button" class="ui-button" id="log-refresh">새로 고침</button><button type="button" class="ui-button" id="log-older" disabled>이전 로그</button>
+</div><p id="log-status" role="status"></p><pre class="code-block build-log-output" id="log-output"></pre>
+<p class="small muted">최근 1,000건부터 조회합니다. 이전 로그 조회 시 자동 갱신은 중지됩니다. 로그 미표시는 빌드 성공을 뜻하지 않습니다.</p>
+<p>로그 활성화: OCI 콘솔 → DevOps → 프로젝트 → 로그 → 로그 사용. <a href="#permissions">권한 설정</a></p>
+</details><script src="/build-logs.js" defer></script></section>
+<section class="card" th:if="${tab == 'execute' and ticket != null}">
+<h2 id="build-execute-area">실행 설정</h2>
+<details class="build-advanced" th:if="${buildChecks != null}"><summary>실행 준비 상태</summary><ul><li th:each="check : ${buildChecks}" th:text="|${check.name()} · ${check.state()} · ${check.message()}|"></li></ul></details>
+<p th:if="${!definition.runnable()}" class="notice">실행 가능한 ACTIVE 단계가 필요합니다. 파이프라인 상태를 확인하세요.</p>
+<form th:action="@{/builds/action}" method="post" class="build-execution" data-flow-step="execute" th:attr="data-pipeline=${definition.name()}">
+<input type="hidden" name="ticket" th:value="${ticket}">
+<label class="form-field build-purpose">실행 목적 · 필수<select name="purpose" class="ui-control" required><option value="test" th:selected="${buildPurpose == 'test'}">빌드·테스트만</option><option value="store" th:selected="${buildPurpose == 'store'}">빌드·저장</option><option value="deploy" th:selected="${buildPurpose == 'deploy'}">빌드·저장·배포</option></select><span class="small muted">목적을 바꿔도 기존 단계는 생략되지 않습니다.</span></label>
+<div class="build-field-grid build-source-fields">
+<label class="form-field"><span>실행 이름 <span class="field-badge">선택</span></span><input class="ui-control" name="runName" th:value="${runName}" maxlength="255" placeholder="OCI 자동 생성"></label>
+<label class="form-field"><span>소스 버전 <span class="field-badge">선택</span></span>
+<select class="ui-control" name="source" id="build-source" th:attr="data-saved-branch=${sourceOverride.branch()},data-saved-commit=${sourceOverride.commit()}">
+<option value="">모든 소스: 기본 브랜치 최신 커밋</option>
+<option th:each="src : ${definition.sources()}" th:value="${src.key()}" th:text="|${src.name()} · ${src.provider()} · ${src.branch()}|" th:selected="${sourceOverride.source() == src.key()}"></option>
+</select></label>
+<label class="form-field"><span>브랜치 <span class="field-badge">소스 지정 시 필수</span></span><select class="ui-control" name="branch" id="build-branch" disabled><option value="">파이프라인 기본값 사용</option></select></label>
+<label class="form-field"><span>커밋 <span class="field-badge">선택</span></span><select class="ui-control" name="commit" id="build-commit" disabled><option value="">선택 브랜치 최신 커밋</option></select></label>
+</div>
+<p id="source-status" class="small muted" role="status">소스를 지정하면 해당 저장소의 브랜치·커밋을 조회합니다. 나머지 소스는 기본값을 사용합니다.</p>
+<h3>빌드 파라미터</h3>
+<p th:if="${fields.isEmpty()}" class="small muted">이 파이프라인에는 등록된 파라미터가 없습니다. 위 소스 설정으로 실행할 수 있습니다.</p>
+<div class="build-field-grid" th:if="${!fields.isEmpty()}">
+<label class="form-field build-parameter" th:each="f : ${fields}" th:attr="data-label=${f.name()}">
+<span><strong th:text="${f.name()}"></strong> <span class="field-badge" th:text="${f.badge()}"></span></span>
+<input type="hidden" name="parameterName" th:value="${f.name()}"><input type="hidden" name="parameterDescription" th:value="${f.description()}">
+<input th:if="${f.type() == 'text'}" class="ui-control" name="parameterValue" th:value="${f.value()}" th:required="${f.required()}" maxlength="4096">
+<select th:if="${f.type() == 'select'}" class="ui-control" name="parameterValue" th:required="${f.required()}">
+<option value="">값 선택</option>
+<option th:if="${!f.value().isEmpty() and !f.choices().contains(f.value())}" th:value="${f.value()}" th:text="|${f.value()} · 선택지 확인 필요|" selected></option>
+<option th:each="choice : ${f.choices()}" th:value="${choice}" th:text="${choice}" th:selected="${choice == f.value()}"></option></select>
+<span class="small muted" th:text="${f.description()}"></span><span class="small muted">OCI 기본값: <span th:text="${f.defaultValue().isEmpty() ? '(빈 값)' : f.defaultValue()}"></span></span>
+</label></div>
+<p class="small muted" th:if="${!fields.isEmpty()}">필수 여부·선택지는 아래 입력 규칙에서 지정합니다. OCI는 이 정보를 제공하지 않습니다.</p>
+<div class="form-toolbar"><button class="ui-button primary" name="action" value="run" id="build-run" th:disabled="${!definition.runnable()}">실행 설정 확인</button></div>
+<details class="build-advanced"><summary>로컬 프리셋</summary>
+<div class="form-toolbar"><label class="form-field">프리셋 이름<input class="ui-control" name="presetName" th:value="${presetName}" maxlength="100"></label><button class="ui-button" name="action" value="preset" formnovalidate>프리셋 저장</button><button class="ui-button" name="action" value="delete" formnovalidate>프리셋 삭제</button></div>
+<p class="small muted">실행 이름·소스 버전·파라미터를 현재 프로파일과 범위의 JSON에 저장합니다.</p>
+</details>
+<dialog id="build-review" class="build-review"><h2>실행 확인</h2><dl class="build-facts" id="build-review-values"></dl><p>이 설정으로 OCI 빌드를 실행합니다.</p><div class="form-toolbar"><button class="ui-button" id="close-build-review" type="button">수정</button><button class="ui-button primary" name="action" value="run" data-confirmed="true">빌드 실행</button></div></dialog>
+</form>
+<details class="build-advanced"><summary>저장된 프리셋 불러오기</summary>
+<form action="/builds" method="get" class="form-toolbar"><input type="hidden" name="tab" value="execute"><input type="hidden" name="pipeline" th:value="${pipeline}">
+<label class="form-field">프리셋<select name="preset" class="ui-control"><option value="">OCI 기본값</option><option th:each="p : ${presets}" th:value="${p.name()}" th:text="${p.name()}" th:selected="${p.name() == presetName}"></option></select></label><button class="ui-button">불러오기</button></form>
+</details>
+<details class="build-advanced" th:if="${!fields.isEmpty()}"><summary>파라미터 입력 규칙</summary>
+<p class="small muted">앱의 입력 폼과 검증에 적용됩니다. OCI 설정은 변경하지 않습니다. 선택지는 한 줄에 하나씩 입력하세요.</p>
+<form th:action="@{/builds/action}" method="post" class="build-rules"><input type="hidden" name="ticket" th:value="${ticket}">
+<div class="table-scroll"><table class="data-table"><thead><tr><th class="table-heading">파라미터</th><th class="table-heading">입력 방식</th><th class="table-heading">필수 여부</th><th class="table-heading">선택지</th></tr></thead><tbody><tr th:each="f : ${fields}">
+<td class="table-cell"><span th:text="${f.name()}"></span><input type="hidden" name="ruleName" th:value="${f.name()}"></td>
+<td class="table-cell"><select class="ui-control" name="ruleType" aria-label="입력 방식"><option value="text" th:selected="${f.type() == 'text'}">직접 입력</option><option value="select" th:selected="${f.type() == 'select'}">선택 목록</option></select></td>
+<td class="table-cell"><select class="ui-control" name="ruleRequirement" aria-label="필수 여부"><option value="unspecified" th:selected="${f.requirement() == 'unspecified'}">미지정</option><option value="required" th:selected="${f.required()}">필수</option><option value="optional" th:selected="${f.requirement() == 'optional'}">선택</option></select></td>
+<td class="table-cell"><textarea class="ui-control build-options" name="ruleChoices" aria-label="선택지" th:text="${#strings.listJoin(f.choices(), '&#10;')}"></textarea></td>
+</tr></tbody></table></div><button class="ui-button" name="action" value="rules">입력 규칙 저장</button></form></details>
+<details class="build-advanced"><summary>OCI 기본 파라미터 관리</summary>
+<p class="small muted">파라미터 이름과 기본값을 추가·수정합니다. 빌드 사양에서 참조한 이름만 효과가 있습니다. 비밀값은 Vault를 사용하세요.</p>
+<form th:action="@{/builds/action}" method="post" class="build-defaults"><input type="hidden" name="ticket" th:value="${ticket}">
+<div class="table-scroll"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">기본값</th><th class="table-heading">설명</th><th class="table-heading">삭제</th></tr></thead><tbody id="parameter-rows"><tr th:each="f : ${fields}">
+<td class="table-cell"><input class="ui-control" name="parameterName" th:value="${f.name()}" aria-label="파라미터 이름"></td>
+<td class="table-cell"><input class="ui-control" name="parameterValue" th:value="${f.defaultValue()}" aria-label="기본값"></td>
+<td class="table-cell"><input class="ui-control" name="parameterDescription" th:value="${f.description()}" aria-label="설명"></td>
+<td class="table-cell"><button class="ui-button remove-parameter" type="button">삭제</button></td>
+</tr></tbody></table></div><div class="form-toolbar"><button class="ui-button" id="add-parameter" type="button">파라미터 추가</button><button class="ui-button" name="action" value="defaults">OCI에 저장</button></div></form>
+</details>
+</section>
+<script src="/builds.js" defer></script>
+<details class="card"><summary>OCI에서 확인</summary><p>파이프라인 추가: DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 파이프라인 생성. 단계 추가: 파이프라인 → 단계 추가 → 관리형 빌드.</p><pre class="code-block">oci devops build-pipeline create --project-id &lt;프로젝트 OCID&gt; --display-name &lt;이름&gt;</pre><p>콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인 → 빌드 실행</p><pre th:text="${buildCli}" class="code-block"></pre><p>CLI: oci devops build-run list --build-pipeline-id &lt;파이프라인 OCID&gt; --all</p><p>실행 · arguments.json: {"items":[{"name":"이름","value":"값"}]}</p><pre class="code-block" th:text="${runCli}"></pre><p>기본값 저장: OCI 콘솔 → 빌드 파이프라인 → 파라미터. </p><p>parameters.json: {"items":[{"name":"이름","defaultValue":"값","description":"설명"}]}</p><pre class="code-block" th:text="${defaultsCli}"></pre><p>특정 소스 버전: 콘솔 → Start Manual Run → Show advanced options → 저장소·브랜치·커밋. CLI에는 --commit-info file://commit.json을 추가합니다.</p><p>commit.json: {"repositoryUrl":"선택 저장소 URL","repositoryBranch":"브랜치","commitHash":"커밋 SHA"}</p><p>실행·저장에는 DevOps 빌드 실행 생성 및 파이프라인 수정 권한이 필요합니다.</p><p>필요 권한: 선택 구획의 DevOps 파이프라인·빌드 실행 읽기.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/managed_buildstage.htm" target="_blank" rel="noopener noreferrer">OCI 문서</a></details>
+<div th:replace="~{permissions :: help}"></div></main><footer th:replace="~{layout :: footer}" class="page-footer app-footer"></footer></body></html>

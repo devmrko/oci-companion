@@ -1,0 +1,18 @@
+version: 0.1
+component: build
+timeoutInSeconds: 3600
+shell: bash
+failImmediatelyOnError: true
+steps:
+  - type: Command
+    name: Java 21 Maven quality and Node tests
+    timeoutInSeconds: 3300
+    command: |
+      bash build.sh
+outputArtifacts:
+  - name: db-companion-jar
+    type: BINARY
+    location: output/db-companion.jar
+  - name: test-reports
+    type: BINARY
+    location: output/test-reports.tar.gz

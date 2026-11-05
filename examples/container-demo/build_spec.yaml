@@ -1,0 +1,39 @@
+version: '0.1'
+component: build
+timeoutInSeconds: 3600
+shell: bash
+failImmediatelyOnError: true
+steps:
+- type: Command
+  name: Build and test
+  command: "set -euo pipefail\nactual_arch=$(uname -m)\nprintf 'Build architecture:\
+    \ %s\\n' \"$actual_arch\"\ntest \"$actual_arch\" = 'x86_64' || { echo 'Architecture\
+    \ mismatch: use a matching build environment'; exit 1; }\nreport_root=\"${OCI_PRIMARY_SOURCE_DIR:-$PWD}\"\
+    \ncollect_reports() {\n  find \"$report_root\" -type f \\( -path '*/surefire-reports/*.xml'\
+    \ -o -path '*/failsafe-reports/*.xml' -o -path '*/test-results/*.xml' -o -path\
+    \ '*/reports/*.xml' \\) -print0 | tar --null -T - -czf \"$report_root/test-reports.tar.gz\"\
+    \n}\ntrap 'build_status=$?; collect_reports || { if [ \"$build_status\" -eq 0\
+    \ ]; then build_status=1; fi; }; exit \"$build_status\"' EXIT\nif ! command -v\
+    \ python3.11 >/dev/null 2>&1; then\n  test \"$(id -u)\" -eq 0 || { echo 'Runtime\
+    \ installation requires root' >&2; exit 1; }\n  dnf install -y python3.11 python3.11-pip\n\
+    fi\npython3.11 --version\ncd -- 'container-demo'\npython3.11 -m venv .venv\n.\
+    \ .venv/bin/activate\nexport PIP_CONFIG_FILE=\"${PIP_CONFIG_FILE:-/dev/null}\"\
+    \nexport PIP_CACHE_DIR=\"${PIP_CACHE_DIR:-$PWD/.cache/pip}\"\npython -m pip install\
+    \ -r requirements.txt\npython -m pytest '--junitxml=reports/tests.xml'\ndocker\
+    \ info >/dev/null\ndocker build --file 'Dockerfile' --tag 'companion-demo:x86-v1'\
+    \ -- '.'\ndocker image inspect 'companion-demo:x86-v1' --format '{{.Id}}'"
+- type: Command
+  name: Verify container HTTP response
+  command: "set -euo pipefail\nname=companion-demo-smoke\ntrap 'docker rm -f \"$name\"\
+    \ >/dev/null 2>&1 || true' EXIT\ndocker run -d --name \"$name\" companion-demo:x86-v1\n\
+    for attempt in $(seq 1 30); do\n  if docker exec \"$name\" python -c 'import urllib.request,json;\
+    \ d=json.load(urllib.request.urlopen(\"http://127.0.0.1:8080\",timeout=2)); assert\
+    \ d[\"status\"]==\"ok\"; assert d[\"architecture\"]==\"x86_64\"; print(d)'; then\
+    \ exit 0; fi\n  sleep 1\ndone\nexit 1\n"
+outputArtifacts:
+- name: container-demo
+  type: DOCKER_IMAGE
+  location: companion-demo:x86-v1
+- name: test-reports
+  location: test-reports.tar.gz
+  type: BINARY

@@ -1,0 +1,18 @@
+spring:
+  autoconfigure:
+    exclude: []
+  datasource:
+    url: ${DATABASE_URL:jdbc:sqlite:.data/companion.db}
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 2
+      connection-timeout: 5000
+      data-source-properties:
+        foreign_keys: true
+        busy_timeout: 5000
+        journal_mode: WAL
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: none

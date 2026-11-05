@@ -8,6 +8,7 @@ import org.springframework.jdbc.core.*;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@org.springframework.context.annotation.Profile("legacy")
 public class JdbcRunRepository implements RunRepository {
     private final JdbcTemplate db;
     private static final RowMapper<Run> MAPPER = (r, i) -> new Run(r.getString("id"),r.getString("workspace_id"),

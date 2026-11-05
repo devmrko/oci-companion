@@ -1,0 +1,32 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
+<details th:fragment="help" class="card permission-help" id="permissions">
+<summary>권한 설정 · OCI 콘솔</summary>
+<p>프로파일의 사용자 그룹에 권한을 부여합니다. 연결 성공만으로 이 메뉴의 권한이 보장되지는 않습니다.</p>
+<ol>
+<li>OCI 콘솔 → ID 및 보안 → 도메인 → 해당 도메인 → 사용자에서 프로파일 사용자의 그룹을 확인합니다. 그룹 상세에서 그룹 OCID를 복사합니다.</li>
+<li>ID 및 보안 → 정책 → 대상 구획 또는 상위 구획 → 정책 생성 → 수동 편집기 표시.</li>
+<li>필요한 작업의 예제만 선택합니다. &lt;GROUP_OCID&gt;를 실제 그룹 OCID로 바꾸고 대상 구획을 확인합니다.</li>
+<li>정책을 저장하고 전파 후 이 화면에서 다시 조회합니다. 사용자 그룹을 바꿨다면 다시 연결합니다.</li>
+</ol>
+<p class="small muted">정책 생성 권한이 없으면 관리자에게 작업명·프로파일 사용자 OCID·리전·구획·아래 정책 예제를 전달하세요. 앱은 정책을 변경하지 않습니다.</p>
+<div th:each="rule : ${permissionRules}"><h3 th:text="${rule.task()}"></h3><pre class="code-block" th:text="${rule.policy()}"></pre></div>
+<p class="small muted">manage 예제는 해당 리소스의 수정·삭제도 허용할 수 있습니다. 필요한 작업만 부여하세요. 다른 구획의 리소스를 사용하면 해당 구획에도 별도 권한이 필요합니다. 루트 구획 선택 시 &lt;COMPARTMENT_OCID&gt;를 작업 대상 구획으로 바꾸세요.</p>
+<details th:unless="${functionMode == true}"><summary>파이프라인 실행 권한</summary>
+<p>사용자 권한과 별개입니다. ID 및 보안 → 동적 그룹에서 실행 파이프라인을 포함하는 규칙을 만든 뒤 정책을 추가합니다.</p>
+<pre class="code-block" th:if="${pipelineRule != null}" th:text="${pipelineRule}"></pre>
+<pre class="code-block" th:unless="${pipelineRule != null}">ALL {resource.type = 'devopsbuildpipeline', resource.id = '&lt;BUILD_PIPELINE_OCID&gt;'}</pre>
+<p>아래 각 구획은 실제 리소스가 있는 구획입니다. 소스·산출물 종류에 필요한 항목만 적용합니다.</p>
+<pre class="code-block">Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to read devops-repository in compartment id &lt;SOURCE_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to read devops-deploy-artifact in compartment id &lt;PROJECT_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to use ons-topics in compartment id &lt;TOPIC_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to read artifact-repositories in compartment id &lt;REGISTRY_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to manage generic-artifacts in compartment id &lt;REGISTRY_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to manage repos in compartment id &lt;REGISTRY_COMPARTMENT_OCID&gt;
+Allow dynamic-group id &lt;DYNAMIC_GROUP_OCID&gt; to read secret-family in compartment id &lt;VAULT_COMPARTMENT_OCID&gt;</pre>
+<p>구독 없이 주제만 생성해도 수신자는 없습니다. 로그는 DevOps → 프로젝트 → 로그에서 별도로 활성화합니다.</p>
+</details>
+<p>401: 프로파일·API 키 확인. 403/404: 권한뿐 아니라 리전·구획·리소스 존재 여부도 확인합니다. 조회 실패를 권한 부족으로 단정하지 않습니다.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm" target="_blank" rel="noopener noreferrer">DevOps IAM</a> ·
+<a href="https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/notificationpolicyreference.htm" target="_blank" rel="noopener noreferrer">Notifications IAM</a> ·
+<a href="https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/loggingpolicyreference.htm" target="_blank" rel="noopener noreferrer">Logging IAM</a>
+</details></body></html>

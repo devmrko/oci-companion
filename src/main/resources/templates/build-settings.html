@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 설정')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
+<h1>빌드 설정</h1><p class="notice" role="alert" th:if="${nativePageError != null}" th:text="${nativePageError}"></p><div class="form-toolbar"><a class="ui-button" href="/builds/tasks">빌드 작업</a><a class="ui-button" href="/builds/configure">새 명세 작성</a></div>
+<section class="card section-stack"><h2>OCI 파이프라인</h2>
+<form method="get" action="/builds/settings" class="form-toolbar"><label class="form-field">파이프라인<select name="pipeline" class="ui-control"><option value="">Git 저장소에서 직접 조회</option><option th:each="p : ${pipelineItems}" th:value="${p.id()}" th:text="${p.projectName() + ' / ' + p.name()}" th:selected="${p.id() == pipeline}"></option></select></label><button class="ui-button">현재 설정 조회</button></form>
+<div th:if="${definition != null}" class="section-stack"><p><strong th:text="${definition.project() + ' / ' + definition.name()}"></strong> · <span th:text="${definition.state()}"></span></p><p class="small muted" th:text="${definition.description()}"></p>
+<div class="table-scroll"><table class="data-table"><thead><tr><th class="table-heading">파라미터</th><th class="table-heading">OCI 기본값</th><th class="table-heading">설명</th></tr></thead><tbody><tr th:each="p : ${nativeParameters}"><td class="table-cell" th:text="${p.name()}"></td><td class="table-cell" th:text="${p.value()}"></td><td class="table-cell" th:text="${p.description()}"></td></tr></tbody></table></div><p th:if="${nativeParameters.isEmpty()}" class="small muted">등록된 파라미터 없음</p>
+<div class="form-toolbar"><a class="ui-button" th:href="@{/builds(tab='execute',pipeline=${pipeline})}">파라미터 수정·실행</a><a class="ui-button" th:href="@{/builds(tab='pipelines',pipeline=${pipeline})}">OCI 단계 설정</a></div></div>
+</section>
+<section class="card section-stack"><h2>저장된 빌드 명세</h2>
+<form id="native-spec-load" th:action="@{/builds/settings/load}" method="post" class="section-stack" th:attr="data-csrf-header=${_csrf.headerName},data-csrf=${_csrf.token}">
+<input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="pipeline" th:value="${pipeline}">
+<label th:if="${definition != null}" class="form-field">빌드 단계<select name="stage" class="ui-control"><option th:each="s : ${nativeStages}" th:value="${s.id()}" th:selected="${s.id() == stage}" th:text="${s.name() + ' · ' + s.spec()}"></option></select></label>
+<div th:if="${definition == null}" class="build-field-grid"><label class="form-field">등록 소스<select name="source" class="ui-control" required><option th:each="s : ${specSources}" th:value="${s.id()}" th:text="${s.name()}" th:attr="data-branch=${s.branch()}"></option></select></label><label class="form-field">브랜치<input name="branch" class="ui-control" required value="main"></label><label class="form-field">명세 경로<input name="path" class="ui-control" required value="build_spec.yaml"></label></div>
+<div class="build-field-grid"><label class="form-field">Git 사용자<input name="username" class="ui-control" autocomplete="off"></label><label class="form-field">Git 인증 참조<input name="secret" class="ui-control" placeholder="Vault Secret OCID 또는 env:GITEA" autocomplete="off"></label></div>
+<p class="small muted">OCI Git 조회는 현재 OCI 프로파일을 사용합니다. Git 저장과 외부 Git 조회에는 Git 인증이 필요합니다. 토큰 값 대신 Vault 또는 서버 참조를 입력하세요.</p>
+<div class="form-toolbar"><button class="ui-button">명세 불러오기</button></div>
+</form>
+<p id="native-spec-status" role="status"></p><p class="task-selection-summary" id="native-spec-origin" hidden></p>
+<section id="native-spec-editor" class="section-stack" hidden>
+<label class="form-field">명령 단계<select id="native-spec-command-select" class="ui-control"></select></label>
+<label class="form-field">현재 명령<textarea id="native-spec-command" class="ui-control ui-control--multiline" rows="10"></textarea></label>
+<div class="build-field-grid"><section class="section-stack"><h3>환경변수</h3><div id="native-spec-variables" class="section-stack"></div><button type="button" class="ui-button" data-add-variable="variables">환경변수 추가</button></section><section class="section-stack"><h3>Vault 참조</h3><div id="native-spec-vaultVariables" class="section-stack"></div><button type="button" class="ui-button" data-add-variable="vaultVariables">Vault 참조 추가</button></section></div>
+<details><summary>조회한 원문</summary><pre class="code-block" id="native-spec-original"></pre></details>
+<p class="small muted">명령·환경변수만 수정합니다. 다른 설정은 유지하며, 저장 시 YAML 서식·주석은 달라질 수 있습니다.</p>
+<div class="form-toolbar"><button type="button" class="ui-button primary" id="native-spec-local-save">로컬 저장</button><button type="button" class="ui-button" id="native-spec-local-load">로컬 불러오기</button><button type="button" class="ui-button" id="native-spec-export">YAML 다운로드</button><button type="button" class="ui-button" id="native-spec-local-delete">로컬 삭제</button></div>
+<p class="small muted">앱 실행 환경에 JSON 초안으로 저장합니다. 같은 프로파일·리전·구획·소스·브랜치·명세의 초안은 덮어씁니다. 비밀값은 Vault 참조를 사용하세요.</p>
+<p class="small muted">로컬 저장은 OCI에 적용되지 않습니다. Managed Build는 연결된 소스의 명세를 사용합니다.</p>
+<details id="native-spec-git"><summary>Git 반영 · 선택</summary><div class="section-stack">
+<label class="form-field">커밋 메시지<input id="native-spec-message" class="ui-control" value="Update build commands and environment" maxlength="200"></label>
+<div class="form-toolbar"><button type="button" class="ui-button" id="native-spec-preview">변경 비교</button><button type="button" class="ui-button primary" id="native-spec-save" disabled>변경 저장·재조회</button></div>
+<section id="native-spec-comparison" class="section-stack" hidden><h3>변경 비교</h3><div class="build-field-grid"><details open><summary>저장 전</summary><pre class="code-block" id="native-spec-before"></pre></details><details open><summary>저장 후</summary><pre class="code-block" id="native-spec-after"></pre></details></div></section>
+</div></details>
+</section>
+<details><summary>조회·저장 권한 ?</summary><p class="small">OCI 콘솔 → 개발자 서비스 → DevOps → 프로젝트 → 빌드 파이프라인. 현재 OCI 프로파일에 파이프라인·단계·코드 저장소 읽기 권한이 필요합니다. Git 인증에는 대상 브랜치 쓰기 권한이 필요합니다. 보호 브랜치는 해당 Git 서비스의 정책을 확인하세요.</p></details>
+</section></main><footer th:replace="~{layout :: footer}"></footer><script src="/native-build-settings.js" defer></script></body></html>

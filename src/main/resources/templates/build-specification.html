@@ -1,0 +1,52 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines' or tab == 'recipes'}" data-flow-step="settings">
+<details th:open="${tab == 'recipes'}"><summary th:text="${tab == 'recipes' ? '2. 빌드 명세' : '빌드 명세 작성'}">빌드 명세 작성</summary>
+<form th:action="@{/builds/specification}" method="post" class="build-field-grid" id="build-specification-form">
+<label class="form-field">언어·빌드 도구<select name="tool" class="ui-control"><option value="maven">Java · Maven</option><option value="gradle">Java · Gradle</option><option value="python">Python · pytest</option><option value="node">JavaScript · npm</option><option value="typescript">TypeScript · npm / tsc</option><option value="go">Go</option><option value="ruby">Ruby · Bundler / Rake</option></select><span class="small muted" id="build-language-requirements" role="status">Java: JAR/WAR 형식·실행할 JDK 버전·네이티브 의존성을 확인하세요.</span></label>
+<label class="form-field">Java 빌드 도구 실행<select name="launcher" class="ui-control"><option value="wrapper">저장소 Wrapper · mvnw / gradlew</option><option value="system">환경에 설치된 mvn / gradle</option></select></label>
+<label class="form-field">런타임<select name="runtime" class="ui-control"><option value="existing">기존 환경 사용</option><option value="builder">빌더 컨테이너 사용</option><option value="jdk17">JDK 17 설치 · Temurin</option><option value="jdk21">JDK 21 설치 · Temurin</option></select><span class="small muted">설치는 OCI Managed Build · Oracle Linux 8 기준</span></label>
+<label class="form-field" id="build-builder-image-field" hidden>빌더 이미지 · 필수<input name="builderImage" class="ui-control" maxlength="1024" disabled list="builder-image-options"><datalist id="builder-image-options"></datalist><span class="small muted">런타임·빌드 도구가 설치된 이미지. 태그 또는 digest 지정. 비공개 이미지는 빌드 환경의 Registry 인증 필요.</span></label>
+<label class="form-field"><span id="build-tasks-label">Goal</span><input name="tasks" class="ui-control" value="verify" required maxlength="1000" list="build-task-options"><datalist id="build-task-options"><option value="test"></option><option value="package"></option><option value="verify"></option></datalist></label>
+<label class="form-field">Maven profile · 선택<input name="profiles" class="ui-control" maxlength="255" placeholder="ci"></label>
+<label class="form-field">작업 경로<input name="directory" class="ui-control" value="." required maxlength="1024"></label>
+<label class="form-field">빌드 아키텍처<select name="architecture" class="ui-control"><option value="NATIVE">실행 환경 기준</option><option value="X86_64">x86 (amd64)</option><option value="ARM64">ARM (arm64)</option></select><span class="small muted">일치하는 실행 환경 필요 · 불일치 시 중단 · 교차 빌드 미지원</span></label>
+<label class="form-field">산출물 유형<select name="outputType" class="ui-control"><option value="BINARY">파일 · JAR / wheel / 압축 파일</option><option value="DOCKER_IMAGE">컨테이너 이미지 · Dockerfile 빌드</option></select></label>
+<label class="form-field">출력 이름 · 저장 시 필수<input name="outputName" class="ui-control" maxlength="255" placeholder="application"></label>
+<label class="form-field"><span id="build-location-label">출력 파일 · 저장 시 필수</span><input name="location" class="ui-control" maxlength="1024" placeholder="target/application.jar"></label>
+<label class="form-field" data-container-field hidden>Dockerfile 경로 · 필수<input name="dockerfile" class="ui-control" value="Dockerfile" maxlength="1024" disabled><span class="small muted">작업 경로 기준 · 기존 파일 사용</span></label>
+<label class="form-field" data-container-field hidden>빌드 컨텍스트 · 필수<input name="context" class="ui-control" value="." maxlength="1024" disabled><span class="small muted">작업 경로 기준 · COPY에 포함할 디렉터리</span></label>
+<p class="small muted" data-container-field hidden>앱 빌드 후 Docker 이미지를 생성합니다. 실행 환경의 아키텍처를 사용합니다. OCIR 저장 후 VM(Docker·Podman)·OKE·Container Instances 배포에 사용할 수 있습니다. Function은 별도 규격을 확인하세요.</p>
+<details class="report-configuration"><summary>고급 설정 · 명령·환경변수</summary>
+<p class="small muted">비워두면 선택한 도구의 기본 명령을 사용합니다. 직접 입력한 명령은 Goal·profile 대신 작업 경로에서 실행됩니다.</p>
+<label class="form-field">빌드 명령 · 선택<textarea name="buildCommand" class="ui-control ui-control--multiline" rows="6" maxlength="16000" placeholder="mvn -B verify -Pci"></textarea><span class="small muted" id="build-command-mode" role="status">도구 기본 명령 사용</span></label>
+<div class="build-field-grid"><label class="form-field">환경 변수 · 선택<textarea name="variables" class="ui-control ui-control--multiline" rows="3" maxlength="8192" placeholder="APP_ENV=ci"></textarea><span class="small muted">한 줄에 이름=값 · 비밀값은 Vault 참조 사용</span></label>
+<label class="form-field">Vault 참조 · 선택<textarea name="vaultVariables" class="ui-control ui-control--multiline" rows="3" maxlength="8192" placeholder="TOKEN=ocid1.vaultsecret.…"></textarea><span class="small muted">한 줄에 이름=Secret OCID</span></label>
+</div><p class="small muted">명령·환경변수는 생성한 빌드 명세에 포함됩니다. 아래 Git 저장으로 재사용할 수 있습니다. 비밀값은 Vault 참조를 사용하세요.</p></details>
+<section class="report-configuration section-stack">
+<h3>보고서</h3>
+<label><input type="checkbox" name="reports" value="true" checked> JUnit·PMD 보고서 수집</label>
+<div class="build-field-grid">
+<label class="form-field">추가 보고서 수집 경로 · 선택<input name="reportPath" class="ui-control" placeholder="reports" maxlength="500"><span class="small muted">소스 루트 기준. 지정 폴더의 파일을 수집합니다. 기본 JUnit·pmd.xml은 자동 수집합니다.</span></label>
+<label class="form-field">보고서 보관<select name="reportDestination" class="ui-control"><option value="registry">Registry 전달 사용</option><option value="object">Object Storage · 실패 시에도 보관</option></select></label>
+</div>
+
+<div data-object-storage-fields hidden><section th:replace="~{report-storage :: fields}"></section></div>
+<p class="small muted">보고서 원본을 test-reports.tar.gz로 보관합니다. Object Storage 경로: 접두어/파이프라인/실행/단계. 강제 종료·시간 초과 시 보관되지 않을 수 있습니다.</p>
+</section>
+<div class="form-toolbar"><button class="ui-button">명세 미리보기</button></div></form>
+<p class="small muted">명세를 작성해 YAML로 다운로드할 수 있습니다. OCI 실행에는 연결된 소스 저장소의 명세가 필요합니다.</p>
+<p id="build-specification-status" role="status"></p><pre class="code-block" id="build-specification-preview" hidden></pre><button type="button" class="ui-button" id="build-specification-download" hidden>build_spec.yaml 다운로드</button>
+<section th:if="${specSources != null}">
+<h3>Git에 저장 · 선택</h3>
+<form th:action="@{/builds/specification/git/preview}" method="post" id="git-spec-form" class="build-field-grid">
+
+<label class="form-field">기존 브랜치<input name="branch" class="ui-control" required maxlength="200" placeholder="main"></label>
+<label class="form-field">명세 경로<input name="path" class="ui-control" required value="build_spec.yaml" maxlength="200"></label>
+<label class="form-field">Git 사용자<input name="username" class="ui-control" required maxlength="300" placeholder="x-access-token"></label>
+<label class="form-field">인증 참조<input name="secret" class="ui-control" required placeholder="ocid1.vaultsecret.…" autocomplete="off"><span class="small muted">Vault Secret OCID 또는 서버 참조 env:GITEA</span></label>
+<label class="form-field">커밋 메시지<input name="message" class="ui-control" required maxlength="200" value="Configure OCI build specification"></label>
+<div class="form-toolbar"><button class="ui-button" id="git-spec-compare" disabled>Git 내용 비교</button><button class="ui-button primary" type="button" id="git-spec-save" disabled>확인한 내용 커밋</button></div>
+</form>
+<details><summary>인증·권한 ?</summary><p class="small">OCI 프로파일은 Vault 읽기에 사용합니다. Gitea는 서버에 등록한 env:GITEA와 Gitea 사용자명을 사용할 수 있습니다. GitHub는 x-access-token, GitLab은 oauth2, OCI는 tenancy/[domain/]username을 입력하세요. 토큰에는 대상 저장소 쓰기 권한이 필요합니다. 보호 브랜치는 별도 브랜치에서 작업하세요.</p><p class="small">OCI 콘솔 → 보안 → Vault → Secret에 토큰 저장. 관리자에게 해당 Secret의 read secret-bundles 권한을 요청하세요. OCI Git Auth Token은 내 프로파일 → Auth tokens에서 생성합니다.</p></details>
+<p id="git-spec-status" role="status"></p><details id="git-spec-before-panel" hidden><summary>현재 Git 내용</summary><pre id="git-spec-before" class="code-block"></pre></details>
+</section>
+</details><script src="/report-storage.js" defer></script></section></body></html>

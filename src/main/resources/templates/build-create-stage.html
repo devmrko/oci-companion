@@ -1,0 +1,21 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body><section th:fragment="form" class="card" th:if="${tab == 'pipelines' and setupTicket != null}" id="build-stage-create" data-flow-step="settings">
+<h2>빌드 단계 추가</h2><a class="ui-button" th:href="@{/builds/project-resources(project=${project})}">코드 저장소·로그 준비</a><p th:if="${handoffSource != null}">선택한 등록 소스: <strong th:text="${handoffSource.name()}"></strong> · <span th:text="${handoffSource.url()}"></span></p>
+<p class="notice" th:if="${buildOptionsError != null}" th:text="${buildOptionsError}"></p>
+<th:block th:if="${buildOptions != null}">
+<p class="notice" th:each="warning : ${buildOptions.warnings()}" th:text="${warning}"></p>
+<form th:action="@{/builds/setup}" method="post" class="build-field-grid" id="create-build-stage" th:attr="data-source-url=${handoffSource != null ? handoffSource.url() : ''},data-source-provider=${handoffSource != null ? handoffSource.provider() : ''},data-source-resource=${handoffSource != null ? handoffSource.resourceId() : ''},data-source-branch=${handoffSource != null ? handoffSource.branch() : ''}">
+<input type="hidden" name="ticket" th:value="${setupTicket}"><input type="hidden" name="action" value="create-build">
+<label class="form-field">단계 이름 · 필수<input name="name" class="ui-control" required maxlength="255" placeholder="build-test"></label>
+<label class="form-field">소스 · 필수<select name="buildSource" class="ui-control" required><option value="">저장소·연결 선택</option><option th:each="s : ${buildOptions.sources()}" th:value="${s.id()}" th:text="|${s.provider()} · ${s.name()}|" th:attr="data-provider=${s.provider()},data-url=${s.url()},data-branch=${s.branch()}"></option></select></label>
+<label class="form-field">Git 주소 · 외부 연결 시 필수<input name="sourceUrl" class="ui-control" type="url" maxlength="2048" placeholder="https://github.com/owner/repository" readonly></label>
+<label class="form-field">브랜치 · 필수<input name="branch" class="ui-control" required maxlength="255" value="main"></label>
+<label class="form-field">빌드 사양 경로 · 필수<input name="spec" class="ui-control" required maxlength="1024" value="build_spec.yaml"></label>
+<label class="form-field">빌드 이미지 · 필수<select name="image" class="ui-control" required><option th:each="image : ${buildOptions.images()}" th:value="${image}" th:text="${image}" th:selected="${image == 'OL8_X86_64_STANDARD_10'}"></option></select></label>
+<label class="form-field">제한 시간 (초)<input name="timeout" class="ui-control" type="number" min="60" max="36000" value="3600" required></label>
+<label class="form-field">선행 단계 · 필수<select name="stage" class="ui-control" th:required="${!definition.stages().isEmpty()}"><option value="" th:text="${definition.stages().isEmpty() ? '시작' : '마지막 단계 선택'}"></option><option th:each="s : ${definition.stages()}" th:value="${s.id()}" th:text="${s.name()}"></option></select></label>
+<div class="form-toolbar"><button class="ui-button" th:disabled="${buildOptions.sources().isEmpty()}">빌드 단계 생성</button></div>
+</form>
+<details class="build-advanced"><summary>소스·명세 준비</summary><p>OCI 저장소 또는 같은 프로젝트의 GitHub/GitLab 연결을 선택하세요. 명세는 선택한 브랜치에 있어야 합니다.</p><p>OCI 저장소는 브랜치·명세를 검사합니다. 외부 Git의 명세 접근은 실행 시 확인됩니다. 새 연결: OCI 콘솔 → DevOps → 프로젝트 → 외부 연결. 인증 값은 Vault secret OCID를 사용하세요.</p><p>기존 단계 뒤에 추가합니다. 기존 연결 순서는 변경하지 않습니다.</p></details>
+</th:block>
+<details class="build-advanced"><summary>OCI에서 수행</summary><p>DevOps → 프로젝트 → 빌드 파이프라인 → 단계 추가 → 관리형 빌드</p><pre class="code-block" th:text="${stageCreateCli}"></pre><p>sources.json: 소스 이름·유형·저장소/연결·주소·브랜치. predecessors.json: 선행 단계 ID 목록. 최초 단계는 파이프라인 ID.</p><a href="https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/devops/build-pipeline-stage/create-build-stage.html" target="_blank" rel="noopener noreferrer">필수값·JSON 명세</a></details>
+</section></body></html>

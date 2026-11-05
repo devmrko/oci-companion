@@ -1,0 +1,245 @@
+# db-companion 실제 빌드 검증 — 2026-10-26
+
+Redmine #984, 상위 작업 #979.
+
+- 프로파일: `DEFAULT`
+- 위치: `ap-seoul-1` / `Joungmin.Ko`
+- 소스: `https://github.com/devmrko/db-companion`, `main`
+- 검증 커밋: `7a5cb34b68d8dae90f9c398667a0db976bb2f6d2`
+- 버전: `0.1.0-alpha.17`
+- DevOps 프로젝트: `db-companion`
+- 빌드 파이프라인: `db-companion-maven`
+
+## 경로
+
+실제 앱의 소스 화면에서 GitHub 주소를 등록했다.
+서울 구획을 선택하고 새로 고침한 화면에서 생성한 프로젝트와 파이프라인을 확인했다.
+등록 소스가 리전 변경 후에도 유지되고 중복이 없음을 확인했다.
+
+최초 빌드 실행은 OCI Python SDK로 수행했다. 당시 앱의 기본 빌드 메뉴는 미구현이었다.
+GitHub 소스에 OCI 빌드 명세가 없으므로 별도 OCI 저장소 `build-config`에 설정을 두었다.
+Managed Build가 공개 GitHub의 고정 커밋을 체크아웃한다. 원본 저장소는 변경하지 않았다.
+
+설정: [빌드 예제](../examples/build/db-companion/README.md).
+Java 21.0.13, Maven 3.9.9, Node.js 22.13.1을 사용했다.
+
+## 확인한 문제
+
+- 생성 직후 제출한 첫 실행은 단계 진행 기록이 없는 `SUCCEEDED`였다.
+  빌드 성공 근거에서 제외하고, 단계가 `ACTIVE`인 것을 확인한 뒤 다시 실행했다.
+- 실제 실행에서 Java 테스트 1,444개와 PMD는 통과했다.
+  JavaScript 테스트는 698개 통과, 1개 실패, 1개 건너뜀.
+- 실패 원인은 OCI 이미지의 `lsof` 누락이었다.
+  `app-runtime.test.mjs`의 오류 메시지 검증이 예상한 분기까지 도달하지 못했다.
+  빌드 설정에 `dnf install -y lsof`를 추가했다. 테스트 코드는 변경하지 않았다.
+- OCI Logging 반영이 실행 상태보다 늦었다. 전체 로그는 페이지네이션으로 조회해야 한다.
+
+## 최종 결과
+
+`lsof` 추가 후 재실행: `SUCCEEDED`.
+Managed Build의 명령 실행과 `SAVE_OUTPUT_ARTIFACTS` 단계 모두 `SUCCEEDED`를 확인했다.
+출력: `db-companion.jar`, `test-reports.tar.gz`.
+빌드 설정 커밋: `0a24065d170ca4414bbf2216e7546627196b0257`.
+
+로그 반영 후 최종 결과를 대조했다.
+
+- Java: 1,444개 통과, 실패·건너뜀 0.
+- PMD: 통과.
+- JavaScript: 700개 중 699개 통과, 1개 건너뜀, 실패 0.
+- Publication 검사: 1,084개 파일, 발견 사항 0.
+
+## 범위
+
+전용 알림 토픽(구독 없음), 프로젝트, 코드 저장소, 파이프라인, 로그 그룹/서비스 로그를 생성했다.
+IAM 정책은 해당 파이프라인의 전용 저장소 읽기와 전용 토픽 사용으로 제한했다.
+IAM 쓰기는 테넌시 홈 리전에서 수행했다.
+
+Registry 영구 저장과 배포는 이번 검증에 포함하지 않는다.
+키·계정 식별자·실제 로그·스크린샷은 Git에서 제외한다.
+
+## 화면 연결 — Redmine #985
+
+빌드 메뉴(`/builds`)를 활성화했다. 선택 리전·구획의 파이프라인, 실행 이력,
+실행 상세와 단계 상태를 OCI SDK로 직접 조회한다. `BuildHistory` 포트와 OCI 어댑터로 분리했다.
+목록에 없는 파이프라인/실행은 거절하며, OCI 응답의 구획·파이프라인 소속도 검사한다.
+단계 기록이 없는 실행에는 별도 안내를 표시한다.
+
+자동 테스트 19개 통과. DEFAULT/서울/Joungmin.Ko 실제 Chromium에서 db-companion-maven의
+성공 상세, 실패 상세, 모바일 표시를 검증했다. 서버 재시작 후 8091에 반영했다.
+당시 화면에서 새 빌드 제출, 로그 본문, Registry 조회는 지원하지 않았다.
+
+
+## 실행 화면 — Redmine #988
+
+빌드 메뉴를 실행/이력으로 나눴다. `BuildControl`이 실제 OCI 기본값 조회·저장 및
+실행을 담당하고, `BuildPresetStore`는 JSON 프리셋을 담당한다.
+
+- 실행 이름과 파라미터 이름/값/설명을 편집한다.
+- OCI에 저장: 파이프라인 기본 파라미터 전체 교체. ETag로 충돌 방지.
+- 빌드 실행: 기존 파라미터의 실행별 값으로 제출하고 해당 이력으로 이동.
+- 프리셋: 프로파일·tenancy·user·리전·구획·파이프라인별 저장/불러오기/삭제.
+  앱 data-dir의 build-presets에 JSON 저장, 디렉터리 0700/파일 0600, 원자적 교체.
+- 실행 요청은 단일 사용 세션 티켓, OCI retry token, CSRF, 현재 범위 검증 적용.
+  결과 불명 시 재요청하지 않고 이력 확인 안내.
+- OCI 도움말 명령에 현재 프로파일·리전·파이프라인을 반영한다.
+
+자동 테스트 25개 통과. 실제 DEFAULT/서울/Joungmin.Ko Chromium에서 프리셋
+저장·불러오기·삭제, OCI 기본값 저장(기존 빈 목록 유지), GUI 실행 제출과 이력 이동 확인.
+4화면 × 6너비 레이아웃 검사 통과. 실행 탭 1440/390px 별도 확인.
+새 실행 이름: db-companion-gui-1792991931154.
+검증 시 Maven/Node 명령 단계 IN_PROGRESS. 완료 성공으로 간주하지 않는다.
+
+소스·브랜치·빌드 사양은 기존 OCI 파이프라인 설정을 사용한다.
+현재 build-config는 db-companion 커밋을 스크립트에서 고정하므로 임의 파라미터를
+추가해도 원본 체크아웃이 바뀌지 않는다. 소스 override, 빌드 사양 편집,
+로그 본문, Registry 전송은 이번 구현 범위 밖이다.
+
+## 파이프라인 상세·선택식 실행 — Redmine #989
+
+빈 파라미터 표 중심 화면을 교체했다. 빌드 메뉴는 실행 탭으로 열리며,
+프로젝트/파이프라인 선택 시 실제 OCI 설정을 조회한다.
+
+- 단계 선후 관계, 상태, 소스 저장소/기본 브랜치, 이미지, 제한 시간 표시.
+- OCI 저장소의 빌드 사양을 해당 커밋의 blob으로 읽어 명령과 출력 산출물을 표시.
+  단순 bash/sh 파일 호출은 최대 3개 파일에서 Git 소스 명령을 찾아 별도 표시.
+  파일 조회 실패는 안내하며 스크립트를 실행하지 않는다.
+- 실행 이름은 선택. 기본 실행은 모든 소스의 기본 브랜치 최신 커밋 사용.
+- 특정 소스 지정 시 브랜치 필수, 커밋 선택. OCI 브랜치는 페이지네이션 조회,
+  커밋은 최근 최대 50개 선택 목록. 외부 Git은 등록된 기본 브랜치만 제공하며
+  외부 인증/커밋 목록 미지원 사실을 표시한다.
+- 파라미터는 이름별 입력 항목. OCI가 제공하지 않는 필수 여부/선택지는
+  앱의 입력 규칙에서 지정하고 범위별 JSON에 저장한다. 미지정은 필수로 추정하지 않는다.
+- 확인 화면에서 대상/소스 버전/파라미터 검토 후 실행.
+- 파이프라인과 단계 ETag 조합으로 변경 감지. 다른 소스·없는 브랜치/커밋,
+  누락 필수값·선택지 밖 값, 오래된 프리셋은 서버에서 거절.
+- 프리셋에 실행 이름/소스 버전도 저장. 기존 JSON 프리셋은 기본 소스 방식으로 읽는다.
+- OCI 기본 파라미터 변경과 로컬 입력 규칙 변경은 별도 폼이다.
+
+31개 자동 테스트 통과. 실제 DEFAULT/서울/Joungmin.Ko에서 단계, build_spec.yaml,
+명령, JAR/보고서 출력, build.sh의 GitHub 고정 커밋 표시를 확인했다.
+실제 main 브랜치와 커밋 목록 조회, 확인 화면, 390px 표시 검증.
+GUI 제출 후 OCI 응답에서 repositoryBranch=main,
+commitHash=0a24065d170ca4414bbf2216e7546627196b0257 일치 확인.
+실행명 db-companion-selected-source-1792993056387은 최종 SUCCEEDED.
+Java/Maven/Node 명령 및 SAVE_OUTPUT_ARTIFACTS 단계 모두 SUCCEEDED 확인.
+이전 실행 db-companion-gui-1792991931154의 최종 상태는 SUCCEEDED 확인.
+
+재현: db-companion 예제 파이프라인이 선택 범위에 있어야 한다.
+```sh
+COMPANION_TEST_PROFILE=DEFAULT COMPANION_TEST_PIPELINE='<pipeline OCID>' node scripts/browser-build-definition.cjs
+```
+기본 검사는 읽기 전용. 실제 제출은 COMPANION_TEST_RUN=1을 추가한다.
+
+한계: 이미지/제한시간/buildspec 편집은 포함하지 않는다. db-companion의 실제 GitHub
+소스 커밋은 build.sh에 고정되어 있으며 실행 폼의 커밋 선택은 build-config 저장소에 적용된다.
+스크립트 소스 추출은 정적 탐지이며 동적 셸 명령을 완전히 해석하지 않는다.
+
+## 2026-10-26 파이프라인 수정·Registry·로그 (#993)
+
+- BuildSetup 인터페이스: 파이프라인 이름/설명, 관리형 빌드 단계 이름/기본 브랜치/빌드 사양 경로/제한 시간 수정.
+- ETag 및 서버 세션의 일회성 티켓으로 오래된 화면·다른 범위·중복 저장 차단.
+- Artifact Registry 저장소 생성, 파일/컨테이너 DevOps 산출물 참조 등록, Deliver Artifacts 단계 추가.
+- 기존 전달 단계는 출력별 저장 위치를 교체하며 다른 출력과 선행 단계는 유지.
+- 빌드 사양에서 확인한 outputArtifacts 이름·유형과 참조를 연결. 외부 소스 사양을 읽을 수 없으면 콘솔 안내.
+- 뒤에 다른 단계가 없는 관리형 빌드 단계에만 전달 단계 추가. 기존 테스트·승인·배포 순서를 임의로 우회하지 않음.
+- 실행 이력의 빌드 상태/Registry 전달 상태/전달된 산출물 기록 분리. 기록 부재는 저장 성공이 아님.
+- BuildLogs 인터페이스: 실제 OCI Logging, 실행 소속 검증, 1,000건 페이지, 시간순 표시, 단계/메시지 필터, 자동 갱신/중지.
+- 메뉴별 IAM 도움말: 사용자와 실행 파이프라인 권한 구분, 구획 반영 정책 예제, 콘솔 수동 편집 절차. IAM 정책 자동 수정 없음.
+
+검증: 44개 테스트 통과. 실제 DEFAULT/서울/Joungmin.Ko에서 저장소
+db-companion-builds, 참조 db-companion-jar-delivery,
+Registry · db-companion-jar 전달 단계를 GUI로 생성했다.
+실제 단계 수정 요청(기존 값 유지), OCI 기본 파라미터 저장, 빌드 제출을 확인했다.
+파일 경로는 db-companion/app.jar, 버전은 ${COMPANION_VERSION}.
+매 실행 시 고유 값을 입력해야 한다.
+
+첫 실행은 신규 전달 단계가 진행 기록에 없었으며 Registry 파일도 0건이었다.
+빌드 성공을 저장 성공으로 간주하지 않고, ACTIVE/연결 확인 후 다른 고유 버전으로 재실행했다.
+두 번째 실행에는 BUILD와 DELIVER_ARTIFACT 단계가 모두 포함됐다.
+BUILD는 SUCCEEDED, DELIVER_ARTIFACT는 FAILED.
+실제 OCI 로그: Unable to access deploy-artifact due to NotAuthorizedOrNotFound.
+당시 Registry 저장 성공은 검증하지 못했으며, 파이프라인의 산출물 읽기·Registry 접근 정책이 필요했다.
+광범위한 tenancy 관리 권한을 자동 부여하지 않았다.
+
+기존 성공 빌드의 실제 로그 약 4,000건에서 Maven BUILD SUCCESS 및 페이지 이동·검색을 확인했다.
+1440/390/320px 화면과 자동 갱신/중지 검증 통과. 긴 산출물 OCID는 공통 CSS에서 줄바꿈한다.
+실행 로그는 영속 캐시에 저장하지 않는다.
+GitHub 원본과 OCI build-config의 빌드 명령은 이번에 변경하지 않았다.
+Maven 전용 Goals/JDK 입력, 빌드 사양 본문 편집, 구독 생성, 로그 자동 활성화는 별도 작업이다.
+
+재현:
+- 읽기 검증: scripts/browser-build-flow.cjs (DEFAULT 및 예제 pipeline 환경 변수 필요).
+- 실제 생성/제출: scripts/browser-build-delivery.cjs (COMPANION_TEST_SETUP=1 명시 필요).
+- 저장소·참조·전달 단계는 이름으로 기존 항목을 재사용. 버전은 실행마다 새 값.
+- 실제 클라우드 실패를 테스트 mock이나 성공 표시로 대체하지 않는다.
+
+## 2026-10-26 Registry 실행 권한 재검증 (#993)
+
+사용자의 권한 추가 요청에 따라 DEFAULT로 홈 리전의 전용 db-companion-build 정책을 수정했다.
+기존 코드 저장소·알림 주제 정책은 보존하고 ETag로 충돌을 방지했다.
+추가 정책 모두 request.principal.id를 db-companion-maven 파이프라인으로 한정했다.
+
+- DevOps 산출물 읽기: 선택 구획 한정. 최초 target.artifact.id 조건으로는 같은 접근 오류가 재현되어 해당 조건을 제거하고 재검증했다.
+- Artifact Registry 저장소·파일 읽기: 선택 구획 한정.
+- 파일 업로드: 선택 구획의 generic-artifacts에 GENERIC_ARTIFACT_CREATE만 허용.
+- Registry 읽기·생성 범위는 구획 전체이며 특정 저장소만으로 제한한 정책은 아니다. 삭제·수정 권한은 추가하지 않았다.
+
+근거: [DevOps IAM](https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm),
+[Artifact Registry 권한](https://docs.oracle.com/en-us/iaas/Content/artifacts/iam-policies-permissions.htm).
+앱 자체의 IAM 자동 변경 기능은 추가하지 않았다.
+기존 산출물 참조가 생성·수정 선택 목록에 동시에 표시될 때 재현 스크립트가 실패하는 문제를 수정했다.
+동일 ID는 재사용하고 서로 다른 ID가 같은 이름이면 중단한다.
+
+산출물 ID 조건을 제거한 재실행에서는 GetDeployArtifact 접근 오류가 사라졌다.
+버전 누락 실행은 최종 FAILED로 종료됐고 업로드 성공 근거에서 제외했다.
+감사 로그의 실패 주체도 해당 빌드 파이프라인으로 확인했다.
+후속 전달에서 COMPANION_VERSION 미치환을 발견했다. 재현 스크립트가 브라우저 confirm을 기본 취소해
+OCI 기본값을 저장하지 않은 것이 원인이다. 확인창 승인, 저장 완료 메시지, 저장값 및 실행 입력값 검사를 추가했다.
+앞선 스크립트의 기본값 저장 성공 주장은 이 확인으로 정정한다.
+
+최종 실제 실행: db-companion-registry-1793006204452 / SUCCEEDED.
+Managed Build와 Deliver Artifacts 모두 SUCCEEDED이며 OCI Logging에 업로드 완료가 기록됐다.
+Registry GetGenericArtifactByPath로 아래 파일을 별도 조회했다.
+
+- 저장소: db-companion-builds
+- 경로: db-companion/app.jar
+- 버전: gui-1793006202881
+- 상태: AVAILABLE
+- 크기: 61,111,725 bytes
+- SHA256: 3d6af1a596ff00140e5af39cc061c0e4333f55a0a30eacf178efabdcbb20d906
+
+전달 단계의 파일 ID·경로·버전이 Registry 조회 결과와 일치한다.
+최종 정책은 해당 파이프라인·구획의 산출물/저장소 읽기 및 일반 산출물 생성이며, 삭제·수정 권한은 없다.
+프로파일은 DEFAULT를 유지했다.
+
+실제 Chromium 검증 통과: 빌드·Registry SUCCEEDED, 파일 ID·경로·버전 대조,
+Maven BUILD SUCCESS 로그 페이지 조회·검색·자동 갱신·중지, 1440/390/320px 표시.
+실행: COMPANION_TEST_STORAGE_SUCCESS=1 및 해당 RUN_ID로 browser-build-flow.cjs.
+이번 변경은 재현 스크립트·검증 문서이며, 앱 코드 변경은 없다. 이전 Maven verify 44개 통과 결과를 유지한다.
+
+## 2026-10-27 Registry 탭 (#995)
+
+- 빌드 → Registry. 파일(Artifact Registry)·이미지(Container Registry) 유형별 실제 목록.
+- 기존 저장소는 별도 앱 등록 없이 선택. 전역 프로파일·리전·구획 사용. 파이프라인 없이도 조회·생성 가능.
+- 저장소 생성, 상세, 파일 저장소 이름/설명 수정, 컨테이너 README 수정.
+- 파일: 경로·버전·크기·SHA256·OCID·상태·생성 시각. 이미지: 저장소·태그·digest·OCID·상태·생성 시각.
+- 저장소 목록은 OCI 페이지네이션 순회. 산출물은 100건씩 다음 페이지 조회. 조회 실패를 빈 목록으로 표시하지 않음.
+- `Registry` 인터페이스와 `OciRegistry` SDK 어댑터. 요청 구획 재검증, 서버 ETag, CSRF, 일회성 티켓, 생성 retry token.
+- 저장소 상세 → 빌드 저장소로 선택 → 파이프라인의 산출물 저장 위치에서 선택 유지.
+- 파일·이미지 저장소를 목록에서 선택. 이미지 URI는 서버에서 실제 선택 저장소 namespace/name으로 구성한다.
+- 파이프라인 변경 시 선택 저장소 유지. 전역 범위 적용 시 Registry 유형 탭 유지.
+- Console 경로, 범위별 CLI 조회/생성/수정/산출물 목록, IAM 도움말. 공통 CSS 사용.
+
+실제 검증: DEFAULT / ap-seoul-1 / Joungmin.Ko.
+기존 db-companion-builds의 app.jar 버전 gui-1793006202881, 61,111,725 bytes 및 SHA256을 화면에서 확인.
+검증용 파일 저장소 companion-registry-check, 비공개 컨테이너 저장소 companion/registry-check를 GUI로 생성했다.
+각 설명/README 수정 후 OCI 재조회 및 빌드 저장소 선택을 확인했다. 기존 컨테이너 이미지 ID/digest도 화면에서 대조했다.
+1440/390/320px 레이아웃 통과. Maven verify 49개 통과. 실제 검증은 mocks 없이 OCI 사용.
+
+컨테이너 생성 요청의 isImmutable 필드는 실제 OCI API가 400 `Setting isImmutable is not currently supported`로 거부했다.
+필드를 제외하고 재검증하여 생성 성공. 컨테이너 생성 화면에는 해당 옵션을 제공하지 않는다.
+파일 저장소의 immutable 선택은 유지하며 생성 후 수정하지 않는다. 컨테이너 공개 전환·저장소/산출물 삭제는 콘솔 안내만 제공한다.
+수동 파일 업로드·이미지 push·배포 실행은 이번 기능에 포함하지 않는다. 이미지 참조 URI 자동 구성은 상용 OCI(oc1) 리전 대상이다.
+
+재현: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-registry.cjs`.
+검증용 저장소 생성/메타데이터 수정은 `COMPANION_TEST_CREATE=1`을 명시한다. 같은 이름의 기존 저장소는 재사용한다.
