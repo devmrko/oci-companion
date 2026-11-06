@@ -63,4 +63,37 @@ class HttpAgentMonitoringTest {
         try {assertEquals("조회 실패",configured("http://127.0.0.1:"+server.getAddress().getPort()).snapshot(connection,"seoul","comp").status());}
         finally {server.stop(0);}
     }
+    @Test void readsVersionedCapabilitiesWithoutClaimingHealth() throws Exception {
+        var server=server(200,"[]");
+        server.createContext("/api/capabilities", exchange->{
+            assertEquals("Bearer private-test-token",exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] bytes="{\"schema_version\":1,\"app_version\":\"0.2.0\",\"capabilities\":{\"memory\":{\"status\":\"configured\",\"secret\":\"private-value\"},\"browser\":{\"status\":\"not_implemented\"}}}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,bytes.length);
+            try(var output=exchange.getResponseBody()){output.write(bytes);}
+        });
+        try {
+            var result=configured("http://127.0.0.1:"+server.getAddress().getPort()).snapshot(connection,"seoul","comp");
+            assertEquals("UP",result.status());
+            assertEquals(9,result.capabilities().size());
+            assertEquals("설정됨",result.capabilities().get(1).status());
+            assertEquals("별도 검증 필요",result.capabilities().get(1).health());
+            assertEquals("미구현",result.capabilities().get(8).status());
+            assertFalse(result.toString().contains("private-value"));
+        } finally {server.stop(0);}
+    }
+    @Test void capabilityVersionMismatchDoesNotHideExistingHealth() throws Exception {
+        var server=server(200,"[]");
+        server.createContext("/api/capabilities",exchange->{
+            byte[] bytes="{\"schema_version\":1,\"app_version\":\"new-version\",\"capabilities\":{}}".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,bytes.length);
+            try(var output=exchange.getResponseBody()){output.write(bytes);}
+        });
+        try {
+            var result=configured("http://127.0.0.1:"+server.getAddress().getPort()).snapshot(connection,"seoul","comp");
+            assertEquals("UP",result.status());
+            assertTrue(result.capabilities().isEmpty());
+            assertTrue(result.capabilityNotice().contains("확인하지 못했습니다"));
+        } finally {server.stop(0);}
+    }
+
 }

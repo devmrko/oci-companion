@@ -61,8 +61,30 @@ public class HttpAgentMonitoring implements AgentMonitoring {
                     text(model,"output_tokens"),text(row,"elapsed_ms"),String.join("; ",steps),text(row,"error_code")));
             }
             Collections.reverse(traces);
+            var capabilities = new ArrayList<Capability>();
+            String capabilityNotice="앱이 보고한 구현·설정 상태입니다. 외부 서비스 연결 성공을 뜻하지 않습니다.";
+            try {
+                JsonNode report=read(base.resolve("/api/capabilities"),token);
+                if(report.path("schema_version").asInt()!=1 || !text(report,"app_version").equals(text(health,"version"))
+                    || !report.path("capabilities").isObject()) throw new IllegalArgumentException("Unsupported capability contract");
+                for(String key:List.of("runtime","memory","gateway","identity","policy","observability","evaluations","code_interpreter","browser")) {
+                    String state=text(report.path("capabilities").path(key),"status");
+                    String label=switch(state) {
+                        case "partial" -> "일부 구현";
+                        case "configured" -> "설정됨";
+                        case "not_configured" -> "미설정";
+                        case "not_implemented" -> "미구현";
+                        default -> "알 수 없음";
+                    };
+                    capabilities.add(new Capability(key,label,"별도 검증 필요"));
+                }
+            } catch(Exception failure) {
+                if(failure instanceof InterruptedException) Thread.currentThread().interrupt();
+                capabilityNotice="기능 상태 API를 확인하지 못했습니다. 미지원·버전 변경·연결 상태를 확인하세요.";
+            }
             return new Snapshot(cfg.name(), text(health,"status"), text(health,"version"), List.copyOf(traces),
-                "설정된 앱 계정의 최대 100건 · 수동 조회 · 대화 원문은 표시하지 않습니다.");
+                "설정된 앱 계정의 최대 100건 · 수동 조회 · 대화 원문은 표시하지 않습니다.",
+                List.copyOf(capabilities),capabilityNotice);
         } catch (Exception failure) {
             if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
             return new Snapshot("에이전트", "조회 실패", "—", List.of(), "앱 상태·SSH 터널·인증 설정을 확인하세요.");
