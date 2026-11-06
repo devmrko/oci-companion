@@ -18,8 +18,22 @@ public class OciBuildProjectResources implements BuildProjectResources {
     private final OciBuildHistory clients;
     public OciBuildProjectResources(OciBuildHistory clients){this.clients=clients;}
     private void project(Connection c,String region,String comp,String project){try(var client=clients.client(c,region)){var p=client.getProject(GetProjectRequest.builder().projectId(project).build()).getProject();if(!comp.equals(p.getCompartmentId())||!"ACTIVE".equals(p.getLifecycleState().getValue()))throw Errors.SCOPE.exception();}catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}}
-    private LoggingManagementClient logging(Connection c,String region)throws Exception{var client=LoggingManagementClient.builder().configuration(ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build()).build(clients.authentication(c));client.setRegion(region);return client;}
+    protected LoggingManagementClient logging(Connection c,String region)throws Exception{var client=LoggingManagementClient.builder().configuration(ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build()).build(clients.authentication(c));client.setRegion(region);return client;}
     private void name(String name){if(name==null||!name.matches("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}"))throw Errors.ADMIN_INPUT.exception();}
+    public LogReadiness logReadiness(Connection c,String region,String comp,String project){
+        project(c,region,comp,project);
+        try(var client=logging(c,region)){
+            boolean disabled=false;
+            for(var group:client.getPaginators().listLogGroupsRecordIterator(ListLogGroupsRequest.builder().compartmentId(comp).build()))
+                for(var log:client.getPaginators().listLogsRecordIterator(ListLogsRequest.builder().logGroupId(group.getId()).build()))
+                    if(log.getConfiguration()!=null && log.getConfiguration().getSource() instanceof OciService src
+                        && "devops".equalsIgnoreCase(src.getService()) && project.equals(src.getResource()) && "all".equals(src.getCategory())){
+                        if(Boolean.TRUE.equals(log.getIsEnabled()) && log.getLifecycleState()==LogLifecycleState.Active) return LogReadiness.READY;
+                        disabled=true;
+                    }
+            return disabled?LogReadiness.DISABLED:LogReadiness.NOT_FOUND;
+        }catch(Exception e){return LogReadiness.UNKNOWN;}
+    }
     public Resources read(Connection c,String region,String comp,String project){
         project(c,region,comp,project);
         try(var devops=clients.client(c,region);var logging=logging(c,region)){

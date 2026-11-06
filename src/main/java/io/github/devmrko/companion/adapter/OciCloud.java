@@ -28,10 +28,11 @@ import org.springframework.stereotype.Component;
 public class OciCloud implements CloudConnection, PipelineGateway {
     private final String configPath;
     private final DeploymentTarget vm;
+    private final BuildProjectResources resources;
     private static final ClientConfiguration CONFIG=ClientConfiguration.builder()
         .connectionTimeoutMillis(5000).readTimeoutMillis(30000)
         .retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();
-    public OciCloud(@Value("${companion.oci-config}") String configPath, DeploymentTarget vm) { this.configPath=configPath; this.vm=vm; }
+    public OciCloud(@Value("${companion.oci-config}") String configPath, DeploymentTarget vm, BuildProjectResources resources) { this.configPath=configPath; this.vm=vm;this.resources=resources; }
     public List<String> profiles() {
         var names=new LinkedHashSet<String>();
         var section=Pattern.compile("^\\[([^\\]\\r\\n]{1,128})\\]\\s*(?:#.*)?$");
@@ -89,6 +90,8 @@ public class OciCloud implements CloudConnection, PipelineGateway {
     public RemoteRun start(Connection c,String kind,String id,String token) {
         try (var client=client(c)) {
             if (kind.equals("BUILD")) {
+                var pipeline=client.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(id).build()).getBuildPipeline();
+                io.github.devmrko.companion.service.BuildLogChecks.requireReady(resources.logReadiness(c,c.region(),pipeline.getCompartmentId(),pipeline.getProjectId()));
                 var run=client.createBuildRun(CreateBuildRunRequest.builder().opcRetryToken(token)
                     .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(id).displayName("companion-"+token).build()).build()).getBuildRun();
                 return new RemoteRun(run.getId(),run.getLifecycleState().getValue());

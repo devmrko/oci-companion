@@ -6,6 +6,8 @@ public interface BuildProjectResources {
     record Repository(String id,String name,String url,String branch,String state) {}
     record Log(String id,String group,String name,boolean enabled,String state) {}
     record Resources(List<Repository> repositories,List<Choice> groups,List<Log> logs) {}
+    enum LogReadiness { READY, DISABLED, NOT_FOUND, UNKNOWN }
+    LogReadiness logReadiness(Connection c,String region,String compartment,String project);
     Resources read(Connection c,String region,String compartment,String project);
     String createRepository(Connection c,String region,String compartment,String project,String name,String description,String token);
     String createLogGroup(Connection c,String region,String compartment,String project,String name,String token);
