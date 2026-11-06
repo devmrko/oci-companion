@@ -71,6 +71,12 @@ public class OciBuildControl implements BuildControl {
                 .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(pipeline).commitInfo(commit).displayName(name.isBlank()?null:name)
                     .buildRunArguments(BuildRunArgumentCollection.builder().items(parameters.stream()
                         .map(v->BuildRunArgument.builder().name(v.name()).value(v.value()).build()).toList()).build()).build()).build()).getBuildRun().getId();
+        } catch(com.oracle.bmc.model.BmcException e) {
+            if(e.getStatusCode()==409 && "IncorrectState".equals(e.getServiceCode())
+                && Objects.toString(e.getMessage(), "").contains("Logs need to be enabled")) {
+                throw Errors.BUILD_LOGS_REQUIRED.exception();
+            }
+            throw Errors.BUILD_UNKNOWN.exception();
         } catch(Exception e) { throw Errors.BUILD_UNKNOWN.exception(); }
     }
 }

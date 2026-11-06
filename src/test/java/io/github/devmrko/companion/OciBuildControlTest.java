@@ -60,6 +60,18 @@ class OciBuildControlTest {
         assertEquals("run",adapter.start(c,"region","comp","p","etag","latest",List.of(),"latest-token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main",""),"rev"));
         verify(client).createBuildRun(capture.capture());
         assertEquals("hash",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getCommitHash());
+        when(client.createBuildRun(any())).thenThrow(new com.oracle.bmc.model.BmcException(
+            409,"IncorrectState","Logs need to be enabled in order to run the builds.","request-id"));
+        var rejected=assertThrows(io.github.devmrko.foundation.core.error.BusinessException.class,
+            ()->adapter.start(c,"region","comp","p","etag","logs",List.of(),"logs-token",
+                new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"rev"));
+        assertEquals(io.github.devmrko.companion.service.Errors.BUILD_LOGS_REQUIRED.safeMessage(), rejected.getMessage());
+        doThrow(new com.oracle.bmc.model.BmcException(
+            409,"IncorrectState","Other state error","request-id")).when(client).createBuildRun(any());
+        var unknown=assertThrows(io.github.devmrko.foundation.core.error.BusinessException.class,
+            ()->adapter.start(c,"region","comp","p","etag","other",List.of(),"other-token",
+                new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"rev"));
+        assertEquals(io.github.devmrko.companion.service.Errors.BUILD_UNKNOWN.safeMessage(), unknown.getMessage());
         clearInvocations(client);
         when(definitions.commits(c,"region",source,"main")).thenReturn(List.of());
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","unresolved",List.of(),"unresolved-token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main",""),"rev"));
