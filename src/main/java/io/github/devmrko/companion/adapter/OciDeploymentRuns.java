@@ -32,7 +32,11 @@ public class OciDeploymentRuns implements DeploymentRuns {
             if(stages.size()!=1)throw Errors.INVALID.exception();
             var stage=client.getDeployStage(GetDeployStageRequest.builder().deployStageId(stages.getFirst().getId()).build()).getDeployStage();
             if(!(stage instanceof ComputeInstanceGroupDeployStage s)||!compartment.equals(s.getCompartmentId())||!pipeline.equals(s.getDeployPipelineId()))throw Errors.SCOPE.exception();
-            if(s.getDeployArtifactIds()!=null&&!s.getDeployArtifactIds().isEmpty())throw Errors.INVALID.exception();
+            var packages=new StringBuilder();
+            if(s.getDeployArtifactIds()!=null)for(var artifactId:s.getDeployArtifactIds()){
+                var pkg=client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(artifactId).build()).getDeployArtifact();
+                validatePackage(pkg,compartment,p.getProjectId());packages.append(pkg.toString());
+            }
             var env=client.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(s.getComputeInstanceGroupDeployEnvironmentId()).build()).getDeployEnvironment();
             if(!(env instanceof ComputeInstanceGroupDeployEnvironment e)||!compartment.equals(e.getCompartmentId()))throw Errors.SCOPE.exception();
             var ids=new ArrayList<String>();
@@ -44,9 +48,13 @@ public class OciDeploymentRuns implements DeploymentRuns {
             validateInstances(c,region,compartment,ids);
             var artifact=client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(s.getDeploymentSpecDeployArtifactId()).build()).getDeployArtifact();
             if(!compartment.equals(artifact.getCompartmentId())||!(artifact.getDeployArtifactSource() instanceof InlineDeployArtifactSource))throw Errors.SCOPE.exception();
-            var digest=MessageDigest.getInstance("SHA-256").digest((p.toString()+s.toString()+e.toString()+artifact.toString()).getBytes(StandardCharsets.UTF_8));
+            var digest=MessageDigest.getInstance("SHA-256").digest((p.toString()+s.toString()+e.toString()+artifact.toString()+packages).getBytes(StandardCharsets.UTF_8));
             return new Plan(pipeline,p.getDisplayName(),e.getDisplayName(),List.copyOf(ids),HexFormat.of().formatHex(digest));
         }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
+    }
+    static void validatePackage(DeployArtifact pkg,String compartment,String project){
+        if(!compartment.equals(pkg.getCompartmentId())||!project.equals(pkg.getProjectId()))throw Errors.SCOPE.exception();
+        if(!(pkg.getDeployArtifactSource() instanceof GenericDeployArtifactSource source)||source.getDeployArtifactVersion()==null||source.getDeployArtifactVersion().isBlank()||source.getDeployArtifactVersion().contains("${")||pkg.getArgumentSubstitutionMode()!=DeployArtifact.ArgumentSubstitutionMode.None)throw Errors.INVALID.exception();
     }
     com.oracle.bmc.core.ComputeClient compute(Connection c,String region) throws java.io.IOException {
         var client=com.oracle.bmc.core.ComputeClient.builder().configuration(com.oracle.bmc.ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(clients.authentication(c));

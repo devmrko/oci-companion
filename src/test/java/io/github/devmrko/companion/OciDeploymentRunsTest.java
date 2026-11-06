@@ -38,4 +38,11 @@ class OciDeploymentRunsTest {
         when(compute.getInstance(any())).thenReturn(com.oracle.bmc.core.responses.GetInstanceResponse.builder().instance(com.oracle.bmc.core.model.Instance.builder().compartmentId("comp").lifecycleState(com.oracle.bmc.core.model.Instance.LifecycleState.Running).build()).build());
         assertDoesNotThrow(()->adapter.validateInstances(c,"seoul","comp",List.of("vm")));
     }
+    @Test void packageRequiresSameScopeAndPinnedVersion(){
+        var good=DeployArtifact.builder().compartmentId("comp").projectId("project").argumentSubstitutionMode(DeployArtifact.ArgumentSubstitutionMode.None).deployArtifactSource(GenericDeployArtifactSource.builder().repositoryId("repo").deployArtifactPath("release.zip").deployArtifactVersion("0.4.1").build()).build();
+        assertDoesNotThrow(()->OciDeploymentRuns.validatePackage(good,"comp","project"));
+        assertThrows(RuntimeException.class,()->OciDeploymentRuns.validatePackage(good,"other","project"));
+        var parameterized=DeployArtifact.builder().compartmentId("comp").projectId("project").argumentSubstitutionMode(DeployArtifact.ArgumentSubstitutionMode.None).deployArtifactSource(GenericDeployArtifactSource.builder().deployArtifactVersion("${version}").build()).build();
+        assertThrows(RuntimeException.class,()->OciDeploymentRuns.validatePackage(parameterized,"comp","project"));
+    }
 }
