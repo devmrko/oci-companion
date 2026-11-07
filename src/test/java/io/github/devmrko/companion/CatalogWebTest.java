@@ -35,6 +35,17 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentEnvironments deploymentEnvironments;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentRuns deploymentRuns;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildHandoff handoff;
+    @Test void buildHandoffIsRevalidatedAndCannotBeChangedByPostParameters() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(deploymentRuns.plan(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.DeploymentRuns.Plan("p","release","VM",java.util.List.of("vm"),"plan"));
+        org.mockito.Mockito.when(handoff.verify(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("bp"),org.mockito.ArgumentMatchers.eq("br"),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.BuildHandoff.Proof("br","before",1),new io.github.devmrko.companion.port.BuildHandoff.Proof("br","after",1));
+        var page=mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourcePipeline","bp").param("sourceRun","br")).andExpect(status().isOk()).andExpect(content().string(containsString("SHA-256"))).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("ticket");assertNotNull(ticket);
+        mvc.perform(post("/deployments/runs").session(session).with(csrf()).param("ticket",ticket).param("sourceRun","other")).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(deploymentRuns,org.mockito.Mockito.never()).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+        mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourceRun","br")).andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("ticket"));
+    }
     @Test void deploymentExecutionRequiresCsrfOneUseTicketAndUnchangedScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(deploymentRuns.plan(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.DeploymentRuns.Plan("p","release 0.4.0","demo VM",java.util.List.of("vm"),"fingerprint"));

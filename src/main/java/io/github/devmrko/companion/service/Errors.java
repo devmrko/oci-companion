@@ -31,6 +31,7 @@ public enum Errors implements ErrorDescriptor {
     MISSING(ErrorCategory.NOT_FOUND, "현재 연결에서 찾을 수 없는 항목입니다."),
     CONFLICT(ErrorCategory.CONFLICT, "이미 사용된 요청입니다. 실행 이력을 확인하세요."),
     TARGET(ErrorCategory.VALIDATION, "현재는 Instance Group 배포와 Approval/Wait 단계로 구성된 VM 파이프라인만 실행할 수 있습니다."),
+    HANDOFF(ErrorCategory.CONFLICT, "빌드·전달 성공과 배포 파일 일치를 확인하지 못했습니다. 같은 산출물을 사용하는 파이프라인과 불변 저장소·읽기 권한을 확인하세요."),
     SCOPE(ErrorCategory.CONFLICT, "OCI 설정의 계정 또는 리전이 변경되었습니다. 다시 연결하세요.");
     private final ErrorCategory category; private final String message;
     Errors(ErrorCategory category, String message) { this.category=category; this.message=message; }
