@@ -12,10 +12,10 @@
 
 ## 남은 연결과 완료 기준
 
-1. 별도 Python Function handler 및 로컬 연결 테스트.
-2. private 프로젝트용 Object Storage 소스 번들: 허용 버킷·객체 버전·SHA256 검증, 안전한 압축 해제, 최소 읽기 정책. 정적 Git 토큰을 전달하지 않는다. 현재 공개 Git 입력만으로 Launchpad private 소스를 빌드했다고 주장하지 않는다.
+1. 구현 완료: 별도 Python Function handler 및 로컬 연결 테스트.
+2. 로컬 검증 완료, 실클라우드 미검증: private 프로젝트용 Object Storage 소스 번들: 허용 버킷·객체 버전·SHA256 검증, 안전한 압축 해제, 최소 읽기 정책. 정적 Git 토큰을 전달하지 않는다. 현재 공개 Git 입력만으로 Launchpad private 소스를 빌드했다고 주장하지 않는다.
 3. 별도 Python 빌더 이미지 준비·Function 배포·probe. 빌더 이미지 최초 제작과 Function 내부 사용자 소스 빌드는 서로 다른 단계다.
-4. Companion Function 계약 조회·템플릿 생성·실행 화면에 Python을 연결. 준비 전에는 compatible로 표시하지 않는다.
+4. 실행 화면·계약 조회 연결 완료. Python 템플릿 ZIP 생성은 남아 있으며 현재 생성 화면은 Maven 전용이다. python-v1은 별도 Python handler 이미지와 필수 설정을 먼저 배포해야 한다. 계약 이름만 바꾸는 것은 설치가 아니다.
 5. Functions에서 실제 Python 테스트와 wheel 생성, Object Storage 결과 확인 및 Companion UI 검증.
 
 컨테이너 이미지 생성은 별도 검증 항목이다. Functions 내 Docker daemon이 존재한다고 가정하거나 `python-v1` wheel 성공을 이미지 성공으로 표시하지 않는다. 이번 구현은 특정 앱·ADB·Langfuse에 종속되지 않는다.
@@ -57,4 +57,23 @@ requiredFreeBytes의 숫자는 형식 설명용이며 Launchpad의 필요 용량
 
 SDK get_object에 version_id를 전달하고 다운로드 크기·SHA256을 검사한다. 압축 전체의 항목·비압축 크기·중복 이름·절대/상위 경로·링크·특수 파일·sparse 항목을 확인한 뒤 새 디렉터리에 일반 파일만 쓴다. 전체 manifest를 검증하기 전에는 소스 디렉터리를 만들지 않는다. 압축 전송·해제 중 실패한 임시 파일은 invocation 작업 디렉터리 종료 때 정리한다.
 
-2026-11-08 로컬 테스트는 총 8개 통과했다. 버전 인자 전달, 정상 추출, 잘못된 prefix/version/hash/commit, 경로 탈출·링크·중복 이름 및 압축 크기 초과 거부를 검증했다. 실제 Object Storage 다운로드, IAM 권한, Function 배포, Companion UI 입력은 아직 검증하지 않았다. 기존 maven-v1 동작과 Java의 빌더 호환 판정은 유지했다.
+2026-11-08 로컬 테스트는 총 8개 통과했다. 버전 인자 전달, 정상 추출, 잘못된 prefix/version/hash/commit, 경로 탈출·링크·중복 이름 및 압축 크기 초과 거부를 검증했다. 실제 Object Storage 다운로드, IAM 권한, Function 배포는 아직 검증하지 않았다. 후속 Java 연결에서 python-v1 호환 판정과 실행 화면을 추가했다. 기존 Maven 요청 경로는 유지한다.
+
+## Companion에서 실행하기
+
+Python 빌더를 배포한 운영자는 `/builds/functions`에서 Application과 Function을 선택하고 **빌드 실행**으로 이동한다. python-v1이면 비공개 소스 번들 전용 화면이 열린다. 공개 Git 입력은 Python handler에서 지원하지만 현재 Python 화면에는 노출하지 않는다.
+
+| 입력 | 필수 여부 | 의미 |
+|---|---|---|
+| 소스 객체 이름 | 필수 | Function에 설정한 허용 버킷·prefix 안의 객체 |
+| 객체 버전 ID | 필수 | 같은 이름의 객체가 바뀌어도 지정 버전 사용 |
+| 번들 SHA-256 / 커밋 SHA | 필수 | 다운로드 바이트 검증 / source.json 출처 대조 |
+| 필요 여유 공간(bytes) | 필수 | 실제 소스·의존성·테스트·산출물·예비 공간을 합한 양의 정수 예산 |
+| Goal / 작업 경로 | 필수 | test 또는 테스트 후 wheel 생성 / 번들 내부 프로젝트 경로 |
+| 산출물 패턴 | 선택 | 예: dist/*.whl. 생략해도 결과와 로그는 저장 |
+
+Function 유형은 서버 세션의 일회용 실행 티켓에 보관한다. Python에 Git URL·Maven 프로파일을 함께 보내거나 Maven에 번들 입력을 보내면 호출 전에 거부한다. 호출 시 기존 어댑터가 현재 리전·compartment·Application·ACTIVE 상태·설정 etag를 다시 확인한다. 소스 버킷·prefix와 실제 공간 검사는 Function 안에서 수행하므로 폼 제출 성공만으로 해당 검사를 통과했다고 볼 수 없다.
+
+접수 후 같은 실행 이력에서 결과 JSON, 로그, JUnit 보고서를 확인한다. Python의 package와 verify는 현재 동일하게 테스트 후 wheel을 생성한다. 저장된 빌드 작업 등록 화면은 아직 Maven 전용이며 Python Function 등록을 거부한다. Python 템플릿 다운로드와 저장 작업 확장은 후속 작업이다.
+
+2026-11-08 Java 전체 `mvn verify` 통과. 새 MockMvc 테스트는 Python 폼 렌더링, 객체 버전·해시·정수 예산의 호출 전달, CSRF·티켓 재사용·교차 유형 입력 거부와 입력 검증을 확인한다. 실제 브라우저·OCI Function 호출을 대체하는 검증은 아니다. 실제 Python Function 배포와 Launchpad 빌드 성공은 아직 남아 있다.
