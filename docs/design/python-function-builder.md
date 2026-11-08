@@ -91,3 +91,9 @@ Launchpad처럼 공개 인덱스에 없는 내부 라이브러리를 사용하�
 BUILD_PREINSTALLED_LOCK이 설정된 경우 소스 잠금 파일과 이미지 잠금 파일의 전체 항목, 실제 설치된 모든 버전을 확인한 후에만 system-site-packages 가상환경을 만든다. 버전이 다르면 즉시 실패하며 다시 다운로드하는 우회는 하지 않는다. 공개 의존성은 읽기 전용 이미지 레이어에서 사용하고 내부 라이브러리·앱은 실행별 가상환경에 설치한다. 설정이 없으면 기존 격리 가상환경 경로를 유지한다. 이미지 의존성도 Function 메모리 소비를 줄여 주지는 않으며 실제 probe·최대 사용량 검증이 필요하다.
 
 2026-11-08 로컬 Python 테스트 11개 통과(Python 3.14). 대상 Python 3.12 Linux 실실행과 이미지 제작·배포는 미검증이다. macOS 기본 /usr/bin/python3(3.9)는 tomllib이 없어 테스트 실행기로 사용할 수 없다.
+
+## 실제 FDK 시작 경로 검증
+
+2026-11-08 새 공식 베이스 이미지로 만든 컨테이너는 import 검사와 pip check를 통과했지만 실제 Function probe에서 502 FunctionInvokeContainerInitFail을 반환했다. 호출 로그의 원인은 `exec /usr/local/bin/fdk failed: No such file or directory`였다. 기존 베이스에서 사용한 절대 경로를 새 이미지에도 그대로 적용한 것이 잘못이었다.
+
+Python Dockerfile은 `/usr/bin/env fdk`로 이미지 PATH의 실행 파일을 찾도록 수정했다. 앞으로 이미지 검사에서는 entrypoint를 python으로 덮어쓰는 import 검사에 더해 실제 기본 entrypoint를 실행하고 FDK 소켓을 통해 probe 응답까지 검증한다. 소스 수정이나 이미지 빌드 성공만으로 실클라우드 오류가 해결됐다고 표시하지 않는다.
