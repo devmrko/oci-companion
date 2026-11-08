@@ -9,7 +9,16 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class AgentConnectionRegistry {
- public record Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment) {}
+ public record Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment,List<Dependency> dependencies) {
+  public Registration { dependencies=dependencies==null?List.of():List.copyOf(dependencies); }
+  public Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment){this(id,name,environment,adapter,baseUrl,credentialRef,profile,tenancy,user,region,compartment,List.of());}
+ }
+ public record Dependency(String type,String label,String ocid) {
+  public Dependency {
+   String prefix=switch(Objects.toString(type,"")){case "VM"->"ocid1.instance.";case "ADB"->"ocid1.autonomousdatabase.";case "OKE"->"ocid1.cluster.";default->throw new IllegalArgumentException("VM·ADB·OKE 중 선택하세요.");};
+   if(label==null||label.isBlank()||label.length()>100||ocid==null||ocid.length()>255||!ocid.startsWith(prefix)||!ocid.matches("[A-Za-z0-9._-]+"))throw new IllegalArgumentException("이름과 유형에 맞는 OCID를 확인하세요.");
+  }
+ }
  public record Credential(String id,String label,String tokenFile,String profile,String tenancy,String user,String region,String compartment) {}
  private final Path file,credentials;
  private final JsonMapper mapper=JsonMapper.builder().build();
@@ -28,4 +37,11 @@ public class AgentConnectionRegistry {
   try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));if(items.size()>=100)throw new IllegalArgumentException();String id=UUID.randomUUID().toString();items.add(new Registration(id,name,environment,"monitoring-http-v1",address,credential,c.profile(),c.tenancy(),c.user(),r,comp));write(items);return id;}catch(Exception e){throw new IllegalArgumentException("연결 등록을 저장하지 못했습니다.");}
  }
  public synchronized void remove(Connection c,String r,String comp,String id){get(c,r,comp,id);try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));items.removeIf(x->x.id().equals(id));write(items);}catch(Exception e){throw new IllegalArgumentException("연결 해제를 저장하지 못했습니다.");}}
+ public synchronized void dependency(Connection c,String r,String comp,String id,Dependency dependency,boolean remove){
+  var current=get(c,r,comp,id);var refs=new ArrayList<>(current.dependencies());
+  if(remove)refs.removeIf(x->x.ocid().equals(dependency.ocid()));
+  else {if(refs.size()>=8||refs.stream().anyMatch(x->x.ocid().equals(dependency.ocid())))throw new IllegalArgumentException("의존 리소스는 중복 없이 최대 8개입니다.");refs.add(dependency);}
+  try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));all.replaceAll(x->x.id().equals(id)?new Registration(x.id(),x.name(),x.environment(),x.adapter(),x.baseUrl(),x.credentialRef(),x.profile(),x.tenancy(),x.user(),x.region(),x.compartment(),refs):x);write(all);}catch(Exception e){throw new IllegalArgumentException("의존 리소스를 저장하지 못했습니다.");}
+ }
+
 }
