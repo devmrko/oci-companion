@@ -31,4 +31,9 @@ class OciDeploymentEnvironmentsTest {
   when(compute.getImage(any())).thenReturn(GetImageResponse.builder().image(Image.builder().operatingSystem("Oracle Linux").operatingSystemVersion("9").build()).build());
   var result=adapter.inspect(c,"region","comp","vm");assertEquals(3,result.checks().stream().filter(x->x.state().equals("확인")).count());assertEquals(4,result.checks().stream().filter(x->x.state().equals("미확인")).count());
  }
+ @Test void okeDetailMapsClusterAndRejectsForeignCompartment() throws Exception {
+  var clients=mock(OciBuildHistory.class);var devops=mock(DevopsClient.class);when(clients.client(c,"region")).thenReturn(devops);var adapter=new OciDeploymentEnvironments(clients);
+  when(devops.getDeployEnvironment(any())).thenReturn(GetDeployEnvironmentResponse.builder().deployEnvironment(OkeClusterDeployEnvironment.builder().id("env").compartmentId("comp").clusterId("cluster").projectId("p").lifecycleState(DeployEnvironment.LifecycleState.Active).build()).build());
+  var e=adapter.environment(c,"region","comp","env");assertEquals("OKE",e.type());assertEquals("cluster",e.clusterId());assertTrue(e.instances().isEmpty());assertThrows(RuntimeException.class,()->adapter.environment(c,"region","other","env"));
+ }
 }
