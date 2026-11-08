@@ -15,3 +15,11 @@
 후속 패키지 배포는 단일 Instance Group 단계에 Generic Artifact를 포함할 수 있다. Companion은 각 아티팩트의 구획·프로젝트와 고정 버전 참조를 검사하고 배포 확인 지문에 전체 아티팩트 구성을 포함한다. 실제 파일 무결성은 VM의 root 설정에 고정한 manifest SHA-256으로 확인한다. Terraform은 is_immutable=true 저장소를 만든다. Companion은 패키지를 다운로드하거나 root 설치 명령을 직접 실행하지 않는다.
 
 패키지 배포 검증 (2026-11-06): 전체 테스트 109개 통과. Terraform이 만든 0.4.1 패키지 파이프라인의 대상 확인 화면, SDK로 시작한 최종 배포의 SUCCEEDED, 에이전트 화면 UP·0.4.1 및 기억 저장·조회 성공 기록을 실제 브라우저에서 확인했다. 이번 패키지 배포 시작 자체는 OCI SDK를 사용했으며 화면 시작 버튼을 통한 패키지 배포 재실행은 수행하지 않았다.
+
+## OKE 실행 확장 계약 (2026-11-08)
+
+준비된 단일 OKE 배포 단계도 같은 확인·티켓·재검증 흐름으로 실행한다. VM 경로와 별도로 클러스터가 선택 구획에서 ACTIVE인지 조회한다. 환경·단계·아티팩트의 프로젝트와 구획을 대조하고, 명시된 namespace와 각 문서의 namespace가 같아야 한다. 첫 지원은 치환 없는 인라인 Kubernetes 명세, Namespace·ServiceAccount·PVC·Deployment·Service다. 모든 컨테이너와 initContainer 이미지에 digest가 필요하다. 알 수 없는 종류, Secret 본문, 다른 namespace, 가변 태그, Generic Artifact 명세는 지원하지 않는다.
+
+확인 화면에는 OKE 클러스터·namespace·이미지 목록을 표시한다. 지문에는 인라인 명세의 실제 바이트도 포함해 내용이 바뀌면 시작을 차단한다. 이는 배포 대상을 확인하는 기능이며 Kubernetes 보안 정책 전체를 검증하거나 이미지의 소스 빌드 출처를 증명하지 않는다. 클러스터 RBAC·네트워크·Vault 주입·업무 검증은 별도 구성이다. 프로젝트별 앱 이름이나 Agent Memory·Langfuse 설정을 Companion에 넣지 않는다. 기존 VM 성공 빌드 연결은 그대로 유지하고 OKE 소스 빌드 연결은 추후 지원한다.
+
+검증 결과: 2026-11-08 전체 Maven verify 134개 테스트 통과(실패·오류·건너뜀 0). OKE 대상 구획/상태, namespace·digest·아티팩트 범위, 명세 바이트 변경 시 시작 차단, 실제 Thymeleaf 화면의 대상 표시와 CSRF·티켓 재사용 차단을 확인했다. 클라우드 OKE 배포 실행 및 실행 중인 Companion 서버 갱신은 아직 수행하지 않았다.
