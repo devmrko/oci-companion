@@ -97,3 +97,5 @@ BUILD_PREINSTALLED_LOCK이 설정된 경우 소스 잠금 파일과 이미지 �
 2026-11-08 새 공식 베이스 이미지로 만든 컨테이너는 import 검사와 pip check를 통과했지만 실제 Function probe에서 502 FunctionInvokeContainerInitFail을 반환했다. 호출 로그의 원인은 `exec /usr/local/bin/fdk failed: No such file or directory`였다. 기존 베이스에서 사용한 절대 경로를 새 이미지에도 그대로 적용한 것이 잘못이었다.
 
 Python Dockerfile은 `/usr/bin/env fdk`로 이미지 PATH의 실행 파일을 찾도록 수정했다. 앞으로 이미지 검사에서는 entrypoint를 python으로 덮어쓰는 import 검사에 더해 실제 기본 entrypoint를 실행하고 FDK 소켓을 통해 probe 응답까지 검증한다. 소스 수정이나 이미지 빌드 성공만으로 실클라우드 오류가 해결됐다고 표시하지 않는다.
+
+두 번째 이미지 검사에서는 FDK 서버 시작 후 HTTP 404가 발생했다. 검사 코드가 `/`로 요청했지만 사용 중인 fdk 0.1.128의 등록된 POST 경로는 `/call`이었다. smoke_runtime.py를 수정하고 경로·호출 헤더, HTTP 오류, 다른 계약 및 아키텍처 거부를 검사하는 회귀 테스트 4개를 추가했다. 2026-11-08 Python 관련 로컬 테스트 총 15개가 통과했다. 이 회귀 테스트는 HTTP 응답을 모의하므로 실제 FDK 시작·클라우드 호출 검증을 대체하지 않는다. 수정한 OCI 소스 68efecad39d70a32b79dd3a5883d78c2f3165193을 Companion에서 지정하여 재빌드 중이다.

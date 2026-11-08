@@ -9,7 +9,7 @@ for attempt in range(30):
     try:
         connection=UnixHTTP('localhost',timeout=5)
         deadline=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=60)).isoformat().replace('+00:00','Z')
-        connection.request('POST','/',json.dumps({'action':'probe'}),{'Content-Type':'application/json','Fn-Call-Id':str(uuid.uuid4()),'Fn-Deadline':deadline})
+        connection.request('POST','/call',json.dumps({'action':'probe'}),{'Content-Type':'application/json','Fn-Call-Id':str(uuid.uuid4()),'Fn-Deadline':deadline})
         response=connection.getresponse();body=response.read()
         assert response.status==200,(response.status,body)
         result=json.loads(body);assert result['contract']=='python-v1',result
