@@ -99,3 +99,5 @@ BUILD_PREINSTALLED_LOCK이 설정된 경우 소스 잠금 파일과 이미지 �
 Python Dockerfile은 `/usr/bin/env fdk`로 이미지 PATH의 실행 파일을 찾도록 수정했다. 앞으로 이미지 검사에서는 entrypoint를 python으로 덮어쓰는 import 검사에 더해 실제 기본 entrypoint를 실행하고 FDK 소켓을 통해 probe 응답까지 검증한다. 소스 수정이나 이미지 빌드 성공만으로 실클라우드 오류가 해결됐다고 표시하지 않는다.
 
 두 번째 이미지 검사에서는 FDK 서버 시작 후 HTTP 404가 발생했다. 검사 코드가 `/`로 요청했지만 사용 중인 fdk 0.1.128의 등록된 POST 경로는 `/call`이었다. smoke_runtime.py를 수정하고 경로·호출 헤더, HTTP 오류, 다른 계약 및 아키텍처 거부를 검사하는 회귀 테스트 4개를 추가했다. 2026-11-08 Python 관련 로컬 테스트 총 15개가 통과했다. 이 회귀 테스트는 HTTP 응답을 모의하므로 실제 FDK 시작·클라우드 호출 검증을 대체하지 않는다. 수정한 OCI 소스 68efecad39d70a32b79dd3a5883d78c2f3165193을 Companion에서 지정하여 재빌드 중이다.
+
+수정 후 실제 검증: 세 번째 OCI 이미지 실행의 기본 entrypoint probe와 Registry 전달이 성공했고, digest sha256:3363eb6a5b4a56cc42638eb65ceb3fa6bd630460b3881c141894718b16f93349로 기존 Function을 갱신했다. OCI invoke probe가 python-v1/x86_64를 반환했다. 실제 /tmp는 768MiB, 메모리 한도는 3GiB였다. 앞 절의 미검증 기록은 당시 상태이며 이미지 제작과 실제 초기화는 이 검증으로 완료됐다. 소스 빌드·결과 업로드·앱 wheel 검증은 아직 남아 있다.
