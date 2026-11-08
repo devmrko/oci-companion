@@ -77,3 +77,17 @@ Function 유형은 서버 세션의 일회용 실행 티켓에 보관한다. Pyt
 접수 후 같은 실행 이력에서 결과 JSON, 로그, JUnit 보고서를 확인한다. Python의 package와 verify는 현재 동일하게 테스트 후 wheel을 생성한다. 저장된 빌드 작업 등록 화면은 아직 Maven 전용이며 Python Function 등록을 거부한다. Python 템플릿 다운로드와 저장 작업 확장은 후속 작업이다.
 
 2026-11-08 Java 전체 `mvn verify` 통과. 새 MockMvc 테스트는 Python 폼 렌더링, 객체 버전·해시·정수 예산의 호출 전달, CSRF·티켓 재사용·교차 유형 입력 거부와 입력 검증을 확인한다. 실제 브라우저·OCI Function 호출을 대체하는 검증은 아니다. 실제 Python Function 배포와 Launchpad 빌드 성공은 아직 남아 있다.
+
+## 비공개 Python 라이브러리 소스 빌드 설계
+
+Launchpad처럼 공개 인덱스에 없는 내부 라이브러리를 사용하는 프로젝트는 동일 소스 번들에 라이브러리를 포함한다. 앱 작업 폴더의 선택 파일 `build-local.json`에는 schema_version=1과 packages 배열을 둔다. 각 항목은 path(앱 내부 상대 폴더), name, version만 받는다. 최대 8개이며 나열 순서대로 설치한다. pyproject.toml의 정적 이름·버전을 대조하고 잠금 파일과 중복되는 패키지, 링크·외부 경로를 거부한다. 별도의 shell 명령이나 저장소 인증값은 받지 않는다.
+
+전체 공개 의존성과 빌드 백엔드는 requirements-build.lock으로 먼저 설치하고, 내부 소스 → 앱 설치 → pip check → 앱 테스트 → 내부 라이브러리와 앱 wheel 생성 순으로 진행한다. 모든 빌드는 Function 안에서 수행한다. 라이브러리 자체 테스트 전체를 수행한다는 의미는 아니며 앱 통합 테스트 범위를 결과와 구분한다. 이 소스들과 추가 빌드 공간을 용량 예산에 포함해야 한다.
+
+## 임시 공간이 작은 Function의 의존성 이미지
+
+공개 의존성을 매번 가상환경에 설치할 공간이 부족하면 `Dockerfile.dependencies`로 별도 python-v1 러너 이미지를 확장한다. RUNNER_IMAGE에는 먼저 만든 러너의 digest를 지정하고 소스와 동일한 requirements-build.lock을 이미지에 포함한다. 이미지 생성 단계에서 pip install과 pip check를 통과해야 한다. 현재 이 Dockerfile은 아직 실제 빌드하지 않았다.
+
+BUILD_PREINSTALLED_LOCK이 설정된 경우 소스 잠금 파일과 이미지 잠금 파일의 전체 항목, 실제 설치된 모든 버전을 확인한 후에만 system-site-packages 가상환경을 만든다. 버전이 다르면 즉시 실패하며 다시 다운로드하는 우회는 하지 않는다. 공개 의존성은 읽기 전용 이미지 레이어에서 사용하고 내부 라이브러리·앱은 실행별 가상환경에 설치한다. 설정이 없으면 기존 격리 가상환경 경로를 유지한다. 이미지 의존성도 Function 메모리 소비를 줄여 주지는 않으며 실제 probe·최대 사용량 검증이 필요하다.
+
+2026-11-08 로컬 Python 테스트 11개 통과(Python 3.14). 대상 Python 3.12 Linux 실실행과 이미지 제작·배포는 미검증이다. macOS 기본 /usr/bin/python3(3.9)는 tomllib이 없어 테스트 실행기로 사용할 수 없다.
