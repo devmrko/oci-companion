@@ -2,6 +2,7 @@ package io.github.devmrko.companion.web;
 import io.github.devmrko.companion.adapter.AgentConnectionRegistry;
 import io.github.devmrko.companion.adapter.AgentHealth;
 import io.github.devmrko.companion.adapter.OciAgentDependencies;
+import io.github.devmrko.companion.adapter.OkeWorkloadHealth;
 import jakarta.servlet.http.*;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
@@ -11,13 +12,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller @Profile("!legacy")
 public class AgentConnectionPages {
- private final CatalogPages catalog;private final AgentConnectionRegistry registry;private final AgentHealth health;private final OciAgentDependencies dependencies;
- public AgentConnectionPages(CatalogPages catalog,AgentConnectionRegistry registry,AgentHealth health,OciAgentDependencies dependencies){this.catalog=catalog;this.registry=registry;this.health=health;this.dependencies=dependencies;}
- @GetMapping("/agents/connections") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String selected,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="false") boolean refresh){
+ private final CatalogPages catalog;private final AgentConnectionRegistry registry;private final AgentHealth health;private final OciAgentDependencies dependencies;private final OkeWorkloadHealth workload;
+ public AgentConnectionPages(CatalogPages catalog,AgentConnectionRegistry registry,AgentHealth health,OciAgentDependencies dependencies,OkeWorkloadHealth workload){this.catalog=catalog;this.registry=registry;this.health=health;this.dependencies=dependencies;this.workload=workload;}
+ @GetMapping("/agents/connections") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String selected,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="false") boolean refresh,@RequestParam(defaultValue="0") int podPage){
   var c=SecurityConfig.connection(auth);catalog.navigation(auth,request,model);var s=catalog.selection(c,request.getSession());model.addAttribute("scopeBack","/agents/connections");model.addAttribute("selection",s);model.addAttribute("selected",selected);model.addAttribute("refresh",refresh);
   if(c.demo()||request.getSession().getAttribute("scopeInvalid")!=null){model.addAttribute("connectionError","실제 OCI 연결과 리전·구획을 선택하세요.");return "agent-connections";}
   try {var all=registry.list(c,s.region(),s.compartment());int last=Math.max(0,(all.size()-1)/20);int current=Math.max(0,Math.min(page,last));model.addAttribute("items",all.subList(current*20,Math.min(all.size(),current*20+20)));model.addAttribute("page",current);model.addAttribute("last",last);model.addAttribute("total",all.size());model.addAttribute("credentials",registry.credentials(c,s.region(),s.compartment()));
-   if(!selected.isBlank()){model.addAttribute("chosen",registry.get(c,s.region(),s.compartment(),selected));model.addAttribute("health",health.check(c,s.region(),s.compartment(),selected));model.addAttribute("dependencies",registry.get(c,s.region(),s.compartment(),selected).dependencies().stream().map(ref->dependencies.check(c,s.region(),s.compartment(),ref)).toList());}
+   if(!selected.isBlank()){model.addAttribute("chosen",registry.get(c,s.region(),s.compartment(),selected));model.addAttribute("health",health.check(c,s.region(),s.compartment(),selected));model.addAttribute("dependencies",registry.get(c,s.region(),s.compartment(),selected).dependencies().stream().map(ref->dependencies.check(c,s.region(),s.compartment(),ref)).toList());var w=workload.check(c,s.region(),s.compartment(),selected);model.addAttribute("workload",w);int pl=Math.max(0,(w.pods().size()-1)/20);int pp=Math.max(0,Math.min(podPage,pl));model.addAttribute("podPage",pp);model.addAttribute("podLast",pl);model.addAttribute("pods",w.pods().subList(pp*20,Math.min(w.pods().size(),pp*20+20)));}
   }catch(IllegalArgumentException e){model.addAttribute("connectionError",e.getMessage());}
   return "agent-connections";
  }
