@@ -71,3 +71,21 @@ Companion 시작 옵션 `--companion.kubectl=/absolute/path/to/kubectl`로 설�
 2026-11-09 KST 실제 Edge 검증: 앱 UP/0.6.0, Deployment 준비 완료, 목표 1/Ready 1/최신 배포본 1, Pod Running·Ready와 재시작 2회를 확인했다. 이번 조회에서 재시작이 발생했다는 의미가 아니라 기존 Pod의 누적 횟수다. 로그·이벤트·클러스터 노드 Ready 및 상시 알람은 아직 연동하지 않았다.
 
 최종 검증: Maven verify 149건 통과(실패·오류 0). 새 테스트는 소유 Pod 필터, NotReady, generation 미반영, 0개 축소, 최신 복제본 미준비, 대상 Deployment 불일치, scope 차단 시 kubectl 미실행, 조회 실패 시 이전 정상 상태 제거, Pod 21개를 20+1로 나누고 범위를 벗어난 페이지를 제한하는 경우를 포함한다.
+
+## 앱 사용 노드 상태 조회 설계 (2026-11-09)
+
+Pod가 Ready여도 노드가 NotReady이거나 DiskPressure/MemoryPressure 상태일 수 있으므로 별도 표로 표시한다. 관리자 옵션 `inspectNodes`는 기본 false다. 활성화하면 해당 Deployment 소유 Pod의 spec.nodeName만 모아 중복 제거하고 20개씩 조회한다. 전체 노드 목록은 조회하지 않는다. 노드는 클러스터 범위 리소스여서 별도의 nodes get RBAC 권한이 필요하며 Companion이 권한을 부여하지 않는다.
+
+노드 조회 실패는 앱·Pod 정상 조회를 지우지 않고 별도 조회 불가로 표시한다. Ready, DiskPressure, MemoryPressure, PIDPressure, NetworkUnavailable 조건과 스케줄링 차단 여부만 표시한다. 없는 조건은 Unknown이며 정상으로 추정하지 않는다. 이는 사용량 측정이 아니므로 디스크 여유 GB나 메모리 사용률은 알 수 없다. 노드 이름은 신뢰한 API 응답에서도 형식을 검증하고 셸 없이 고정 get 명령의 개별 인수로 전달한다. 페이지마다 대상 이름을 지정한 한 번의 kubectl 호출로 기존 시간·출력 크기 제한을 적용한다.
+
+완료 기준: 실제 앱 Pod의 nodeName 전달, 해당 노드만 조회, 옵션 미설정 시 조회 없음, 노드 권한 실패에도 Pod 유지, 누락/압박 조건 구분, 20+1 페이지 및 실제 OKE 화면 확인이다.
+
+### 노드 조회 사용법·검증 결과
+
+관리자 설정 예시의 `inspectNodes`를 true로 바꾸면 해당 앱의 할당 노드를 조회한다. 기존 설정에서 생략하면 false로 동작한다. 기존 kubeconfig 주체에 nodes get 권한이 없으면 노드 표만 조회 불가이며, Deployment·Pod 결과는 유지한다. 노드 접근은 namespace Role만으로 부여할 수 없는 클러스터 범위 권한이다. 운영에서는 별도 RBAC 검토가 필요하며 이 검증에서 권한을 추가하지 않았다.
+
+노드·Pod 표는 각각 20개씩 페이지를 나눈다. 노드 조회는 현재 페이지의 명시된 이름만 get하며 전체 노드 list를 요청하지 않는다. 할당되지 않은 Pod는 노드 목록에 넣지 않고 동일 노드는 한 번만 조회한다. 조회 완료는 API 응답을 받았다는 뜻이며 노드 정상 판정이 아니다. 조건의 True/False/Unknown을 각각 확인한다.
+
+2026-11-09 KST: Maven verify 156건 통과(실패·오류 0). 실제 조회 경로에서 Pod nodeName 전달과 노드 권한 실패 후 Pod 결과 유지, 옵션 기본 끔, 중복 제거, 잘못된 이름의 실행 차단, 예상하지 않은 노드 응답 숨김, 조건 누락의 Unknown, 21개 노드의 20+1 페이지를 검증했다. 실제 Edge 화면에서 노드 10.80.1.205는 Ready=True, DiskPressure/MemoryPressure/PIDPressure/NetworkUnavailable=False, 새 Pod 배치 미차단이었다. 앱 UP/0.6.0과 Deployment 1/1/1 및 Pod Running·Ready도 유지됐다. 정상 단일 노드 실측이며 실제 장애를 발생시키지는 않았다.
+
+현재 남은 운영 연동: 로그·이벤트, 상시 알람, 디스크 여유 GB·메모리 사용률 수집과 용량 계획 연결이다. 이 정보는 OCI Monitoring/Logging 등 전문 도구를 우선 활용하며 별도 관측 저장소를 Companion에 만들지 않는다.

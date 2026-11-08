@@ -11,6 +11,7 @@
     "namespace": "example-app",
     "deployment": "example-app",
     "server": "",
-    "tlsServerName": ""
+    "tlsServerName": "",
+    "inspectNodes": false
   }
 ]
