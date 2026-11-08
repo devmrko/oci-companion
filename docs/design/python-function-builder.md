@@ -27,3 +27,34 @@
 `python3 -m unittest discover -s tests -p test_python_function.py -v`의 4개 테스트가 통과했다. 명령 구성과 handler의 실패 기록 경로를 검증했고, OCI 저장소와 명령 실행은 테스트 대역이다. Functions의 실제 Python 빌드·wheel 다운로드 검증은 아직 하지 않았다. Dockerfile의 BASE_IMAGE는 공식 OCI Functions Python 3.12 이미지의 검증된 digest를 외부에서 제공해야 한다. 고정된 입력 없이 임의 최신 태그로 배포하지 않는다.
 
 이 초기 버전은 전체 peak 메모리·디스크 사용량을 보장하지 않는다. 소스와 모든 의존성을 /tmp에 설치하므로 Launchpad 전체 의존성이 Functions 공간에 맞는지 먼저 probe 및 산정해야 한다. 필요하면 빌더 이미지에 고정 공통 의존성을 미리 넣고 변경되는 프로젝트 소스만 실행 공간에 두는 구조를 검토한다. 실행 중 원격 패키지 설치, 테스트, PEP 517 backend 실행은 신뢰하는 소스에만 허용한다. 결과 버킷 권한을 가진 Function에서 임의의 제3자 코드를 안전하게 실행하는 샌드박스로 간주하지 않는다.
+
+## 비공개 Object Storage 소스 입력 구현
+
+`source_bundle.py`와 Python handler에 비공개 입력 경로를 연결했다. 요청에는 `sourceBundle`의 object/version/sha256만 넣으며 namespace·bucket·허용 prefix는 관리자 Function 설정에서 가져온다. Git URL과 번들을 동시에 지정할 수 없다. Resource Principal의 객체 읽기 권한도 해당 버킷과 필요 범위로 한정해야 한다. 이 구현이 IAM 정책을 생성하지는 않는다.
+
+```json
+{
+  "action": "build",
+  "runId": "<새 UUID>",
+  "commit": "<40자리 소스 커밋>",
+  "sourceBundle": {
+    "object": "sources/<소스 번들>.tgz",
+    "version": "<Object Storage 객체 버전 ID>",
+    "sha256": "<번들 파일의 64자리 SHA-256>"
+  },
+  "goal": "verify",
+  "directory": "project",
+  "artifact": "dist/*.whl",
+  "requiredFreeBytes": 536870912
+}
+```
+
+requiredFreeBytes의 숫자는 형식 설명용이며 Launchpad의 필요 용량 실측값이 아니다. 실제 probe·산정 결과로 바꾼다. 버전 관리를 활성화한 소스 버킷과 실제 객체 version ID가 필요하다. 정적 Git 토큰이나 PAR URL은 입력으로 전달하지 않는다.
+
+관리자 설정은 BUILD_SOURCE_NAMESPACE, BUILD_SOURCE_BUCKET, BUILD_SOURCE_PREFIX(끝 `/` 필수)다. 선택 제한은 BUILD_SOURCE_MAX_BYTES(기본 64MiB), BUILD_SOURCE_MAX_UNPACKED_BYTES(256MiB), BUILD_SOURCE_MAX_ENTRIES(10,000), BUILD_SOURCE_RESERVE_BYTES(16MiB)이며 모두 양수다. 이 값은 Function 저장 공간을 늘리지 않는다. 전체 빌드 예산은 별도의 BUILD_MIN_FREE_BYTES·requiredFreeBytes로 검사한다.
+
+번들 최상위 `source.json`은 `{"schema_version":1,"commit":"<40자리 SHA>"}`를 포함해야 한다. commit은 출처 추적용이며 해시·manifest가 코드 신뢰를 증명하지 않는다. 소스 게시자를 신뢰해야 한다. 패키지와 테스트 코드를 함께 넣고 project/requirements-build.lock으로 전체 의존성을 고정한다. 기존 Launchpad의 다중 저장소 번들은 manifest 필드가 달라 그대로 호환되지 않으며 별도 입력 패키징이 필요하다.
+
+SDK get_object에 version_id를 전달하고 다운로드 크기·SHA256을 검사한다. 압축 전체의 항목·비압축 크기·중복 이름·절대/상위 경로·링크·특수 파일·sparse 항목을 확인한 뒤 새 디렉터리에 일반 파일만 쓴다. 전체 manifest를 검증하기 전에는 소스 디렉터리를 만들지 않는다. 압축 전송·해제 중 실패한 임시 파일은 invocation 작업 디렉터리 종료 때 정리한다.
+
+2026-11-08 로컬 테스트는 총 8개 통과했다. 버전 인자 전달, 정상 추출, 잘못된 prefix/version/hash/commit, 경로 탈출·링크·중복 이름 및 압축 크기 초과 거부를 검증했다. 실제 Object Storage 다운로드, IAM 권한, Function 배포, Companion UI 입력은 아직 검증하지 않았다. 기존 maven-v1 동작과 Java의 빌더 호환 판정은 유지했다.

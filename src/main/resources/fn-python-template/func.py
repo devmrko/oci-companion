@@ -18,11 +18,15 @@ from fdk import response
 CONTRACT = "python-v1"
 
 def validate(request):
-    source = request.get("source", "")
-    uri = urlparse(source)
-    hosts = os.environ.get("BUILD_ALLOWED_GIT_HOSTS", "github.com,gitlab.com").split(",")
-    if uri.scheme != "https" or uri.hostname not in hosts or uri.username or uri.password or uri.query or uri.fragment or uri.port not in (None, 443):
-        raise ValueError("Source must be an allowed HTTPS Git repository without credentials")
+    if "sourceBundle" in request:
+        from source_bundle import validate as validate_bundle
+        validate_bundle(request)
+    else:
+        source = request.get("source", "")
+        uri = urlparse(source)
+        hosts = os.environ.get("BUILD_ALLOWED_GIT_HOSTS", "github.com,gitlab.com").split(",")
+        if uri.scheme != "https" or uri.hostname not in hosts or uri.username or uri.password or uri.query or uri.fragment or uri.port not in (None, 443):
+            raise ValueError("Source must be an allowed HTTPS Git repository without credentials")
     if not re.fullmatch(r"[0-9a-f]{40}", request.get("commit", "")):
         raise ValueError("A full Git commit SHA is required")
     uuid.UUID(request["runId"])
@@ -67,7 +71,7 @@ def handler(ctx, data=None):
         raise ValueError("Invalid BUILD_PREFIX")
     key = prefix + "/" + run
     started = time.monotonic()
-    result = {"run": run, "source": request["source"], "commit": request["commit"], "goal": request["goal"], "environment": probe, "status": "RUNNING"}
+    result = {"run": run, "source": request.get("source", "object-storage"), "sourceBundle": request.get("sourceBundle"), "commit": request["commit"], "goal": request["goal"], "environment": probe, "status": "RUNNING"}
     def put(name, content):
         storage.put_object(namespace, bucket, key + "/" + name, content)
     def status():
@@ -118,14 +122,18 @@ def handler(ctx, data=None):
             result["capacity"] = {"requiredFreeBytes": required, "availableBytes": shutil.disk_usage(root).free}
             if result["capacity"]["availableBytes"] < required:
                 raise ValueError("Insufficient Function temporary capacity")
-            command(["git", "init", "source"], root)
-            source = root / "source"
-            command(["git", "remote", "add", "origin", request["source"]], source)
-            command(["git", "fetch", "--depth", "1", "origin", request["commit"]], source)
-            command(["git", "checkout", "--detach", "FETCH_HEAD"], source)
-            actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
-            if actual != request["commit"]:
-                raise RuntimeError("Source revision mismatch")
+            if "sourceBundle" in request:
+                from source_bundle import fetch
+                source = fetch(storage, request, root)
+            else:
+                command(["git", "init", "source"], root)
+                source = root / "source"
+                command(["git", "remote", "add", "origin", request["source"]], source)
+                command(["git", "fetch", "--depth", "1", "origin", request["commit"]], source)
+                command(["git", "checkout", "--detach", "FETCH_HEAD"], source)
+                actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
+                if actual != request["commit"]:
+                    raise RuntimeError("Source revision mismatch")
             directory = (source / request.get("directory", ".")).resolve()
             if not directory.is_relative_to(source.resolve()) or not directory.is_dir():
                 raise ValueError("Work directory is outside source or missing")
