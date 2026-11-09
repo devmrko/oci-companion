@@ -20,3 +20,7 @@
 - 예약 시간이 도래한 실제 자동 백업 생성은 이번 검증에 포함하지 않았습니다. 사용자 정의 정책은 대상 구획에 없어 실제 연결 검증은 Oracle 제공 정책으로 수행했습니다.
 
 참고: [OCI 정책 연결](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/create-bv-volume-backup-policy-assignment.htm), [연결 CLI](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/bv/volume-backup-policy-assignment/create.html), [권한 명세](https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/corepolicyreference.htm).
+
+## 정리
+
+검증용 볼륨은 정책 연결 없음·생성 백업 없음 확인 후 삭제했습니다. OCI `TERMINATED`를 확인했으며 검증 서버 8092도 종료했습니다. 최종 화면은 사용자 앱 8091에 반영하고 실제 조회를 다시 검증했습니다.
