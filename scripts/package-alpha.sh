@@ -43,5 +43,5 @@ VALIDATION.md를 먼저 확인하세요. 실제 OCI 생성·빌드·실행에는
 GUIDE
 (cd "$staging" && zip -qr package.zip "oci-companion-$version")
 mv "$staging/package.zip" ".tools/releases/oci-companion-$version.zip"
-shasum -a 256 ".tools/releases/oci-companion-$version.zip" > ".tools/releases/oci-companion-$version.zip.sha256"
+(cd .tools/releases && shasum -a 256 "oci-companion-$version.zip" > "oci-companion-$version.zip.sha256")
 echo ".tools/releases/oci-companion-$version.zip"
