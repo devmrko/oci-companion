@@ -20,7 +20,19 @@ const fs=require('fs');
   await list.click();await status.filter({hasText:'이 실행의 보고서 없음'}).waitFor();if(!await view.isDisabled())throw Error('Empty report view enabled');
   await form.locator('[name=reportPrefix]').fill('build-reports');await context.setOffline(true);await list.click();await status.filter({hasText:'조회 실패'}).waitFor();if(!await view.isDisabled())throw Error('Failed report view enabled');await context.setOffline(false);
   await list.click();await status.filter({hasText:/보고서 \d+개/}).waitFor();await view.click();await page.locator('#build-report-status').filter({hasText:'테스트 1 · 실패 0 · 오류 0'}).waitFor();
+  // Hold the actual report body while the user changes the target.
+  let releaseReport,receivedReport;const heldReport=new Promise(r=>releaseReport=r),readyReport=new Promise(r=>receivedReport=r);
+  await page.route('**/builds/report-storage/report?*',async route=>{const response=await route.fetch();receivedReport();await heldReport;await route.fulfill({response});},{times:1});
+  await view.click();await readyReport;await form.locator('[name=reportPrefix]').fill('changed-during-report');releaseReport();
+  await page.locator('#object-report-form[data-report-busy=false]').waitFor();
+  await page.locator('#build-report-status[data-state=CHANGED]').waitFor();
+  if(await page.locator('#pmd-reports').textContent()||await page.locator('#report-files').textContent())throw Error('Stale report body displayed');
+  if(!await view.isDisabled())throw Error('View enabled after target changed');
+  await form.locator('[name=reportPrefix]').fill('build-reports');await list.click();await status.filter({hasText:/보고서 \d+개/}).waitFor();
+  await context.setOffline(true);await view.click();await page.locator('#build-report-status[data-state=ERROR]').waitFor();await context.setOffline(false);
+  await view.click();await page.locator('#build-report-status[data-state=READY]').waitFor();
+  await page.locator('#build-report-status').filter({hasText:'테스트 1 · 실패 0 · 오류 0'}).waitFor();
   for(const width of [390,768,1440]){await page.setViewportSize({width,height:1000});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Overflow '+width);await form.scrollIntoViewIfNeeded();await page.screenshot({path:'.tools/report-selection-'+width+'.png'});}
-  console.log('PASS real OCI report: stale response discarded, empty/failure disabled, retry and report read, responsive layout');
+  console.log('PASS real OCI report: stale response discarded, empty/failure disabled, retry, stale report body discarded, report failure/recovery, responsive layout');
  }finally{await context.setOffline(false);await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
