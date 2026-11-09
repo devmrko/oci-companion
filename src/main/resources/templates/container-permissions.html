@@ -1,0 +1,12 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
+<details th:fragment="privateRegistry" class="card section-stack"><summary>사설 OCIR 인증 확인 ?</summary>
+<p>화면에서 이미지가 보여도 Container Instances의 다운로드 권한은 별도로 필요합니다.</p>
+<ol><li>OCI 콘솔 → Developer Services → Container Registry: 이미지 경로·digest와 저장소 구획을 확인하세요.</li><li>ID 및 보안 → 도메인 → 동적 그룹: 대상 Container Instance가 일치 규칙에 포함되는지 확인하세요.</li><li>ID 및 보안 → 정책: 해당 동적 그룹에 대상 저장소의 읽기 권한을 부여하세요.</li><li>Networking → 서브넷: OCIR 접근 경로·DNS·보안 규칙을 확인하세요. 권한 변경은 반영에 시간이 걸릴 수 있습니다.</li></ol>
+<p class="small muted">기존 인스턴스 한 대로 제한하는 동적 그룹 예시입니다. 새 인스턴스에는 그 인스턴스의 OCID를 사용해야 합니다.</p>
+<pre class="code-block">ALL {resource.type='computecontainerinstance', resource.id='&lt;인스턴스 OCID&gt;'}
+
+Allow dynamic-group &lt;동적 그룹&gt; to read repos in compartment id &lt;저장소 구획 OCID&gt; where target.repo.name='&lt;저장소 이름&gt;'</pre>
+<p class="small muted">동적 그룹 생성이 한도 초과로 거절되면 관리자가 그룹 사용 현황과 서비스 한도를 확인해야 합니다. 앱은 기존 그룹을 삭제하거나 IAM 권한을 자동 변경하지 않습니다.</p>
+<p class="small muted">OCIR 사설 이미지는 리소스 주체 IAM을 사용합니다. Vault 이미지 인증은 외부 Registry용입니다. FAILED 생성 건은 원인을 해결한 뒤 삭제·재생성하세요. 같은 생성 요청을 반복하기 전에 OCI 작업 상태를 확인하세요.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/container-instances/permissions/policy-reference.htm" target="_blank" rel="noopener noreferrer">Container Instances IAM ↗</a>
+</details></body></html>
