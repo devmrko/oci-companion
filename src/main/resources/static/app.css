@@ -986,3 +986,9 @@ a:focus-visible, .ui-button:focus-visible {
 .deployment-spec { white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; }
 
 .resource-details dd, .section-stack > .notice { overflow-wrap:anywhere; }
+
+/* Shared checkbox rows used by environment network selectors. */
+.checkbox-field { display:flex; align-items:center; gap:8px; min-width:0; padding-block:4px; }
+.checkbox-field input[type="checkbox"] { flex:0 0 auto; width:auto; margin:0; }
+.checkbox-field span { overflow-wrap:anywhere; }
+.container-log { max-height:420px; overflow:auto; }

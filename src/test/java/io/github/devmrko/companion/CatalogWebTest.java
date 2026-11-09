@@ -38,6 +38,9 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentLogs deploymentLogs;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentSetup deploymentSetup;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.VmCapacity vmCapacity;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.VmSizing vmSizing;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkePreparation okePreparation;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.ContainerPreparation containerPreparation;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildHandoff handoff;
     @Test void deploymentHistoryAndNativeLogsRenderWithoutInjectingMarkup() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);

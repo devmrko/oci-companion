@@ -45,4 +45,10 @@ class OciRegistryTest {
         assertEquals("next",page.next());assertEquals("hash",page.items().getFirst().digest());assertEquals("42",page.items().getFirst().bytes());
         verify(client).listGenericArtifacts(argThat(r->r.getPage().equals("previous")&&r.getRepositoryId().equals("repo")&&r.getLimit()==100));
     }
+    @Test void nativeContainerStateUsesApiValueForImageSelectors() throws Exception {
+        var client=mock(ArtifactsClient.class);var adapter=adapter(client);
+        when(client.getContainerRepository(any())).thenReturn(GetContainerRepositoryResponse.builder().containerRepository(ContainerRepository.builder().id("repo").compartmentId("comp").lifecycleState(ContainerRepository.LifecycleState.Available).build()).build());
+        when(client.listContainerImages(any())).thenReturn(ListContainerImagesResponse.builder().containerImageCollection(ContainerImageCollection.builder().items(List.of(ContainerImageSummary.builder().id("image").repositoryName("hello").digest("sha256:hash").lifecycleState(ContainerImage.LifecycleState.Available).build())).build()).build());
+        assertEquals("AVAILABLE",adapter.artifacts(c,"region","comp","CONTAINER","repo","").items().getFirst().state());
+    }
 }

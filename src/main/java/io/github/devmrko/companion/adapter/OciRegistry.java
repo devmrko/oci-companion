@@ -27,10 +27,10 @@ public class OciRegistry implements Registry {
             var result=new ArrayList<Repository>();
             if(kind.equals("GENERIC")) {
                 for(var r:client.getPaginators().listRepositoriesRecordIterator(ListRepositoriesRequest.builder().compartmentId(comp).build()))
-                    result.add(new Repository(r.getId(),kind,r.getDisplayName(),value(r.getDescription()),value(r.getLifecycleState()),Boolean.TRUE.equals(r.getIsImmutable()),false,""));
+                    result.add(new Repository(r.getId(),kind,r.getDisplayName(),value(r.getDescription()),r.getLifecycleState()==null?"":r.getLifecycleState().getValue(),Boolean.TRUE.equals(r.getIsImmutable()),false,""));
             } else {
                 for(var r:client.getPaginators().listContainerRepositoriesRecordIterator(ListContainerRepositoriesRequest.builder().compartmentId(comp).build()))
-                    result.add(new Repository(r.getId(),kind,r.getDisplayName(),"",value(r.getLifecycleState()),null,Boolean.TRUE.equals(r.getIsPublic()),""));
+                    result.add(new Repository(r.getId(),kind,r.getDisplayName(),"",r.getLifecycleState()==null?"":r.getLifecycleState().getValue(),null,Boolean.TRUE.equals(r.getIsPublic()),""));
             }
             return result;
         } catch(BusinessException e) {throw e;} catch(Exception e) {throw Errors.CLOUD.exception();}
@@ -40,11 +40,11 @@ public class OciRegistry implements Registry {
         if(kind.equals("GENERIC")) {
             var response=client.getRepository(GetRepositoryRequest.builder().repositoryId(id).build());var r=response.getRepository();
             if(!comp.equals(r.getCompartmentId()))throw Errors.SCOPE.exception();
-            return new Repository(r.getId(),kind,r.getDisplayName(),value(r.getDescription()),value(r.getLifecycleState()),Boolean.TRUE.equals(r.getIsImmutable()),false,response.getEtag());
+            return new Repository(r.getId(),kind,r.getDisplayName(),value(r.getDescription()),r.getLifecycleState()==null?"":r.getLifecycleState().getValue(),Boolean.TRUE.equals(r.getIsImmutable()),false,response.getEtag());
         }
         var response=client.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(id).build());var r=response.getContainerRepository();
         if(!comp.equals(r.getCompartmentId()))throw Errors.SCOPE.exception();
-        return new Repository(r.getId(),kind,r.getDisplayName(),r.getReadme()==null?"":value(r.getReadme().getContent()),value(r.getLifecycleState()),Boolean.TRUE.equals(r.getIsImmutable()),Boolean.TRUE.equals(r.getIsPublic()),response.getEtag());
+        return new Repository(r.getId(),kind,r.getDisplayName(),r.getReadme()==null?"":value(r.getReadme().getContent()),r.getLifecycleState()==null?"":r.getLifecycleState().getValue(),Boolean.TRUE.equals(r.getIsImmutable()),Boolean.TRUE.equals(r.getIsPublic()),response.getEtag());
     }
     public Repository read(Connection c,String region,String comp,String kind,String id) {
         try(var client=client(c,region)){return read(client,comp,kind,id);}
@@ -55,10 +55,10 @@ public class OciRegistry implements Registry {
             read(client,comp,kind,id);
             if(kind.equals("GENERIC")) {
                 var r=client.listGenericArtifacts(ListGenericArtifactsRequest.builder().compartmentId(comp).repositoryId(id).limit(100).page(page.isEmpty()?null:page).build());
-                return new Page(r.getGenericArtifactCollection().getItems().stream().map(a->new Artifact(a.getId(),a.getArtifactPath(),a.getVersion(),a.getSha256(),value(a.getSizeInBytes()),value(a.getLifecycleState()),date(a.getTimeCreated()))).toList(),value(r.getOpcNextPage()));
+                return new Page(r.getGenericArtifactCollection().getItems().stream().map(a->new Artifact(a.getId(),a.getArtifactPath(),a.getVersion(),a.getSha256(),value(a.getSizeInBytes()),a.getLifecycleState()==null?"":a.getLifecycleState().getValue(),date(a.getTimeCreated()))).toList(),value(r.getOpcNextPage()));
             }
             var r=client.listContainerImages(ListContainerImagesRequest.builder().compartmentId(comp).repositoryId(id).limit(100).page(page.isEmpty()?null:page).build());
-            return new Page(r.getContainerImageCollection().getItems().stream().map(a->new Artifact(a.getId(),a.getRepositoryName(),value(a.getVersion()),a.getDigest(),"—",value(a.getLifecycleState()),date(a.getTimeCreated()))).toList(),value(r.getOpcNextPage()));
+            return new Page(r.getContainerImageCollection().getItems().stream().map(a->new Artifact(a.getId(),a.getRepositoryName(),value(a.getVersion()),a.getDigest(),"—",a.getLifecycleState()==null?"":a.getLifecycleState().getValue(),date(a.getTimeCreated()))).toList(),value(r.getOpcNextPage()));
         }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
     }
     static void validate(String kind,String name,String description) {
