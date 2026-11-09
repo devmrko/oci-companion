@@ -992,3 +992,10 @@ a:focus-visible, .ui-button:focus-visible {
 .checkbox-field input[type="checkbox"] { flex:0 0 auto; width:auto; margin:0; }
 .checkbox-field span { overflow-wrap:anywhere; }
 .container-log { max-height:420px; overflow:auto; }
+
+/* Reusable action steps: labels, explanations and next actions. */
+.setup-steps { list-style:decimal; margin:0; padding-left:24px; }
+.setup-steps > li { padding:16px 8px; border-bottom:1px solid var(--border,#ddd); }
+.setup-steps > li:last-child { border-bottom:0; }
+.setup-steps > li > strong, .setup-steps > li > span { display:block; margin-bottom:8px; overflow-wrap:anywhere; }
+.setup-steps .form-toolbar { margin:0; flex-wrap:wrap; }

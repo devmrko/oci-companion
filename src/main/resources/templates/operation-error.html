@@ -1,1 +1,7 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('요청 결과 확인')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content section-stack"><h1>요청 결과 확인</h1><section class="card section-stack"><p class="notice" th:text="${operationError}"></p><p>자동으로 다시 실행하지 않습니다. 생성·실행 요청이었다면 이력과 OCI 상태를 먼저 확인하세요.</p><div class="form-toolbar"><a class="ui-button" href="/deployments/runs">배포 이력</a><a class="ui-button" href="/environments/containers">Container 상태</a><a class="ui-button" href="/environments">배포 환경</a></div></section></main><footer th:replace="~{layout :: footer}"></footer></body></html>
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('요청 결과 확인')}"></head><body>
+<header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content section-stack"><h1>요청 결과 확인</h1>
+<section class="card section-stack"><p class="notice" role="alert" th:text="${operationError}"></p><p class="small muted">오류 코드: <code th:text="${operationCode}"></code></p>
+<p th:if="${readRequest}">리전·구획과 리소스 존재 여부를 먼저 확인하세요. 조회 실패만으로 권한 부족이라고 단정할 수는 없습니다.</p>
+<p th:unless="${readRequest}">자동으로 다시 실행하지 않습니다. 생성·실행 요청이었다면 이력과 OCI 상태를 먼저 확인하세요.</p>
+<div class="form-toolbar"><a class="ui-button primary" th:href="${operationBack}" th:text="${operationBackLabel}"></a><a class="ui-button" href="/guides#permissions">권한 설정 안내</a><a href="/guides#start">시작 순서</a></div></section>
+</main><footer th:replace="~{layout :: footer}"></footer></body></html>
