@@ -68,7 +68,17 @@ public class OciContainerPreparation implements ContainerPreparation {
   var subnets=new ArrayList<Subnet>();for(var s:network.getPaginators().listSubnetsRecordIterator(ListSubnetsRequest.builder().compartmentId(comp).build()))if("AVAILABLE".equals(s.getLifecycleState().getValue())&&(s.getAvailabilityDomain()==null||s.getAvailabilityDomain().equals(domain)))subnets.add(new Subnet(s.getId(),s.getDisplayName(),s.getVcnId(),Boolean.TRUE.equals(s.getProhibitPublicIpOnVnic())));
   return new Options(domains,List.copyOf(shapes),List.copyOf(subnets));
  }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}}
+ com.oracle.bmc.vault.VaultsClient vault(Connection c,String r) throws java.io.IOException {var client=com.oracle.bmc.vault.VaultsClient.builder().configuration(config()).build(clients.authentication(c));client.setRegion(r);return client;}
+ public List<PullSecret> pullSecrets(Connection c,String r,String comp){try(var v=vault(c,r)){var items=new ArrayList<PullSecret>();for(var s:v.getPaginators().listSecretsRecordIterator(com.oracle.bmc.vault.requests.ListSecretsRequest.builder().compartmentId(comp).build()))if(s.getLifecycleState()==com.oracle.bmc.vault.model.SecretSummary.LifecycleState.Active)items.add(new PullSecret(s.getId(),s.getSecretName()));return List.copyOf(items);}catch(Exception e){throw Errors.CLOUD.exception();}}
+ static boolean externalImage(String image){
+  if(image==null||image.length()>2048||!image.matches("[a-z0-9]+([.-][a-z0-9]+)*(:[0-9]{1,5})?/[a-z0-9]+([._/-][a-z0-9]+)*@sha256:[a-f0-9]{64}"))return false;
+  String host=image.substring(0,image.indexOf('/')).split(":")[0];return host.contains(".")&&!host.endsWith(".ocir.io")&&!host.endsWith(".oci.oraclecloud.com")&&!host.equals("localhost");
+ }
  static void validate(Input i){
+  if(i.externalImage()==null||i.pullSecret()==null||i.image()==null)throw Errors.INVALID.exception();
+  boolean external=!i.externalImage().isBlank();
+  if(external?(!i.image().isBlank()||!externalImage(i.externalImage())):i.image().isBlank())throw Errors.INVALID.exception();
+  if(!i.pullSecret().isBlank()&&(!external||!i.pullSecret().matches("ocid1\\.vaultsecret\\.[a-z0-9.-]+")))throw Errors.INVALID.exception();
   if(i.healthPath()==null||i.healthPort()<0||i.healthPort()>65535||(i.healthPort()>0&&(!i.healthPath().startsWith("/")||i.healthPath().length()>1024||i.healthPath().contains("\r")||i.healthPath().contains("\n")))||(i.healthPort()==0&&!i.healthPath().isBlank()))throw Errors.INVALID.exception();
   if(i.name()==null||!i.name().matches("[A-Za-z0-9][A-Za-z0-9-]{0,62}")||i.variables()==null||i.variables().size()>100||i.command()==null||i.arguments()==null||i.command().size()>100||i.arguments().size()>100)throw Errors.INVALID.exception();
   for(var e:i.variables().entrySet())if(!e.getKey().matches("[A-Za-z_][A-Za-z0-9_]*")||e.getValue()==null||e.getValue().length()>4096)throw Errors.INVALID.exception();
@@ -78,14 +88,22 @@ public class OciContainerPreparation implements ContainerPreparation {
   return CreateContainerInstanceDetails.builder().compartmentId(comp).displayName(i.name()).availabilityDomain(i.domain()).shape(i.shape()).shapeConfig(CreateContainerInstanceShapeConfigDetails.builder().ocpus(i.cpu()).memoryInGBs(i.memory()).build())
    .vnics(List.of(CreateContainerVnicDetails.builder().subnetId(i.subnet()).isPublicIpAssigned(i.publicIp()).build()))
    .containers(List.of(CreateContainerDetails.builder().displayName(i.name()).imageUrl(imageUrl).environmentVariables(i.variables()).command(i.command().isEmpty()?null:i.command()).arguments(i.arguments().isEmpty()?null:i.arguments()).healthChecks(i.healthPort()==0?null:List.of(CreateContainerHttpHealthCheckDetails.builder().name("HTTP").port(i.healthPort()).path(i.healthPath()).initialDelayInSeconds(10).intervalInSeconds(15).timeoutInSeconds(5).successThreshold(1).failureThreshold(3).failureAction(ContainerHealthCheckFailureAction.None).build())).build()))
+   .imagePullSecrets(i.pullSecret().isBlank()?null:List.of(CreateVaultImagePullSecretDetails.builder().registryEndpoint(imageUrl.substring(0,imageUrl.indexOf('@'))).secretId(i.pullSecret()).build()))
    .containerRestartPolicy(ContainerInstance.ContainerRestartPolicy.Always).freeformTags(Map.of("created-by","oci-companion")).build();
  }
+ static boolean externalRegistryRoute(java.util.List<com.oracle.bmc.core.model.RouteRule> routes){return routes.stream().anyMatch(x->x.getNetworkEntityId()!=null&&x.getNetworkEntityId().startsWith("ocid1.natgateway.")&&"0.0.0.0/0".equals(x.getDestination()));}
  static boolean privateRegistryRoute(java.util.List<com.oracle.bmc.core.model.RouteRule> routes){return routes.stream().anyMatch(x->x.getNetworkEntityId()!=null&&((x.getNetworkEntityId().startsWith("ocid1.natgateway.")&&"0.0.0.0/0".equals(x.getDestination()))||(x.getNetworkEntityId().startsWith("ocid1.servicegateway.")&&Objects.toString(x.getDestination(),"").startsWith("all-")&&Objects.toString(x.getDestination(),"").contains("services-in-oracle-services-network"))));}
  public Preview preview(Connection c,String r,String comp,Input i){validate(i);var options=options(c,r,comp,i.domain());if(!options.domains().contains(i.domain()))throw Errors.SCOPE.exception();var shape=options.shapes().stream().filter(x->x.name().equals(i.shape())).findFirst().orElseThrow(Errors.SCOPE::exception);shape.limits().validate(i.cpu(),i.memory());var subnet=options.subnets().stream().filter(x->x.id().equals(i.subnet())).findFirst().orElseThrow(Errors.SCOPE::exception);if(i.publicIp()&&subnet.privateOnly())throw Errors.INVALID.exception();
   try(var net=network(c,r)){
    var selected=net.getSubnet(GetSubnetRequest.builder().subnetId(i.subnet()).build()).getSubnet();if(!comp.equals(selected.getCompartmentId()))throw Errors.SCOPE.exception();
-   if(!i.publicIp()&&!privateRegistryRoute(net.getRouteTable(GetRouteTableRequest.builder().rtId(selected.getRouteTableId()).build()).getRouteTable().getRouteRules()))throw Errors.CONTAINER_NETWORK.exception();
+   var routes=net.getRouteTable(GetRouteTableRequest.builder().rtId(selected.getRouteTableId()).build()).getRouteTable().getRouteRules();
+   if(!i.publicIp()&&!(i.externalImage().isBlank()?privateRegistryRoute(routes):externalRegistryRoute(routes)))throw Errors.CONTAINER_NETWORK.exception();
   }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
+  if(!i.externalImage().isBlank()){
+   String version="";
+   if(!i.pullSecret().isBlank())try(var v=vault(c,r)){var response=v.getSecret(com.oracle.bmc.vault.requests.GetSecretRequest.builder().secretId(i.pullSecret()).build());var secret=response.getSecret();if(!comp.equals(secret.getCompartmentId())||secret.getLifecycleState()!=com.oracle.bmc.vault.model.Secret.LifecycleState.Active)throw Errors.SCOPE.exception();version=Objects.toString(secret.getCurrentVersionNumber(),"");}catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
+   try{String json=com.oracle.bmc.model.internal.JsonConverter.objectToJsonBlob(details(comp,i,i.externalImage()));String fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((json+version+subnet.toString()+shape.toString()).getBytes(StandardCharsets.UTF_8)));return new Preview(i,i.externalImage(),json,fingerprint);}catch(Exception e){throw Errors.CLOUD.exception();}
+  }
   try(var registry=artifacts(c,r)){
    var response=registry.getContainerImage(GetContainerImageRequest.builder().imageId(i.image()).build());var image=response.getContainerImage();if(!comp.equals(image.getCompartmentId())||!"AVAILABLE".equals(image.getLifecycleState().getValue())||image.getDigest()==null||!image.getDigest().matches("sha256:[a-f0-9]{64}"))throw Errors.SCOPE.exception();
    var repo=registry.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(image.getRepositoryId()).build()).getContainerRepository();if(!comp.equals(repo.getCompartmentId())||!"AVAILABLE".equals(repo.getLifecycleState().getValue()))throw Errors.SCOPE.exception();
