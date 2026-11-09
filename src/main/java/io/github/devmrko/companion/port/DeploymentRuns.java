@@ -4,7 +4,10 @@ import java.util.List;
 public interface DeploymentRuns {
     record Pipeline(String id,String name,String state) {}
     record Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,
-                String targetType,String cluster,String namespace,List<String> images) {
+                String targetType,String cluster,String namespace,List<String> images,java.util.Map<String,List<String>> imageArchitectures) {
+        public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,String targetType,String cluster,String namespace,List<String> images){
+            this(pipeline,name,environment,instances,fingerprint,targetType,cluster,namespace,images,java.util.Map.of());
+        }
         public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint){
             this(pipeline,name,environment,instances,fingerprint,"VM","","",List.of());
         }
