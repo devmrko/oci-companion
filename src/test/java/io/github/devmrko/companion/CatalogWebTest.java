@@ -35,9 +35,18 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildControl control;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentEnvironments deploymentEnvironments;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentRuns deploymentRuns;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentLogs deploymentLogs;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentSetup deploymentSetup;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.VmCapacity vmCapacity;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildHandoff handoff;
+    @Test void deploymentHistoryAndNativeLogsRenderWithoutInjectingMarkup() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var run=new io.github.devmrko.companion.port.DeploymentRuns.Run("run","release-v1","SUCCEEDED","",java.util.List.of(new io.github.devmrko.companion.port.DeploymentRuns.Step("Deploy VM","vm","Rollout deployment","SUCCEEDED")));
+        org.mockito.Mockito.when(deploymentRuns.run(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("pipeline"),org.mockito.ArgumentMatchers.eq("run"))).thenReturn(run);
+        org.mockito.Mockito.when(deploymentRuns.history(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("pipeline"),org.mockito.ArgumentMatchers.anyString())).thenReturn(new io.github.devmrko.companion.port.DeploymentRuns.History(java.util.List.of(run),"next-page"));
+        org.mockito.Mockito.when(deploymentLogs.read(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("pipeline"),org.mockito.ArgumentMatchers.eq("run"),org.mockito.ArgumentMatchers.eq(""),org.mockito.ArgumentMatchers.eq(""))).thenReturn(new io.github.devmrko.companion.port.BuildLogs.Page("READY","OCI Logging",java.util.List.of(new io.github.devmrko.companion.port.BuildLogs.Line("now","VM","<script>alert('log')</script>")),"next-log","until"));
+        mvc.perform(get("/deployments/runs").session(session).param("pipeline","pipeline").param("run","run")).andExpect(status().isOk()).andExpect(content().string(containsString("배포 로그"))).andExpect(content().string(containsString("실행 이력"))).andExpect(content().string(containsString("&lt;script&gt;"))).andExpect(content().string(not(containsString("<script>alert")))).andExpect(content().string(containsString("next-log"))).andExpect(content().string(containsString("Rollout deployment")));
+    }
     @Test void deploymentSetupRendersCapacityAndCreatesOnlyReviewedSettingsOnce() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var env=new io.github.devmrko.companion.port.DeploymentEnvironments.Environment("env","test VM environment","description","ACTIVE","project",java.util.List.of("vm"),java.util.List.of());

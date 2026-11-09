@@ -33,3 +33,13 @@
 - [Instance group deployment](https://docs.oracle.com/en-us/iaas/Content/devops/using/deploy_instancegroups.htm)
 - [Rollout policy SDK](https://docs.oracle.com/en-us/iaas/tools/python/latest/api/devops/models/oci.devops.models.ComputeInstanceGroupRolloutPolicy.html)
 - [Volume expansion](https://docs.oracle.com/en-us/iaas/Content/Block/Tasks/update-online-resize-block-boot-volume.htm)
+
+## 실행 이력과 로그
+
+`/deployments/runs`는 OCI ListDeployments/GetDeployment로 이력·단계·대상별 진행 상태를 조회한다. OCI Logging에서 해당 프로젝트와 deploymentId로 로그를 조회하며 페이지 탐색과 고정 조회 종료 시각을 지원한다. 로그 없음·비활성화·권한 오류를 구분하고 내용을 HTML로 실행하지 않는다.
+
+실행 중에는 15초 자동 갱신을 켜거나 끌 수 있다. 백그라운드 탭·이전 로그 탐색에서는 갱신하지 않으며, 다른 입력을 바꾸면 갱신을 멈춘다. 완료 후에는 자동 갱신을 중지한다. 앱 재시작 이후에도 OCI 이력을 다시 조회할 수 있다.
+
+브라우저 textarea의 CRLF/CR은 배포 명세 생성 시 LF로 변환한다. 명령 본문과 실패 처리 명령에 모두 적용한다. 실제 VM 배포에서 CR이 셸 변수·경로에 섞이는 문제를 재현해 수정했다.
+
+[OCI DevOps 로그 필드와 조회](https://docs.oracle.com/en-us/iaas/Content/Logging/Reference/details_for_devops.htm)
