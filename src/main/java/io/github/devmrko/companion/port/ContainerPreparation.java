@@ -3,6 +3,14 @@ import io.github.devmrko.companion.domain.Models.Connection;
 import java.util.List;
 import java.util.Map;
 public interface ContainerPreparation {
+ enum Action {
+  START("시작"), STOP("중지"), RESTART("재시작"), DELETE("삭제");
+  private final String label; Action(String label){this.label=label;} public String label(){return label;}
+  public boolean allowed(String state){return switch(this){case START -> "INACTIVE".equals(state);case STOP,RESTART -> "ACTIVE".equals(state);case DELETE -> List.of("ACTIVE","INACTIVE","FAILED").contains(state);};}
+ }
+ record Operation(String instance,String name,String state,String etag,Action action) {}
+ Operation planAction(Connection c,String region,String compartment,String instance,Action action);
+ void applyAction(Connection c,String region,String compartment,Operation expected);
  record Instance(String id,String name,String state,String shape,String cpu,String memory) {}
  record Process(String id,String name,String state,String detail,String exitCode,String image) {}
  record Work(String id,String state,String percent,String error) {}
