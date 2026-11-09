@@ -4,4 +4,4 @@
 <p th:if="${readRequest}">리전·구획과 리소스 존재 여부를 먼저 확인하세요. 조회 실패만으로 권한 부족이라고 단정할 수는 없습니다.</p>
 <p th:unless="${readRequest}">자동으로 다시 실행하지 않습니다. 생성·실행 요청이었다면 이력과 OCI 상태를 먼저 확인하세요.</p>
 <div class="form-toolbar"><a class="ui-button primary" th:href="${operationBack}" th:text="${operationBackLabel}"></a><a class="ui-button" href="/guides#permissions">권한 설정 안내</a><a href="/guides#start">시작 순서</a></div></section>
-</main><footer th:replace="~{layout :: footer}"></footer></body></html>
+<section th:if="${backupPolicyError}" class="section-stack"><p>정책 권한과 수동 백업·복구 권한은 별개입니다.</p><div class="form-toolbar"><a href="/backups" class="ui-button">수동 백업·복구</a><a href="/guides#backup-policy-help" class="ui-button">정책 도움말</a></div><div th:replace="~{backup-help :: policy(true)}"></div></section><section th:if="${backupManualError}" class="section-stack"><div th:replace="~{backup-help :: manual(true)}"></div></section></main><footer th:replace="~{layout :: footer}"></footer></body></html>
