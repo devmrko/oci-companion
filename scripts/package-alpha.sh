@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version=0.1.0-alpha.1
+version="${1:-0.1.0-alpha.2}"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]] || { echo 'Expected version: x.y.z-alpha.n' >&2; exit 1; }
 jar_path=target/oci-companion-0.1.0-SNAPSHOT.jar
 [[ -f "$jar_path" ]] || { echo 'Run ./scripts/build.sh first.' >&2; exit 1; }
 mkdir -p .tools/releases
@@ -23,8 +24,8 @@ exec "$java_bin" -jar oci-companion.jar "$@"
 RUN
 chmod +x "$package/run.sh"
 cp docs/releases/alpha-readiness.md "$package/VALIDATION.md"
-cat > "$package/README.txt" <<'GUIDE'
-OCI Companion 0.1.0-alpha.1 — Public Alpha
+cat > "$package/README.txt" <<GUIDE
+OCI Companion $version — Public Alpha
 
 1. JDK 21 이상을 설치합니다.
 2. ~/.oci/config에 OCI API 키 프로파일을 준비합니다.
