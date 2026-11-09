@@ -1,5 +1,5 @@
 package io.github.devmrko.companion.web;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.ui.ExtendedModelMap;

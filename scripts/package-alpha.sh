@@ -24,7 +24,7 @@ RUN
 chmod +x "$package/run.sh"
 cp docs/releases/alpha-readiness.md "$package/VALIDATION.md"
 cat > "$package/README.txt" <<'GUIDE'
-OCI Companion 0.1.0-alpha.1 — 제한적 알파
+OCI Companion 0.1.0-alpha.1 — Public Alpha
 
 1. JDK 21 이상을 설치합니다.
 2. ~/.oci/config에 OCI API 키 프로파일을 준비합니다.
@@ -43,5 +43,5 @@ VALIDATION.md를 먼저 확인하세요. 실제 OCI 생성·빌드·실행에는
 GUIDE
 (cd "$staging" && zip -qr package.zip "oci-companion-$version")
 mv "$staging/package.zip" ".tools/releases/oci-companion-$version.zip"
-shasum -a 256 ".tools/releases/oci-companion-$version.zip" > ".tools/releases/oci-companion-$version.zip.sha256"
+(cd .tools/releases && shasum -a 256 "oci-companion-$version.zip" > "oci-companion-$version.zip.sha256")
 echo ".tools/releases/oci-companion-$version.zip"

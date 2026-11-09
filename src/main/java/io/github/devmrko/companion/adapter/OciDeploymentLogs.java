@@ -60,7 +60,7 @@ public class OciDeploymentLogs implements DeploymentLogs {
         } catch(com.oracle.bmc.model.BmcException e) {
             String state=e.getStatusCode()==401?"AUTH":Set.of(403,404).contains(e.getStatusCode())?"ACCESS_OR_MISSING":"ERROR";
             return new Page(state,"로그 조회 실패 · HTTP "+e.getStatusCode()+" · 권한·리전·리소스 확인. 요청 ID: "+Objects.toString(e.getOpcRequestId(),""),List.of(),"","");
-        } catch(io.github.devmrko.foundation.core.error.BusinessException e) { throw e; }
+        } catch(io.github.devmrko.companion.error.BusinessException e) { throw e; }
         catch(Exception e) { return new Page("ERROR","로그 조회 실패 · 연결과 Logging 설정을 확인하세요.",List.of(),"",""); }
     }
     private static Map<?,?> map(Object o) { return o instanceof Map<?,?> m?m:Map.of(); }

@@ -73,7 +73,7 @@ public class OciBuildAdministration implements BuildAdministration {
                     CreateBuildPipelineDetails.builder().projectId(project).displayName(name.trim()).description(description.isBlank()?null:description).build()).build())
                     .getBuildPipeline().getId();
             } catch(Exception e) { throw Errors.ADMIN_UNKNOWN.exception(); }
-        } catch(io.github.devmrko.foundation.core.error.BusinessException e) { throw e; }
+        } catch(io.github.devmrko.companion.error.BusinessException e) { throw e; }
         catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
     private void validate(String name,String description) {

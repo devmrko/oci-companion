@@ -31,7 +31,7 @@ public class NativeBuildSettingsPages {
         if(request.getSession().getAttribute("scopeInvalid")!=null)return "build-settings";
         try { model.addAttribute("pipelineItems",history.pipelines(c,s.region(),s.compartment()));model.addAttribute("specSources",sources.sources(c,s.region(),s.compartment()));
         if(!pipeline.isBlank()){var definition=definitions.read(c,s.region(),s.compartment(),pipeline);model.addAttribute("definition",definition);model.addAttribute("nativeParameters",control.settings(c,s.region(),s.compartment(),pipeline).parameters());model.addAttribute("nativeStages",definition.stages().stream().filter(v->!v.sources().isEmpty()).toList());}
-        } catch(io.github.devmrko.foundation.core.error.BusinessException error){model.addAttribute("nativePageError",error.getMessage());}
+        } catch(io.github.devmrko.companion.error.BusinessException error){model.addAttribute("nativePageError",error.getMessage());}
         return "build-settings";
     }
     @PostMapping("/builds/settings/load") @ResponseBody Map<String,Object> load(Authentication auth,HttpSession session,
@@ -99,6 +99,6 @@ public class NativeBuildSettingsPages {
         String revision=git.save(b.connection(),b.region(),proposal.target(),proposal.snapshot().revision(),proposal.content(),proposal.message());
         return Map.of("revision",revision,"state",revision.equals(proposal.snapshot().revision())?"UNCHANGED":"SAVED");
     }
-    @ExceptionHandler(io.github.devmrko.foundation.core.error.BusinessException.class)
-    @ResponseBody ResponseEntity<Map<String,String>> error(io.github.devmrko.foundation.core.error.BusinessException error){return ResponseEntity.status(Set.of("CLOUD","GIT_ACCESS").contains(error.code())?HttpStatus.SERVICE_UNAVAILABLE:HttpStatus.CONFLICT).body(Map.of("message",error.getMessage()));}
+    @ExceptionHandler(io.github.devmrko.companion.error.BusinessException.class)
+    @ResponseBody ResponseEntity<Map<String,String>> error(io.github.devmrko.companion.error.BusinessException error){return ResponseEntity.status(Set.of("CLOUD","GIT_ACCESS").contains(error.code())?HttpStatus.SERVICE_UNAVAILABLE:HttpStatus.CONFLICT).body(Map.of("message",error.getMessage()));}
 }

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 public class BuildTaskPages {
     private final CatalogPages catalog;private final BuildTaskStore store;private final FunctionBuilds functions;private final BuildHistory builds;private final CatalogService sources;private final TaskSources taskSources;private final SourceVersions versions;private final BuildDefinition definitions;
     public BuildTaskPages(CatalogPages catalog,BuildTaskStore store,FunctionBuilds functions,BuildHistory builds,CatalogService sources,TaskSources taskSources,SourceVersions versions,BuildDefinition definitions){this.taskSources=taskSources;this.versions=versions;this.definitions=definitions;this.catalog=catalog;this.store=store;this.functions=functions;this.builds=builds;this.sources=sources;}
-    @ExceptionHandler(io.github.devmrko.foundation.core.error.BusinessException.class) org.springframework.web.servlet.ModelAndView invalid(io.github.devmrko.foundation.core.error.BusinessException error) {
+    @ExceptionHandler(io.github.devmrko.companion.error.BusinessException.class) org.springframework.web.servlet.ModelAndView invalid(io.github.devmrko.companion.error.BusinessException error) {
         var view=new org.springframework.web.servlet.ModelAndView("error");view.setStatus(error.code().equals("SCOPE")?org.springframework.http.HttpStatus.CONFLICT:org.springframework.http.HttpStatus.BAD_REQUEST);view.addObject("message",error.getMessage());return view;
     }
     @GetMapping("/builds/tasks") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="tasks") String view,@RequestParam(defaultValue="") String edit) {

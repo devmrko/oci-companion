@@ -1,0 +1,6 @@
+# Reviewed synthetic Vault OCID test references, scoped to exact historical lines.
+b36e1eba9e008e758b921e8871c726cb628143c1:src/test/java/io/github/devmrko/companion/DeploymentSpecificationsTest.java:generic-api-key:18
+0c8a682a373b789316840b824b0b1d964dfe9cdb:src/test/java/io/github/devmrko/companion/GitSpecificationsTest.java:generic-api-key:8
+6584935b82062466934421fa25459445d66e792d:scripts/browser-build-automation.cjs:generic-api-key:18
+6584935b82062466934421fa25459445d66e792d:src/test/java/io/github/devmrko/companion/BuildSchedulesTest.java:generic-api-key:14
+6584935b82062466934421fa25459445d66e792d:src/test/java/io/github/devmrko/companion/BuildSchedulesTest.java:generic-api-key:17

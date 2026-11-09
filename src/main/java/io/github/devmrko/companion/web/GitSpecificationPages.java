@@ -15,8 +15,8 @@ public class GitSpecificationPages {
     public GitSpecificationPages(GitSpecifications git,CatalogPages catalog,CatalogService sources){this.git=git;this.catalog=catalog;this.sources=sources;}
     record Draft(String profile,String region,String compartment,GitSpecifications.Target target,String revision,String content,String message,Instant expires) {}
     @SuppressWarnings("unchecked") private Map<String,Draft> drafts(HttpSession session){var drafts=(Map<String,Draft>)session.getAttribute("gitSpecDrafts");if(drafts==null){drafts=new LinkedHashMap<>();session.setAttribute("gitSpecDrafts",drafts);}return drafts;}
-    @ExceptionHandler(io.github.devmrko.foundation.core.error.BusinessException.class)
-    ResponseEntity<Map<String,String>> error(io.github.devmrko.foundation.core.error.BusinessException error){return ResponseEntity.status(error.code().equals("GIT_ACCESS")?HttpStatus.SERVICE_UNAVAILABLE:HttpStatus.CONFLICT).body(Map.of("message",error.getMessage()));}
+    @ExceptionHandler(io.github.devmrko.companion.error.BusinessException.class)
+    ResponseEntity<Map<String,String>> error(io.github.devmrko.companion.error.BusinessException error){return ResponseEntity.status(error.code().equals("GIT_ACCESS")?HttpStatus.SERVICE_UNAVAILABLE:HttpStatus.CONFLICT).body(Map.of("message",error.getMessage()));}
     @PostMapping("/builds/specification/git/preview") Map<String,String> preview(Authentication auth,HttpSession session,
         @RequestParam String source,@RequestParam String branch,@RequestParam String path,@RequestParam String username,@RequestParam String secret,@RequestParam String content,@RequestParam String message) {
         if(content.isBlank()||content.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>131072||message.isBlank()||message.length()>200||message.chars().anyMatch(Character::isISOControl))throw Errors.INVALID.exception();
