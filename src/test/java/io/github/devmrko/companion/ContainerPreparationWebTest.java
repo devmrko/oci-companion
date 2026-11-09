@@ -29,4 +29,24 @@ class ContainerPreparationWebTest {
   mvc.perform(post("/environments/containers/create").session(session).param("ticket",ticket)).andExpect(status().isForbidden());
   when(preparation.create(any(),anyString(),anyString(),eq(preview),eq(ticket))).thenReturn("created");mvc.perform(post("/environments/containers/create").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().is3xxRedirection());mvc.perform(post("/environments/containers/create").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict());verify(preparation,times(1)).create(any(),anyString(),anyString(),eq(preview),eq(ticket));
  }
+
+ @Test void lifecycleRequiresConfirmationCsrfAndSingleUseTicket() throws Exception {
+  var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+  var op=new ContainerPreparation.Operation("id","hello","ACTIVE","etag",ContainerPreparation.Action.DELETE);
+  when(preparation.list(any(),anyString(),anyString())).thenReturn(List.of());
+  when(preparation.read(any(),anyString(),anyString(),eq("id"))).thenReturn(new ContainerPreparation.Detail("id","hello","ACTIVE","",List.of()));
+  when(preparation.planAction(any(),anyString(),anyString(),eq("id"),eq(ContainerPreparation.Action.DELETE))).thenReturn(op);
+  mvc.perform(get("/environments/containers").session(session).param("instance","id")).andExpect(status().isOk()).andExpect(content().string(containsString("재시작")));
+  var result=mvc.perform(post("/environments/containers/action/preview").session(session).with(csrf()).param("instance","id").param("action","DELETE")).andExpect(status().isOk()).andExpect(content().string(containsString("삭제할 인스턴스 이름"))).andReturn();
+  var token=(String)result.getModelAndView().getModel().get("actionTicket");
+  mvc.perform(post("/environments/containers/action/apply").session(session).param("ticket",token).param("confirmation","hello")).andExpect(status().isForbidden());
+  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","wrong")).andExpect(status().isConflict());verify(preparation,never()).applyAction(any(),anyString(),anyString(),any());
+  result=mvc.perform(post("/environments/containers/action/preview").session(session).with(csrf()).param("instance","id").param("action","DELETE")).andReturn();token=(String)result.getModelAndView().getModel().get("actionTicket");
+  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","hello")).andExpect(status().is3xxRedirection());
+  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","hello")).andExpect(status().isConflict());verify(preparation,times(1)).applyAction(any(),anyString(),anyString(),eq(op));
+  result=mvc.perform(post("/environments/containers/action/preview").session(session).with(csrf()).param("instance","id").param("action","DELETE")).andReturn();token=(String)result.getModelAndView().getModel().get("actionTicket");
+  session.setAttribute("compartment","other");
+  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","hello")).andExpect(status().isConflict());verify(preparation,times(1)).applyAction(any(),anyString(),anyString(),eq(op));
+
+ }
 }

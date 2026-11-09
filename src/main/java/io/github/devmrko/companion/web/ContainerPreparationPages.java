@@ -38,5 +38,22 @@ public class ContainerPreparationPages {
  private Ticket checked(Authentication auth,HttpSession session,String token,boolean consume){Ticket t;synchronized(session){t=consume?tickets(session).remove(token):tickets(session).get(token);}if(t==null||t.expires().isBefore(Instant.now()))throw Errors.BUILD_CHANGED.exception();var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(!c.equals(t.c())||session.getAttribute("scopeInvalid")!=null||!s.region().equals(t.region())||!s.compartment().equals(t.compartment()))throw Errors.SCOPE.exception();return t;}
  @GetMapping("/environments/containers/request.json") @ResponseBody org.springframework.http.ResponseEntity<String> download(Authentication auth,HttpSession session,@RequestParam String ticket){var t=checked(auth,session,ticket,false);return org.springframework.http.ResponseEntity.ok().header("Content-Disposition","attachment; filename=container-instance.json").contentType(org.springframework.http.MediaType.APPLICATION_JSON).body(t.preview().json());}
  @PostMapping("/environments/containers/create") String create(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String ticket){var t=checked(auth,session,ticket,true);try{var id=preparation.create(t.c(),t.region(),t.compartment(),t.preview(),ticket);flash.addFlashAttribute("message","생성 요청 접수 · "+id+" · 새로 조회하여 OCI 상태를 확인하세요.");return "redirect:/environments/containers?instance="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);}catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());}return "redirect:/environments/containers";}
+ record ActionTicket(Connection c,String region,String compartment,ContainerPreparation.Operation operation,Instant expires) {}
+ @SuppressWarnings("unchecked") private Map<String,ActionTicket> actionTickets(HttpSession session){
+  var map=(Map<String,ActionTicket>)session.getAttribute("containerActionTickets");if(map==null){map=new LinkedHashMap<>();session.setAttribute("containerActionTickets",map);}return map;
+ }
+ @PostMapping("/environments/containers/action/preview") String actionPreview(Authentication auth,HttpServletRequest request,Model model,@RequestParam String instance,@RequestParam ContainerPreparation.Action action){
+  var c=SecurityConfig.connection(auth);var session=request.getSession();if(session.getAttribute("scopeInvalid")!=null)throw Errors.SCOPE.exception();var scope=catalog.selection(c,session);
+  var operation=preparation.planAction(c,scope.region(),scope.compartment(),instance,action);
+  page(auth,request,model,"","","","",instance,"");model.addAttribute("operation",operation);
+  synchronized(session){var map=actionTickets(session);map.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));if(map.size()>=16)map.remove(map.keySet().iterator().next());var token=UUID.randomUUID().toString();map.put(token,new ActionTicket(c,scope.region(),scope.compartment(),operation,Instant.now().plusSeconds(600)));model.addAttribute("actionTicket",token);}
+  return "container-preparation";
+ }
+ @PostMapping("/environments/containers/action/apply") String actionApply(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String ticket,@RequestParam(defaultValue="") String confirmation){
+  ActionTicket t;synchronized(session){t=actionTickets(session).remove(ticket);}if(t==null||t.expires().isBefore(Instant.now()))throw Errors.BUILD_CHANGED.exception();
+  var c=SecurityConfig.connection(auth);var scope=catalog.selection(c,session);if(!c.equals(t.c())||session.getAttribute("scopeInvalid")!=null||!scope.region().equals(t.region())||!scope.compartment().equals(t.compartment()))throw Errors.SCOPE.exception();
+  if(t.operation().action()==ContainerPreparation.Action.DELETE&&!t.operation().name().equals(confirmation))throw Errors.INVALID.exception();
+  preparation.applyAction(c,scope.region(),scope.compartment(),t.operation());flash.addFlashAttribute("message",t.operation().action().label()+" 요청 접수 · 상태 새로 조회로 완료 여부를 확인하세요.");return "redirect:/environments/containers?instance="+java.net.URLEncoder.encode(t.operation().instance(),java.nio.charset.StandardCharsets.UTF_8);
+ }
  @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
 }

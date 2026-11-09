@@ -29,6 +29,26 @@ public class OciContainerPreparation implements ContainerPreparation {
  VirtualNetworkClient network(Connection c,String r)throws Exception{var x=VirtualNetworkClient.builder().configuration(config()).build(clients.authentication(c));x.setRegion(r);return x;}
  IdentityClient identity(Connection c,String r)throws Exception{var x=IdentityClient.builder().configuration(config()).build(clients.authentication(c));x.setRegion(r);return x;}
  ArtifactsClient artifacts(Connection c,String r)throws Exception{var x=ArtifactsClient.builder().configuration(config()).build(clients.authentication(c));x.setRegion(r);return x;}
+ public Operation planAction(Connection c,String r,String comp,String id,Action action){
+  try(var client=client(c,r)){
+   var response=client.getContainerInstance(GetContainerInstanceRequest.builder().containerInstanceId(id).build());var v=response.getContainerInstance();
+   if(!comp.equals(v.getCompartmentId()))throw Errors.SCOPE.exception();
+   if(action==null||!action.allowed(v.getLifecycleState().getValue()))throw Errors.INVALID.exception();
+   if(response.getEtag()==null||response.getEtag().isBlank())throw Errors.BUILD_CHANGED.exception();
+   return new Operation(id,v.getDisplayName(),v.getLifecycleState().getValue(),response.getEtag(),action);
+  }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
+ }
+ public void applyAction(Connection c,String r,String comp,Operation expected){
+  if(!expected.equals(planAction(c,r,comp,expected.instance(),expected.action())))throw Errors.BUILD_CHANGED.exception();
+  try(var client=client(c,r)){
+   switch(expected.action()){
+    case START -> client.startContainerInstance(StartContainerInstanceRequest.builder().containerInstanceId(expected.instance()).ifMatch(expected.etag()).build());
+    case STOP -> client.stopContainerInstance(StopContainerInstanceRequest.builder().containerInstanceId(expected.instance()).ifMatch(expected.etag()).build());
+    case RESTART -> client.restartContainerInstance(RestartContainerInstanceRequest.builder().containerInstanceId(expected.instance()).ifMatch(expected.etag()).build());
+    case DELETE -> client.deleteContainerInstance(DeleteContainerInstanceRequest.builder().containerInstanceId(expected.instance()).ifMatch(expected.etag()).build());
+   }
+  }catch(Exception e){throw Errors.ADMIN_UNKNOWN.exception();}
+ }
  public List<Instance> list(Connection c,String r,String comp){try(var client=client(c,r)){var result=new ArrayList<Instance>();for(var v:client.getPaginators().listContainerInstancesRecordIterator(ListContainerInstancesRequest.builder().compartmentId(comp).build())){var s=v.getShapeConfig();result.add(new Instance(v.getId(),v.getDisplayName(),v.getLifecycleState().getValue(),v.getShape(),s==null?"미확인":Objects.toString(s.getOcpus(),"미확인"),s==null?"미확인":Objects.toString(s.getMemoryInGBs(),"미확인")));}return result;}catch(Exception e){throw Errors.CLOUD.exception();}}
  public Detail read(Connection c,String r,String comp,String id){try(var client=client(c,r)){
   var v=client.getContainerInstance(GetContainerInstanceRequest.builder().containerInstanceId(id).build()).getContainerInstance();if(!comp.equals(v.getCompartmentId()))throw Errors.SCOPE.exception();var processes=new ArrayList<ContainerPreparation.Process>();
