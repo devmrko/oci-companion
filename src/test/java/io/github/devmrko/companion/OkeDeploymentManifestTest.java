@@ -14,6 +14,16 @@ class OkeDeploymentManifestTest {
   var yaml=OkeDeploymentManifest.render(input("companion-demo","","data","/data",1),"icn.ocir.io/ns/image@sha256:"+"a".repeat(64));assertTrue(yaml.contains("Recreate"));assertTrue(yaml.contains("claimName: data"));assertFalse(yaml.contains("kind: PersistentVolumeClaim"));
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","","data","/data",2),"icn.ocir.io/ns/image@sha256:"+"a".repeat(64)));
  }
+ @Test void pvcGroupIsOptionalAndCannotBeUsedWithoutVolume(){
+  String image="icn.ocir.io/ns/image@sha256:"+"a".repeat(64);
+  assertFalse(OkeDeploymentManifest.render(input("companion-demo","","data","/data",1),image).contains("fsGroup"));
+  for(long group:new long[]{0,1000,2147483647L}){
+   var i=new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","pull-secret","data","/data",true,group);
+   String yaml=OkeDeploymentManifest.render(i,image);assertTrue(yaml.contains("fsGroup: "+group));assertTrue(yaml.contains("fsGroupChangePolicy: OnRootMismatch"));assertFalse(yaml.contains("runAsUser"));
+  }
+  for(long group:new long[]{-1,2147483648L})assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","data","/data",true,group),image));
+  assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","","",true,1000L),image));
+ }
  @Test void invalidNamespaceDuplicateVariablesAndUnpinnedImageFail(){
   String image="icn.ocir.io/ns/image@sha256:"+"a".repeat(64);
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("kube-system","","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","A=1\nA=2","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","","","",1),"image:latest"));
