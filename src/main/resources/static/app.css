@@ -999,3 +999,5 @@ a:focus-visible, .ui-button:focus-visible {
 .setup-steps > li:last-child { border-bottom:0; }
 .setup-steps > li > strong, .setup-steps > li > span { display:block; margin-bottom:8px; overflow-wrap:anywhere; }
 .setup-steps .form-toolbar { margin:0; flex-wrap:wrap; }
+
+.table-cell--status { white-space: nowrap; }
