@@ -19,9 +19,17 @@ public class OciVolumeBackups implements VolumeBackups {
  private ClientConfiguration config(){return ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(10000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();}
  BlockstorageClient storage(Connection c,String region)throws Exception{var x=BlockstorageClient.builder().configuration(config()).build(clients.authentication(c));x.setRegion(region);return x;}
  List<String> domains(Connection c,String region,String comp)throws Exception{try(var x=IdentityClient.builder().configuration(config()).build(clients.authentication(c))){x.setRegion(region);return x.listAvailabilityDomains(ListAvailabilityDomainsRequest.builder().compartmentId(comp).build()).getItems().stream().map(a->a.getName()).toList();}}
+ private static String timestamp(Date value){return value==null?"":value.toInstant().toString();}
+ static Backup backup(VolumeBackup b){
+  String source=b.getSourceType()==null?"":b.getSourceType().getValue();
+  source=switch(source){case "MANUAL"->"수동";case "SCHEDULED"->"예약";default->"미제공·알 수 없음";};
+  String expires=timestamp(b.getExpirationTime());if(expires.isEmpty())expires=b.getSourceType()==VolumeBackup.SourceType.Manual?"자동 만료 없음":"미제공";
+  var protection=new ArrayList<String>();if(Boolean.TRUE.equals(b.getIsRetentionLockEnabled()))protection.add("보존 잠금");if(Boolean.TRUE.equals(b.getIsPreventDeletionEnabled()))protection.add("삭제 보호");if(Boolean.TRUE.equals(b.getIsIndefiniteRetentionEnabled()))protection.add("법적 보존");
+  return new Backup(b.getId(),b.getDisplayName(),b.getLifecycleState().getValue(),b.getSizeInGBs(),b.getVolumeId(),b.getType()==null?"미제공":b.getType().getValue(),timestamp(b.getTimeCreated()),source,expires,timestamp(b.getTimeRetentionExpiresAt()),protection.isEmpty()?"설정 없음":String.join(" · ",protection),b.getSourceVolumeBackupId()==null?"":b.getSourceVolumeBackupId());
+ }
  public Catalog list(Connection c,String region,String comp){try(var x=storage(c,region)){
   var volumes=new ArrayList<Volume>();for(var v:x.getPaginators().listVolumesRecordIterator(ListVolumesRequest.builder().compartmentId(comp).build()))if(!"TERMINATED".equals(v.getLifecycleState().getValue()))volumes.add(new Volume(v.getId(),v.getDisplayName(),v.getLifecycleState().getValue(),v.getSizeInGBs(),v.getAvailabilityDomain()));
-  var backups=new ArrayList<Backup>();for(var b:x.getPaginators().listVolumeBackupsRecordIterator(ListVolumeBackupsRequest.builder().compartmentId(comp).build()))if(!"TERMINATED".equals(b.getLifecycleState().getValue()))backups.add(new Backup(b.getId(),b.getDisplayName(),b.getLifecycleState().getValue(),b.getSizeInGBs(),b.getVolumeId(),String.valueOf(b.getType()),b.getTimeCreated()==null?"":b.getTimeCreated().toInstant().toString()));
+  var backups=new ArrayList<Backup>();for(var b:x.getPaginators().listVolumeBackupsRecordIterator(ListVolumeBackupsRequest.builder().compartmentId(comp).build()))if(!"TERMINATED".equals(b.getLifecycleState().getValue()))backups.add(backup(b));
   volumes.sort(Comparator.comparing(Volume::name,Comparator.nullsLast(String::compareTo)));backups.sort(Comparator.comparing(Backup::created).reversed());return new Catalog(List.copyOf(volumes),List.copyOf(backups),domains(c,region,comp));
  }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}}
  public Plan plan(Connection c,String region,String comp,Input i){
