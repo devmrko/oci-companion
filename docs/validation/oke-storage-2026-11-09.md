@@ -25,6 +25,10 @@ Kubernetes 네이티브 방식으로 같은 Namespace에 OCIR imagePullSecret과
 
 로컬 증거: `.tools/oke-storage-data.json`의 교체 전후 Pod UID와 파일 일치 결과, `oke-storage-v2-ui.txt/png`의 실제 실행 로그. 계정 참조와 전체 로그는 공개 저장소에 올리지 않습니다.
 
+## 정리
+
+검증 Namespace와 PVC/PV 삭제, OCI 볼륨 `TERMINATED`, 전용 검증 파이프라인 IAM 정책 삭제를 확인했습니다. 배포 이력은 남겼으며, 재실행하려면 Namespace·PVC·인증과 권한을 다시 준비해야 합니다.
+
 ## 검증 한계
 
 이 작업은 기존 PVC 연결과 파일 유지 검증입니다. 데이터베이스 일관성 백업, 스냅샷 복원, 노드·가용영역 장애 복구를 대신하지 않습니다. 실행·로그는 화면으로 확인하고 Pod UID·파일 내용·볼륨 정리는 Kubernetes와 OCI API로 교차 확인합니다.
