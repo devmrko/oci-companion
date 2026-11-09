@@ -32,6 +32,5 @@ public class BuildProjectResourcePages {
         try{switch(action){case "repository"->resources.createRepository(c,t.region(),t.compartment(),t.project(),name,description,ticket);case "group"->resources.createLogGroup(c,t.region(),t.compartment(),t.project(),name,ticket);case "log"->resources.createLog(c,t.region(),t.compartment(),t.project(),group,name,ticket);default->throw Errors.INVALID.exception();}flash.addFlashAttribute("message","생성 요청 접수 · 아래 OCI 조회 결과에서 상태를 확인하세요.");}catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());}
         return "redirect:/builds/project-resources?project="+java.net.URLEncoder.encode(t.project(),java.nio.charset.StandardCharsets.UTF_8);
     }
-    @ExceptionHandler(BusinessException.class) @ResponseBody
-    org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }
