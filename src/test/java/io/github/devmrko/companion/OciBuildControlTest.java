@@ -55,7 +55,7 @@ class OciBuildControlTest {
         verify(client,never()).createBuildRun(any());
         for(var state:List.of(io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.DISABLED,io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.NOT_FOUND,io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.UNKNOWN)) {
             when(resources.logReadiness(c,"region","comp","project")).thenReturn(state);
-            var error=assertThrows(io.github.devmrko.foundation.core.error.BusinessException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",io.github.devmrko.companion.port.BuildDefinition.SourceOverride.none(),"rev"));
+            var error=assertThrows(io.github.devmrko.companion.error.BusinessException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",io.github.devmrko.companion.port.BuildDefinition.SourceOverride.none(),"rev"));
             assertEquals(state==io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.DISABLED?"BUILD_LOGS_REQUIRED":state==io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.NOT_FOUND?"BUILD_LOGS_NOT_FOUND":"BUILD_LOGS_UNVERIFIED",error.code());
             verify(client,never()).createBuildRun(any());
         }
@@ -71,13 +71,13 @@ class OciBuildControlTest {
         assertEquals("hash",capture.getValue().getCreateBuildRunDetails().getCommitInfo().getCommitHash());
         when(client.createBuildRun(any())).thenThrow(new com.oracle.bmc.model.BmcException(
             409,"IncorrectState","Logs need to be enabled in order to run the builds.","request-id"));
-        var rejected=assertThrows(io.github.devmrko.foundation.core.error.BusinessException.class,
+        var rejected=assertThrows(io.github.devmrko.companion.error.BusinessException.class,
             ()->adapter.start(c,"region","comp","p","etag","logs",List.of(),"logs-token",
                 new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"rev"));
         assertEquals(io.github.devmrko.companion.service.Errors.BUILD_LOGS_REQUIRED.safeMessage(), rejected.getMessage());
         doThrow(new com.oracle.bmc.model.BmcException(
             409,"IncorrectState","Other state error","request-id")).when(client).createBuildRun(any());
-        var unknown=assertThrows(io.github.devmrko.foundation.core.error.BusinessException.class,
+        var unknown=assertThrows(io.github.devmrko.companion.error.BusinessException.class,
             ()->adapter.start(c,"region","comp","p","etag","other",List.of(),"other-token",
                 new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"rev"));
         assertEquals(io.github.devmrko.companion.service.Errors.BUILD_UNKNOWN.safeMessage(), unknown.getMessage());

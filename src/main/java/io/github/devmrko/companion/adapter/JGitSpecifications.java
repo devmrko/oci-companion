@@ -45,7 +45,7 @@ public class JGitSpecifications implements GitSpecifications {
                 var head=git.getRepository().resolve("refs/heads/source");if(head==null)throw Errors.MISSING.exception();
                 return work.run(git,credentials,head);
             }
-        }catch(io.github.devmrko.foundation.core.error.BusinessException e){throw e;}
+        }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}
         catch(Exception e){throw Errors.GIT_ACCESS.exception();}
         finally {
             if(credentials!=null)credentials.clear();

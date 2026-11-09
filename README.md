@@ -1,14 +1,16 @@
 # OCI Companion
 
-OCI 프로파일 기반 리소스·소스 관리. Java 21 · Spring Foundation · OCI Java SDK.
+OCI 프로파일 기반 리소스·소스 관리. Java 21 · Spring Boot · OCI Java SDK.
 
-## 제한적 알파 준비
+## Public Alpha
 
-검증 범위와 공개 전 조건은 [알파 기준](docs/releases/alpha-readiness.md)을 참고하세요. 빌드 후 `./scripts/package-alpha.sh`로 로컬 실행 묶음을 만듭니다. 공개 릴리스는 아직 제공하지 않습니다.
+로컬 실행용 초기 버전입니다. [릴리스](https://github.com/devmrko/oci-companion/releases)에서 실행 ZIP을 내려받거나 소스로 빌드할 수 있습니다. [지원 범위·알려진 제한](docs/releases/alpha-readiness.md)을 먼저 확인하세요.
 
 ## 실행
 
-JDK 21+, GitHub CLI 필요. Maven Wrapper 포함.
+JDK 21 이상이 필요합니다. ZIP을 풀고 `./run.sh`를 실행하세요(macOS/Linux). GitHub CLI·별도 DB는 필요하지 않습니다.
+
+소스 빌드에는 Git과 Maven 의존성 다운로드를 위한 인터넷 연결이 필요합니다. Maven Wrapper를 포함합니다.
 
 ```sh
 ./scripts/build.sh
@@ -78,11 +80,9 @@ DB Companion과 같은 좌측 그룹 메뉴·접기/펼치기·상단 연결 정
 - [재사용 빌더 이미지](docs/design/reusable-builders.md)
 - [트리거·예약 실행과 검증 범위](docs/design/build-automation.md)
 - [검증](docs/validation.md)
-- [Redmine #977](https://redmine.cloud-handson.com/issues/977)
 - [GitHub](https://github.com/devmrko/oci-companion)
 
-Spring Foundation 소스 커밋: `abc0bb10a7ddf1d0767a044ebe654b58eea48ac3`.
-빌드 스크립트가 `.tools`에 내려받아 프로젝트 전용 Maven 저장소에서 빌드합니다.
+비공개 저장소 의존성 없이 공개 Maven 의존성으로 빌드합니다. `./scripts/package-alpha.sh`는 실행 ZIP과 SHA-256 파일을 생성합니다.
 
 명세 저장·런타임·테스트 보고서: [사용 흐름과 Git 인증 설정](docs/design/build-specification-delivery.md).
 

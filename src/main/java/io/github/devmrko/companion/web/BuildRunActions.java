@@ -1,7 +1,7 @@
 package io.github.devmrko.companion.web;
 import io.github.devmrko.companion.port.BuildControl;
 import io.github.devmrko.companion.service.Errors;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;

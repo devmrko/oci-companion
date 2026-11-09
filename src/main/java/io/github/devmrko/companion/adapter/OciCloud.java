@@ -15,7 +15,7 @@ import com.oracle.bmc.retrier.RetryConfiguration;
 import io.github.devmrko.companion.domain.Models.*;
 import io.github.devmrko.companion.port.*;
 import io.github.devmrko.companion.service.Errors;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;

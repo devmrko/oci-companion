@@ -3,7 +3,7 @@ import io.github.devmrko.companion.domain.Models.Connection;
 import io.github.devmrko.companion.port.DeploymentRuns;
 import io.github.devmrko.companion.port.BuildHandoff;
 import io.github.devmrko.companion.service.Errors;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import jakarta.servlet.http.*;
 import java.time.Instant;
 import java.util.*;

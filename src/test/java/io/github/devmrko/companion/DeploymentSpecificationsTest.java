@@ -1,7 +1,7 @@
 package io.github.devmrko.companion;
 import io.github.devmrko.companion.port.DeploymentSetup.Input;
 import io.github.devmrko.companion.service.DeploymentSpecifications;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.yaml.snakeyaml.Yaml;
 import java.util.*;

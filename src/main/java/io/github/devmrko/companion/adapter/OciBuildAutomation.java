@@ -7,7 +7,7 @@ import io.github.devmrko.companion.domain.Models.Connection;
 import io.github.devmrko.companion.port.BuildAutomation;
 import io.github.devmrko.companion.port.BuildDefinition;
 import io.github.devmrko.companion.service.*;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import java.util.*;
 import org.springframework.stereotype.Component;
 @Component

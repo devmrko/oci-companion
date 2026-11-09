@@ -93,7 +93,7 @@ public class OciFunctionBuilds implements FunctionBuilds {
                 if(response.getInputStream()!=null)response.getInputStream().close();
                 if(response.get__httpStatusCode__()!=202)throw Errors.BUILD_UNKNOWN.exception();
             }
-        } catch(io.github.devmrko.foundation.core.error.BusinessException e) { throw e; }
+        } catch(io.github.devmrko.companion.error.BusinessException e) { throw e; }
         catch(Exception e) {
             Throwable cause=e;for(int i=0;i<10 && cause.getCause()!=null;i++)cause=cause.getCause();
             String message=Objects.toString(cause.getMessage(),"");

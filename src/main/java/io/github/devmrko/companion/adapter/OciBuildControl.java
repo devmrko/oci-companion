@@ -6,7 +6,7 @@ import io.github.devmrko.companion.port.BuildControl;
 import io.github.devmrko.companion.port.BuildDefinition;
 import io.github.devmrko.companion.port.BuildProjectResources;
 import io.github.devmrko.companion.service.Errors;
-import io.github.devmrko.foundation.core.error.BusinessException;
+import io.github.devmrko.companion.error.BusinessException;
 import java.util.*;
 import org.springframework.stereotype.Component;
 

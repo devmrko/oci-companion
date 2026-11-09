@@ -18,9 +18,6 @@ spring:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
       - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
       - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
-foundation:
-  jobs:
-    enabled: false
 companion:
   git-hosts: ${COMPANION_GIT_HOSTS:}
   oci-config: ${OCI_CONFIG_FILE:${user.home}/.oci/config}
