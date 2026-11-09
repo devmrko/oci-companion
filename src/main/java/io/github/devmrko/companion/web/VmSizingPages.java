@@ -38,5 +38,5 @@ public class VmSizingPages {
         try{sizing.apply(c,t.region(),t.compartment(),t.before(),t.change());flash.addFlashAttribute("message","OCI 변경 요청 접수 · 상태와 사양을 새로 조회하세요.");}catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());}
         return "redirect:/environments/sizing?instance="+java.net.URLEncoder.encode(t.before().instance(),java.nio.charset.StandardCharsets.UTF_8);
     }
-    @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }
