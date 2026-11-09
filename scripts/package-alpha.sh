@@ -23,7 +23,9 @@ umask 077
 exec "$java_bin" -jar oci-companion.jar "$@"
 RUN
 chmod +x "$package/run.sh"
-cp docs/releases/alpha-readiness.md "$package/VALIDATION.md"
+mkdir -p "$package/validation"
+cp docs/validation/*.md "$package/validation/"
+sed 's#](../validation/#](validation/#g' docs/releases/alpha-readiness.md > "$package/VALIDATION.md"
 cat > "$package/README.txt" <<GUIDE
 OCI Companion $version — Public Alpha
 

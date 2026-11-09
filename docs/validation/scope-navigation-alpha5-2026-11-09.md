@@ -9,3 +9,5 @@
 - 실제 OCI 10개 화면: 소스, 빌드, 배포 이력, OKE 배포 구성, Container 준비, 백업·복구, 정기 정책, 빌드 설정, 새 명세 작성, 등록 앱 상태. 각 390/768/1440px 문서 가로 넘침 없음.
 - 클라우드 리소스 변경 없음. 등록 앱 상태는 빈 목록 검증이며 실제 앱 연결·건강 검사 성공을 뜻하지 않습니다.
 - 재검증: `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-scope-navigation.cjs`. Playwright 설치 필요. 다른 서버 주소는 COMPANION_TEST_URL로 지정합니다.
+
+ZIP의 VALIDATION.md가 참조하는 검증 문서도 validation/에 포함하고 상대 링크를 수정했습니다. 아카이브 내부의 모든 로컬 Markdown 링크가 실제 파일로 연결되는지 확인했습니다.
