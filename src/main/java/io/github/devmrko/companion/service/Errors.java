@@ -35,6 +35,8 @@ public enum Errors implements ErrorDescriptor {
     DRAFT_MISSING(ErrorCategory.NOT_FOUND, "이 조회 대상에 저장한 로컬 초안이 없습니다."),
     GIT_CONFLICT(ErrorCategory.CONFLICT, "원격 브랜치 변경·보호 규칙 또는 만료된 요청입니다. Git 내용을 다시 비교하세요."),
     GIT_ACCESS(ErrorCategory.UNAVAILABLE, "Git 연결 실패 · 저장소 URL·브랜치·Vault 읽기 권한·토큰의 저장소 권한을 확인하세요."),
+    BACKUP_INPUT(ErrorCategory.VALIDATION, "백업·복원 대상, 이름, 백업 유형과 가용성 도메인을 확인하세요."),
+    BACKUP_UNKNOWN(ErrorCategory.UNAVAILABLE, "백업·복원 요청 결과를 확인하지 못했습니다. 다시 실행하기 전에 OCI 목록에서 생성 여부를 확인하세요."),
     CLOUD(ErrorCategory.UNAVAILABLE, "OCI 요청을 완료하지 못했습니다. 연결·리전·IAM 권한과 OCI 콘솔을 확인하세요."),
     MISSING(ErrorCategory.NOT_FOUND, "현재 연결에서 찾을 수 없는 항목입니다."),
     CONFLICT(ErrorCategory.CONFLICT, "이미 사용된 요청입니다. 실행 이력을 확인하세요."),
