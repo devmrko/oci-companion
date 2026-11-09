@@ -63,14 +63,14 @@ public class OciDeploymentRuns implements DeploymentRuns {
         if(stage.getKubernetesManifestDeployArtifactIds()==null||stage.getKubernetesManifestDeployArtifactIds().isEmpty())throw Errors.INVALID.exception();
         var artifacts=new ArrayList<DeployArtifact>();
         for(var id:stage.getKubernetesManifestDeployArtifactIds())artifacts.add(client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build()).getDeployArtifact());
-        var checked=OkeManifests.inspect(artifacts,compartment,pipeline.getProjectId(),stage.getNamespace());
+        var checked=OkeManifests.inspectPlan(artifacts,compartment,pipeline.getProjectId(),stage.getNamespace());
         var hash=MessageDigest.getInstance("SHA-256");
         hash.update((pipeline.toString()+stage.toString()+env.toString()).getBytes(StandardCharsets.UTF_8));
         for(var artifact:artifacts){
             hash.update(artifact.toString().getBytes(StandardCharsets.UTF_8));
             hash.update(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent());
         }
-        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),HexFormat.of().formatHex(hash.digest()),"OKE",env.getClusterId(),stage.getNamespace(),checked);
+        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),HexFormat.of().formatHex(hash.digest()),"OKE",env.getClusterId(),stage.getNamespace(),checked.images(),checked.jobs());
     }
     com.oracle.bmc.containerengine.ContainerEngineClient clusters(Connection c,String region) throws java.io.IOException {
         var client=com.oracle.bmc.containerengine.ContainerEngineClient.builder().configuration(com.oracle.bmc.ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(clients.authentication(c));

@@ -45,4 +45,62 @@ class OkeManifestsTest {
         assertThrows(RuntimeException.class,()->inspect(""));
         assertThrows(RuntimeException.class,()->inspect(" ".repeat(524289)));
     }
+    static final String JOB="""
+        apiVersion: batch/v1
+        kind: Job
+        metadata: {name: verify-001, namespace: testing}
+        spec:
+          activeDeadlineSeconds: 180
+          backoffLimit: 0
+          ttlSecondsAfterFinished: 3600
+          template:
+            spec:
+              restartPolicy: Never
+              serviceAccountName: verifier
+              securityContext: {runAsNonRoot: true, runAsUser: 10001}
+              containers:
+              - name: verify
+                image: IMAGE
+                securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+                resources: {limits: {cpu: 500m, memory: 256Mi}}
+                env:
+                - name: TOKEN
+                  valueFrom: {secretKeyRef: {name: app-auth, key: token}}
+              volumes:
+              - name: credentials
+                projected:
+                  sources:
+                  - secret: {name: validation-auth}
+        """.replace("IMAGE",IMAGE);
+    @Test void boundedJobShowsExecutionLimitsAndOnlySecretReferences(){
+        var result=OkeManifests.inspectPlan(List.of(artifact(JOB)),"comp","project","testing");
+        assertEquals(List.of(IMAGE),result.images());var job=result.jobs().getFirst();
+        assertEquals("verify-001",job.name());assertEquals("verifier",job.serviceAccount());
+        assertEquals(180,job.deadlineSeconds());assertEquals(0,job.retries());assertEquals(3600,job.ttlSeconds());
+        assertEquals(List.of("app-auth","validation-auth"),job.secrets());
+    }
+    @Test void unboundedOrUnsafeJobsFail(){
+        for(var pair:List.of(
+            List.of("activeDeadlineSeconds: 180","activeDeadlineSeconds: 601"),
+            List.of("activeDeadlineSeconds: 180","activeDeadlineSeconds: 1.5"),
+            List.of("backoffLimit: 0","backoffLimit: 3"),
+            List.of("ttlSecondsAfterFinished: 3600","ttlSecondsAfterFinished: 0"),
+            List.of("restartPolicy: Never","restartPolicy: OnFailure"),
+            List.of("serviceAccountName: verifier","serviceAccountName: default"),
+            List.of("runAsNonRoot: true","runAsNonRoot: false"),
+            List.of("runAsUser: 10001","runAsUser: 0"),
+            List.of("allowPrivilegeEscalation: false","allowPrivilegeEscalation: true"),
+            List.of("readOnlyRootFilesystem: true","readOnlyRootFilesystem: false"),
+            List.of("drop: [ALL]","drop: [NET_RAW]"),
+            List.of("cpu: 500m","cpu: 2000m"),
+            List.of("memory: 256Mi","memory: 8Gi"),
+            List.of("namespace: testing","namespace: other"),
+            List.of(IMAGE,"app:latest"),
+            List.of("restartPolicy: Never","restartPolicy: Never\n      hostNetwork: true"),
+            List.of("backoffLimit: 0","backoffLimit: 0\n  parallelism: 2"),
+            List.of("secret: {name: validation-auth}","serviceAccountToken: {path: token}")))
+            assertThrows(RuntimeException.class,()->inspect(JOB.replace(pair.get(0),pair.get(1))),pair.toString());
+        assertThrows(RuntimeException.class,()->inspect(JOB.replace("  activeDeadlineSeconds: 180\n","")));
+        assertThrows(RuntimeException.class,()->inspect(JOB.replace("projected:\n          sources:\n          - secret: {name: validation-auth}","hostPath: {path: /}")));
+    }
 }
