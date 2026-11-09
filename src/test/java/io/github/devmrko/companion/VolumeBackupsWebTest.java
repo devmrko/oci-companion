@@ -27,4 +27,15 @@ class VolumeBackupsWebTest {
  @Test void scopeChangeBlocksRestore()throws Exception{
   setup();var s=connect();var p=mvc.perform(post("/backups/preview").session(s).with(csrf()).param("operation","RESTORE").param("target","b").param("name","new").param("domain","ad")).andExpect(status().isOk()).andExpect(content().string(containsString("새 볼륨 복원 확인"))).andReturn();String token=(String)p.getModelAndView().getModel().get("ticket");s.setAttribute("scopeInvalid",true);mvc.perform(post("/backups/apply").session(s).with(csrf()).param("ticket",token)).andExpect(status().isConflict());verify(backups,never()).apply(any(),anyString(),anyString(),any(),anyString());
  }
+ VolumeBackups.Backup row(String id,String volume,String source,String state){return new VolumeBackups.Backup(id,id,state,50,volume,"FULL","2026-11-09",source,"미제공","","설정 없음","");}
+ @Test void filtersIntersectKeepRestoreInventoryAndSupportDeletedVolumes()throws Exception{
+  setup();var all=List.of(row("manual","v","수동","AVAILABLE"),row("scheduled","v","예약","AVAILABLE"),row("faulty","v","예약","FAULTY"),row("other","other-volume","예약","AVAILABLE"),row("deleted","deleted-volume","수동","AVAILABLE"));
+  when(backups.list(any(),anyString(),anyString())).thenReturn(new VolumeBackups.Catalog(List.of(new VolumeBackups.Volume("v","disk","AVAILABLE",50,"ad")),all,List.of("ad")));var session=connect();
+  var result=mvc.perform(get("/backups").session(session).param("backupVolume","v").param("backupSource","예약").param("backupState","AVAILABLE")).andExpect(status().isOk()).andExpect(content().string(containsString("1건 / 전체 5건"))).andReturn().getModelAndView().getModel();
+  org.junit.jupiter.api.Assertions.assertEquals(List.of(all.get(1)),result.get("history"));org.junit.jupiter.api.Assertions.assertEquals(all,((VolumeBackups.Catalog)result.get("inventory")).backups());
+  var deleted=mvc.perform(get("/backups").session(session).param("backupVolume","deleted-volume")).andExpect(status().isOk()).andReturn().getModelAndView().getModel();org.junit.jupiter.api.Assertions.assertEquals(List.of(all.get(4)),deleted.get("history"));org.junit.jupiter.api.Assertions.assertEquals("deleted-volume",((Map<?,?>)deleted.get("historyVolumes")).get("deleted-volume"));
+  mvc.perform(get("/backups").session(session).param("backupVolume","v").param("backupSource","수동").param("backupState","FAULTY")).andExpect(status().isOk()).andExpect(content().string(containsString("조건에 맞는 백업 없음")));
+  var reset=mvc.perform(get("/backups").session(session)).andExpect(status().isOk()).andReturn().getModelAndView().getModel();org.junit.jupiter.api.Assertions.assertEquals(all,reset.get("history"));
+  mvc.perform(get("/backups").session(session).param("backupSource","<script>alert(1)</script>")).andExpect(status().isOk()).andExpect(content().string(containsString("&lt;script&gt;alert(1)&lt;/script&gt;")));
+ }
 }
