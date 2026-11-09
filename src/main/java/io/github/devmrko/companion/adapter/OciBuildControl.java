@@ -4,6 +4,7 @@ import com.oracle.bmc.devops.requests.*;
 import io.github.devmrko.companion.domain.Models.Connection;
 import io.github.devmrko.companion.port.BuildControl;
 import io.github.devmrko.companion.port.BuildDefinition;
+import io.github.devmrko.companion.port.BuildProjectResources;
 import io.github.devmrko.companion.service.Errors;
 import io.github.devmrko.foundation.core.error.BusinessException;
 import java.util.*;
@@ -13,7 +14,8 @@ import org.springframework.stereotype.Component;
 public class OciBuildControl implements BuildControl {
     private final OciBuildHistory clients;
     private final BuildDefinition definitions;
-    public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions) { this.clients=clients;this.definitions=definitions; }
+    private final BuildProjectResources resources;
+    public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions,BuildProjectResources resources) { this.clients=clients;this.definitions=definitions;this.resources=resources; }
     public void cancel(Connection c,String region,String compartment,String pipeline,String run) {
         try(var client=clients.client(c,region)) {
             var response=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build());var r=response.getBuildRun();
@@ -67,10 +69,20 @@ public class OciBuildControl implements BuildControl {
             commit=CommitInfo.builder().repositoryUrl(source.url()).repositoryBranch(override.branch()).commitHash(hash).build();
         } else if(!override.branch().isEmpty() || !override.commit().isEmpty()) throw Errors.BUILD_PARAMETERS.exception();
         try(var client=clients.client(c,r)) {
+            var p=client.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(pipeline).build()).getBuildPipeline();
+            if(!compartment.equals(p.getCompartmentId())) throw Errors.SCOPE.exception();
+            var readiness=resources.logReadiness(c,r,compartment,p.getProjectId());
+            io.github.devmrko.companion.service.BuildLogChecks.requireReady(readiness);
             return client.createBuildRun(CreateBuildRunRequest.builder().opcRetryToken(token)
                 .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(pipeline).commitInfo(commit).displayName(name.isBlank()?null:name)
                     .buildRunArguments(BuildRunArgumentCollection.builder().items(parameters.stream()
                         .map(v->BuildRunArgument.builder().name(v.name()).value(v.value()).build()).toList()).build()).build()).build()).getBuildRun().getId();
+        } catch(BusinessException e) { throw e; } catch(com.oracle.bmc.model.BmcException e) {
+            if(e.getStatusCode()==409 && "IncorrectState".equals(e.getServiceCode())
+                && Objects.toString(e.getMessage(), "").contains("Logs need to be enabled")) {
+                throw Errors.BUILD_LOGS_REQUIRED.exception();
+            }
+            throw Errors.BUILD_UNKNOWN.exception();
         } catch(Exception e) { throw Errors.BUILD_UNKNOWN.exception(); }
     }
 }

@@ -1,0 +1,47 @@
+[
+  {
+    "profile": "DEFAULT",
+    "tenancy": "ocid1.tenancy.oc1..synthetic",
+    "user": "ocid1.user.oc1..synthetic",
+    "region": "ap-seoul-1",
+    "compartment": "ocid1.compartment.oc1..synthetic",
+    "id": "342fda1a-1891-5e03-8188-027e8ffb237f",
+    "name": "Service Desk VM",
+    "environment": "dev-vm",
+    "adapter": "monitoring-http-v1",
+    "baseUrl": "http://127.0.0.1:18091",
+    "credentialRef": "app-342fda1a-1891-5e03-8188-027e8ffb237f",
+    "dependencies": [
+      {
+        "type": "VM",
+        "label": "VM runtime",
+        "ocid": "ocid1.instance.oc1.ap-seoul-1.synthetic"
+      }
+    ]
+  },
+  {
+    "profile": "DEFAULT",
+    "tenancy": "ocid1.tenancy.oc1..synthetic",
+    "user": "ocid1.user.oc1..synthetic",
+    "region": "ap-seoul-1",
+    "compartment": "ocid1.compartment.oc1..synthetic",
+    "id": "27987a2c-d1ea-5e5f-9937-e7a67f375975",
+    "name": "Service Desk OKE",
+    "environment": "dev-oke",
+    "adapter": "monitoring-http-v1",
+    "baseUrl": "http://127.0.0.1:18092",
+    "credentialRef": "app-27987a2c-d1ea-5e5f-9937-e7a67f375975",
+    "dependencies": [
+      {
+        "type": "OKE",
+        "label": "OKE runtime",
+        "ocid": "ocid1.cluster.oc1.ap-seoul-1.synthetic"
+      },
+      {
+        "type": "ADB",
+        "label": "Agent memory",
+        "ocid": "ocid1.autonomousdatabase.oc1.ap-seoul-1.synthetic"
+      }
+    ]
+  }
+]

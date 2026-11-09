@@ -25,7 +25,7 @@ public class FunctionBuildPages {
         view.setStatus(Set.of("SCOPE","CONFLICT","BUILD_CHANGED").contains(error.code())?HttpStatus.CONFLICT:HttpStatus.BAD_REQUEST);
         view.addObject("message",error.getMessage());return view;
     }
-    record Ticket(String region,String compartment,String application,String function,String etag,String run) {}
+    record Ticket(String region,String compartment,String application,String function,String etag,String run,String contract) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession session) {
         var value=(Map<String,Ticket>)session.getAttribute("functionTickets");
         if(value==null){value=new LinkedHashMap<>();session.setAttribute("functionTickets",value);}return value;
@@ -67,7 +67,7 @@ public class FunctionBuildPages {
                     var builder=builders.stream().filter(b->b.id().equals(function)).findFirst().orElseThrow(()->Errors.MISSING.exception());model.addAttribute("builder",builder);
                     if(builder.compatible() && view.equals("execute")) {
                         String ticket=UUID.randomUUID().toString();
-                        synchronized(session){var map=tickets(session);if(map.size()>=32)map.remove(map.keySet().iterator().next());map.put(ticket,new Ticket(s.region(),s.compartment(),application,function,builder.etag(),UUID.randomUUID().toString()));}
+                        synchronized(session){var map=tickets(session);if(map.size()>=32)map.remove(map.keySet().iterator().next());map.put(ticket,new Ticket(s.region(),s.compartment(),application,function,builder.etag(),UUID.randomUUID().toString(),builder.contract()));}
                         model.addAttribute("functionTicket",ticket);
                     }
                     if(builder.compatible() && view.equals("history")) {
@@ -103,12 +103,21 @@ public class FunctionBuildPages {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType("application/zip")).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=\""+name+".zip\"").body(FunctionTemplate.zip(files));
     }
     @PostMapping("/builds/functions/run") String run(Authentication auth,HttpSession session,RedirectAttributes flash,
-        @RequestParam String ticket,@RequestParam String source,@RequestParam String commit,@RequestParam String goal,
-        @RequestParam(defaultValue="") String profiles,@RequestParam(defaultValue=".") String directory,@RequestParam(defaultValue="") String artifact) {
+        @RequestParam String ticket,@RequestParam(defaultValue="") String source,@RequestParam String commit,@RequestParam String goal,
+        @RequestParam(defaultValue="") String profiles,@RequestParam(defaultValue=".") String directory,@RequestParam(defaultValue="") String artifact,
+        @RequestParam(defaultValue="") String sourceObject,@RequestParam(defaultValue="") String sourceVersion,
+        @RequestParam(defaultValue="") String sourceSha256,@RequestParam(defaultValue="") String requiredFreeBytes) {
         var c=SecurityConfig.connection(auth);Ticket t;synchronized(session){t=tickets(session).remove(ticket);}if(t==null)throw Errors.CONFLICT.exception();
         var s=catalog.selection(c,session);
         if(!s.region().equals(t.region()) || !s.compartment().equals(t.compartment()) || session.getAttribute("scopeInvalid")!=null)throw Errors.SCOPE.exception();
-        var payload=FunctionTemplate.request(t.run(),source,commit,goal,profiles,directory,artifact);
+        String payload;
+        if("python-v1".equals(t.contract())) {
+            if(!source.isEmpty() || !profiles.isEmpty())throw Errors.INVALID.exception();
+            payload=PythonFunctionRequest.request(t.run(),sourceObject,sourceVersion,sourceSha256,commit,goal,directory,artifact,requiredFreeBytes);
+        } else {
+            if(!sourceObject.isEmpty() || !sourceVersion.isEmpty() || !sourceSha256.isEmpty() || !requiredFreeBytes.isEmpty())throw Errors.INVALID.exception();
+            payload=FunctionTemplate.request(t.run(),source,commit,goal,profiles,directory,artifact);
+        }
         synchronized(session){var values=submittedProfiles(session);if(values.size()>=64)values.remove(values.keySet().iterator().next());values.put(String.join("/",t.region(),t.compartment(),t.application(),t.function(),t.run()),profiles);}
         try {builds.invoke(c,t.region(),t.compartment(),t.application(),t.function(),t.etag(),payload);flash.addFlashAttribute("message","빌드 접수 · "+t.run()+" · 결과가 기록되면 조회됩니다.");}
         catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage()+" 실행 ID: "+t.run());}

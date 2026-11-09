@@ -36,7 +36,7 @@
 </form><p class="small muted">func.yaml · Dockerfile · 실행 코드 · 요청 예제 · OCI/Fn CLI 구성 안내. 다운로드로 OCI 리소스가 생성되지는 않습니다.</p>
 <details class="build-advanced"><summary>구성 순서</summary><ol><li>애플리케이션·서브넷·결과 버킷 확인 또는 생성</li><li>빌더 이미지 생성 → Container Registry 업로드 → Function 배포</li><li>결과 버킷 쓰기 권한·로그 설정</li><li>이 화면에서 다시 조회 → 빌드 실행</li></ol><p>템플릿은 앱 없이 사용할 수 있습니다. 빌더 이미지 준비와 사용자 소스 빌드는 별도 단계입니다.</p><a href="/builds?tab=registry&amp;kind=CONTAINER">Container Registry 관리</a></details>
 </section>
-<section class="card" th:if="${tab == 'execute' and functionTicket != null}"><h2 th:text="${buildTask != null ? buildTask.name() : 'Maven 빌드 실행'}"></h2>
+<section class="card" th:if="${tab == 'execute' and functionTicket != null and builder.contract() == 'maven-v1'}"><h2 th:text="${buildTask != null ? buildTask.name() : 'Maven 빌드 실행'}"></h2>
 <form th:action="@{/builds/functions/run}" method="post" class="build-field-grid"><input type="hidden" name="ticket" th:value="${functionTicket}">
 <div class="form-field"><div class="field-label"><label for="function-field-1">Git URL · 필수</label><details class="field-help"><summary aria-label="Git URL · 필수 도움말">?</summary><p>빌드할 공개 GitHub·GitLab 저장소 주소입니다.</p></details></div><input id="function-field-1" class="ui-control" name="source" th:value="${buildTask != null ? buildTask.source() : ''}" type="url" required placeholder="https://github.com/owner/repository.git"><span class="small muted">공개 GitHub·GitLab 저장소</span></div>
 <div class="form-field"><div class="field-label"><label for="function-field-2">커밋 SHA · 필수</label><details class="field-help"><summary aria-label="커밋 SHA · 필수 도움말">?</summary><p>이번에 빌드할 소스 버전입니다. Git 커밋의 40자리 SHA를 입력합니다.</p></details></div><input id="function-field-2" class="ui-control" name="commit" th:value="${buildTask != null ? buildTask.commit() : ''}" pattern="[0-9a-f]{40}" required maxlength="40"></div>
@@ -46,6 +46,21 @@
 <div class="form-field"><div class="field-label"><label for="function-field-6">산출물 경로 · 선택</label><details class="field-help"><summary aria-label="산출물 경로 · 선택 도움말">?</summary><p>작업 경로 기준 파일 패턴입니다. 예: target/*.jar. 비워도 로그와 생성된 보고서는 저장합니다.</p></details></div><input id="function-field-6" class="ui-control" name="artifact" th:value="${buildTask != null ? buildTask.artifact() : ''}" placeholder="target/*.jar" maxlength="250"><span class="small muted">테스트만 실행하면 비워두세요.</span></div>
 <div class="form-toolbar"><button class="ui-button primary" th:disabled="${builder.state() != 'ACTIVE'}">빌드 실행</button></div></form>
 <p class="small muted">결과는 선택한 Function의 버킷에 저장됩니다. 접수 후 실행 이력에서 확인하세요.</p></section>
+<section class="card" th:if="${tab == 'execute' and functionTicket != null and builder.contract() == 'python-v1'}">
+<h2>Python 빌드 실행</h2>
+<p>선택한 Function에 설정된 비공개 소스 버킷을 사용합니다. 테스트 후 wheel을 만들고 결과 버킷에 기록합니다.</p>
+<form th:action="@{/builds/functions/run}" method="post" class="build-field-grid" data-runtime="Python">
+<input type="hidden" name="ticket" th:value="${functionTicket}">
+<label class="form-field">소스 객체 이름 · 필수<input class="ui-control" name="sourceObject" placeholder="sources/project.tgz" maxlength="1024" required></label>
+<label class="form-field">객체 버전 ID · 필수<input class="ui-control" name="sourceVersion" maxlength="1024" required></label>
+<label class="form-field">번들 SHA-256 · 필수<input class="ui-control" name="sourceSha256" pattern="[0-9a-f]{64}" maxlength="64" required></label>
+<label class="form-field">커밋 SHA · 필수<input class="ui-control" name="commit" pattern="[0-9a-f]{40}" maxlength="40" required></label>
+<label class="form-field">필요 여유 공간(bytes) · 필수<input class="ui-control" name="requiredFreeBytes" inputmode="numeric" pattern="[1-9][0-9]{0,18}" required><span class="small muted">소스 압축·해제, 가상환경, 의존성, wheel 및 예비 공간을 포함한 예산입니다. 실제 공간이 부족하면 빌드를 중단합니다.</span></label>
+<label class="form-field">Goal<select class="ui-control" name="goal"><option value="verify">verify · 테스트·wheel</option><option value="package">package · 테스트·wheel</option><option value="test">test · 테스트</option></select></label>
+<label class="form-field">작업 경로<input class="ui-control" name="directory" value="project" maxlength="250" required><span class="small muted">pyproject.toml과 requirements-build.lock이 있는 번들 내부 폴더</span></label>
+<label class="form-field">산출물 패턴 · 선택<input class="ui-control" name="artifact" value="dist/*.whl" maxlength="250"></label>
+<div class="form-toolbar"><button class="ui-button primary" th:disabled="${builder.state() != 'ACTIVE'}">빌드 실행</button></div>
+</form><p class="small muted">접수는 빌드 성공을 의미하지 않습니다. 실행 이력에서 결과·로그·테스트 보고서를 확인하세요.</p></section>
 <section class="card" id="function-progress" th:if="${tab == 'history' and builder != null and builder.compatible() and !selectedRun.isEmpty()}" th:attr="data-url=@{/builds/functions/progress(region=${selection.region()},compartment=${selection.compartment()},application=${functionApplication},function=${function},run=${selectedRun})}">
 <div class="section-title"><h2>빌드 로그</h2><button type="button" class="ui-button" id="function-log-refresh">다시 조회</button></div>
 <p><strong id="function-run-status" role="status">조회 중</strong> · <span th:text="${selectedRun}"></span></p>

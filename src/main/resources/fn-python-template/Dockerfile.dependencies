@@ -1,0 +1,7 @@
+# Extend an already built, digest-pinned python-v1 runner image.
+ARG RUNNER_IMAGE
+FROM ${RUNNER_IMAGE}
+USER root
+COPY requirements-build.lock /opt/build-dependencies/requirements-build.lock
+RUN pip3 install --no-cache-dir --no-deps -r /opt/build-dependencies/requirements-build.lock && pip3 check
+ENV BUILD_PREINSTALLED_LOCK=/opt/build-dependencies/requirements-build.lock

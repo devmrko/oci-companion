@@ -11,12 +11,16 @@ public enum Errors implements ErrorDescriptor {
     TOPIC_INPUT(ErrorCategory.VALIDATION, "알림 주제 이름은 영문·숫자·하이픈·밑줄 1–255자로 입력하세요."),
     DELIVERY_ORDER(ErrorCategory.VALIDATION, "뒤에 연결된 단계가 있습니다. 기존 순서를 OCI 콘솔에서 확인하고 전달 단계를 연결하세요."),
     OUTPUT_UNKNOWN(ErrorCategory.VALIDATION, "빌드 사양에서 출력 이름을 확인할 수 없습니다. outputArtifacts와 소스 읽기 권한을 확인하세요."),
+    DEPLOYMENT_VM_STATE(ErrorCategory.CONFLICT, "대상 VM이 RUNNING 상태가 아닙니다. OCI Compute에서 VM 상태를 확인한 뒤 다시 조회하세요."),
     ADMIN_INPUT(ErrorCategory.VALIDATION, "이름(1–255자)과 설명(400자 이하)을 확인하세요."),
     ADMIN_UNKNOWN(ErrorCategory.UNAVAILABLE, "생성 결과를 확인하지 못했습니다. 재생성 전에 목록과 OCI 콘솔을 확인하세요."),
     BUILD_REQUIRED(ErrorCategory.VALIDATION, "필수 파라미터 값을 입력하세요."),
     BUILD_PRESET(ErrorCategory.CONFLICT, "프리셋과 현재 OCI 파라미터가 다릅니다. OCI 기본값을 불러와 다시 저장하세요."),
     BUILD_PARAMETERS(ErrorCategory.VALIDATION, "파라미터 이름·값을 확인하세요. 새 이름은 OCI에 먼저 저장하세요."),
     BUILD_CHANGED(ErrorCategory.CONFLICT, "설정 저장 실패 또는 OCI 설정 변경 · 새로 조회하고 권한을 확인하세요."),
+    BUILD_LOGS_REQUIRED(ErrorCategory.CONFLICT, "프로젝트 로그가 비활성 또는 준비 중이어서 빌드를 시작하지 않았습니다. OCI 콘솔 → DevOps 프로젝트 → 로그에서 활성화한 뒤 실행하세요."),
+    BUILD_LOGS_NOT_FOUND(ErrorCategory.CONFLICT, "현재 구획에서 이 프로젝트의 DevOps 서비스 로그를 찾지 못해 빌드를 요청하지 않았습니다. 프로젝트 리소스 화면에서 로그를 준비하세요. 다른 구획의 로그는 OCI 콘솔에서 확인하세요."),
+    BUILD_LOGS_UNVERIFIED(ErrorCategory.UNAVAILABLE, "현재 구획에서 활성 프로젝트 로그를 확인하지 못해 빌드를 요청하지 않았습니다. 프로젝트 리소스 화면이나 OCI 콘솔에서 로그 위치·활성 상태·Logging 읽기 권한을 확인하세요. 다른 구획의 로그는 이 점검 범위에 포함되지 않습니다."),
     BUILD_UNKNOWN(ErrorCategory.UNAVAILABLE, "실행 결과를 확인하지 못했습니다. 다시 실행하기 전에 이력과 OCI 콘솔을 확인하세요."),
     INVALID(ErrorCategory.VALIDATION, "입력값을 확인하세요. 저장소에는 인증정보 없는 HTTPS URL을 사용하세요."),
     CONFIG(ErrorCategory.UNAVAILABLE, "OCI 프로파일을 읽거나 연결할 수 없습니다. API 키 설정과 tenancy 조회 권한을 확인하세요."),
@@ -28,6 +32,7 @@ public enum Errors implements ErrorDescriptor {
     MISSING(ErrorCategory.NOT_FOUND, "현재 연결에서 찾을 수 없는 항목입니다."),
     CONFLICT(ErrorCategory.CONFLICT, "이미 사용된 요청입니다. 실행 이력을 확인하세요."),
     TARGET(ErrorCategory.VALIDATION, "현재는 Instance Group 배포와 Approval/Wait 단계로 구성된 VM 파이프라인만 실행할 수 있습니다."),
+    HANDOFF(ErrorCategory.CONFLICT, "빌드·전달 성공과 배포 파일 일치를 확인하지 못했습니다. 같은 산출물을 사용하는 파이프라인과 불변 저장소·읽기 권한을 확인하세요."),
     SCOPE(ErrorCategory.CONFLICT, "OCI 설정의 계정 또는 리전이 변경되었습니다. 다시 연결하세요.");
     private final ErrorCategory category; private final String message;
     Errors(ErrorCategory category, String message) { this.category=category; this.message=message; }

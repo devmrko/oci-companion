@@ -1,0 +1,17 @@
+[
+  {
+    "profile": "DEFAULT",
+    "tenancy": "ocid1.tenancy.oc1..synthetic",
+    "user": "ocid1.user.oc1..synthetic",
+    "region": "ap-seoul-1",
+    "compartment": "ocid1.compartment.oc1..synthetic",
+    "appId": "27987a2c-d1ea-5e5f-9937-e7a67f375975",
+    "clusterId": "ocid1.cluster.oc1.ap-seoul-1.synthetic",
+    "kubeconfig": "/protected/oke-config",
+    "namespace": "service-desk",
+    "deployment": "service-desk",
+    "server": "",
+    "tlsServerName": "",
+    "inspectNodes": false
+  }
+]

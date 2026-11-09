@@ -71,7 +71,7 @@ public class BuildTaskPages {
         if(runner.equals("FUNCTIONS")) {
             if(selectedSource.provider().equals("OCI"))throw Errors.INVALID.exception();
             FunctionTemplate.request(UUID.randomUUID().toString(),source,commit,goal,profiles,directory,artifact);
-            var b=functions.read(c,region,compartment,application,function);if(!b.compatible() || !b.state().equals("ACTIVE"))throw Errors.INVALID.exception();pipeline="";
+            var b=functions.read(c,region,compartment,application,function);if(!b.compatible() || !io.github.devmrko.companion.port.FunctionBuilds.CONTRACT.equals(b.contract()) || !b.state().equals("ACTIVE"))throw Errors.INVALID.exception();pipeline="";
         }else if(runner.equals("DEVOPS")) {
             String selected=pipeline;if(builds.pipelines(c,region,compartment).stream().noneMatch(p->p.id().equals(selected)))throw Errors.MISSING.exception();
             var matched=TaskSources.match(selectedSource,definitions.read(c,region,compartment,pipeline));

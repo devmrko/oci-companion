@@ -28,7 +28,7 @@ public class OciGuides implements GuideCatalog {
             "oci devops deployment create-pipeline-deployment --pipeline-id <DEPLOY_PIPELINE_OCID> --profile <PROFILE>","DevopsClient.createDeployment(CreateDeployPipelineDeploymentDetails) / getDeployment",
             "사용자의 배포 실행 권한, 배포 파이프라인의 인스턴스·배포 아티팩트 접근 권한, 대상 VM의 필요한 리소스 접근 권한을 각각 설정합니다.","https://docs.oracle.com/en-us/iaas/Content/devops/using/deploy_instancegroups.htm"),
         new Guide("iam","권한·실패 확인","연결 사용자와 실행 파이프라인의 권한을 구분해 확인합니다.",
-            List.of("사용자 그룹의 정책에서 해당 컴파트먼트의 필요한 DevOps 작업을 허용합니다.","빌드·배포 파이프라인을 동적 그룹으로 식별하고 필요한 리소스 권한을 부여합니다.","권한 오류와 리소스 없음은 OCI에서 같은 오류로 보일 수 있습니다. 리전·OCID·컴파트먼트도 확인합니다.","SUBMITTING 상태가 오래 지속되거나 UNKNOWN이면 요청 ID와 OCI 실행 이력을 먼저 확인합니다. 새 실행을 무조건 반복하지 않습니다."),
+            List.of("사용자 그룹의 정책에서 해당 컴파트먼트의 필요한 DevOps 작업을 허용합니다.","빌드·배포 파이프라인을 동적 그룹으로 식별하고 필요한 리소스 권한을 부여합니다.","권한 오류와 리소스 없음은 OCI에서 같은 오류로 보일 수 있습니다. 리전·OCID·컴파트먼트도 확인합니다.","정책 생성이 TenantCapacityExceeded로 거부되면 계정의 현재 정책 한도를 확인합니다. 다른 정책을 삭제하거나 광범위 권한으로 우회하지 말고, 관리 중인 기존 정책에 필요한 정확한 파이프라인 주체만 추가하는 방법을 검토합니다. 변경 전후 권한과 정책을 관리하는 Terraform 상태를 함께 확인하세요.","빌드 전에는 현재 구획의 활성 프로젝트 로그를 점검합니다. 로그가 다른 구획에 있거나 Logging 읽기 권한이 없으면 미확인으로 중단하므로 프로젝트 리소스·OCI 콘솔에서 위치와 권한을 확인하세요.","SUBMITTING 상태가 오래 지속되거나 UNKNOWN이면 요청 ID와 OCI 실행 이력을 먼저 확인합니다. 새 실행을 무조건 반복하지 않습니다."),
             "oci devops build-run get --build-run-id <BUILD_RUN_OCID> --profile <PROFILE>","OCI IAM policies + DevopsClient.getBuildRun / getDeployment",
             "정책 예제의 대상·범위를 실제 프로젝트에 맞게 좁혀 적용합니다. 이 앱은 IAM 정책을 자동 생성하지 않습니다.","https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm")
     ); }

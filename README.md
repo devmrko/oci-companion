@@ -81,3 +81,5 @@ Spring Foundation 소스 커밋: `abc0bb10a7ddf1d0767a044ebe654b58eea48ac3`.
 빌드 스크립트가 `.tools`에 내려받아 프로젝트 전용 Maven 저장소에서 빌드합니다.
 
 명세 저장·런타임·테스트 보고서: [사용 흐름과 Git 인증 설정](docs/design/build-specification-delivery.md).
+
+성공한 빌드의 파일을 확인하고 준비된 VM 파이프라인으로 배포하려면 [빌드에서 배포로 연결하기](docs/design/build-deployment-handoff.md)를 참고하세요.

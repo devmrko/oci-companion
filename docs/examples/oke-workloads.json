@@ -1,0 +1,17 @@
+[
+  {
+    "appId": "registered-app-id",
+    "profile": "DEFAULT",
+    "tenancy": "ocid1.tenancy.oc1..replace",
+    "user": "ocid1.user.oc1..replace",
+    "region": "ap-seoul-1",
+    "compartment": "ocid1.compartment.oc1..replace",
+    "clusterId": "ocid1.cluster.oc1.ap-seoul-1.replace",
+    "kubeconfig": "/absolute/path/to/trusted-kubeconfig",
+    "namespace": "example-app",
+    "deployment": "example-app",
+    "server": "",
+    "tlsServerName": "",
+    "inspectNodes": false
+  }
+]

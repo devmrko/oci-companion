@@ -4,6 +4,7 @@
   <groupId>io.github.devmrko</groupId><artifactId>oci-companion</artifactId><version>0.1.0-SNAPSHOT</version>
   <properties><java.version>21</java.version><oci.version>3.94.1</oci.version></properties>
   <dependencies>
+    <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-containerengine</artifactId><version>${oci.version}</version></dependency>
     <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-genericartifactscontent</artifactId><version>${oci.version}</version></dependency>
     <dependency><groupId>org.eclipse.jgit</groupId><artifactId>org.eclipse.jgit</artifactId><version>7.3.0.202506031305-r</version></dependency>
     <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-secrets</artifactId><version>${oci.version}</version></dependency>
@@ -14,6 +15,7 @@
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-flyway</artifactId></dependency>
     <dependency><groupId>org.xerial</groupId><artifactId>sqlite-jdbc</artifactId><version>3.50.3.0</version></dependency>
     <dependency><groupId>org.hibernate.orm</groupId><artifactId>hibernate-community-dialects</artifactId></dependency>
+    <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-database</artifactId><version>${oci.version}</version></dependency>
     <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-core</artifactId><version>${oci.version}</version></dependency>
     <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-functions</artifactId><version>${oci.version}</version></dependency>
     <dependency><groupId>com.oracle.oci.sdk</groupId><artifactId>oci-java-sdk-objectstorage</artifactId><version>${oci.version}</version></dependency>
