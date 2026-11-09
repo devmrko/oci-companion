@@ -42,5 +42,5 @@ public class DeploymentEnvironmentPages {
         try{var id=environments.create(c,t.region(),t.compartment(),project,name,description,instances,ticket);flash.addFlashAttribute("message","환경 생성 요청 접수 · OCI 상태를 확인하세요.");return "redirect:/environments?environment="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);}
         catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());return "redirect:/environments";}
     }
-    @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }

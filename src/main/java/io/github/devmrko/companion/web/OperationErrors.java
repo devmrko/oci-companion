@@ -7,6 +7,21 @@ import org.springframework.web.servlet.ModelAndView;
 import org.springframework.http.HttpStatus;
 final class OperationErrors {
  private OperationErrors() {}
+ record Destination(String prefix,String path,String label) {}
+ private static final java.util.List<Destination> DESTINATIONS=java.util.List.of(
+  new Destination("/backups/policies","/backups/policies","정기 정책"),
+  new Destination("/backups","/backups","백업·복구"),
+  new Destination("/environments/containers","/environments/containers","Container 상태"),
+  new Destination("/environments/oke","/environments/oke","OKE 환경 준비"),
+  new Destination("/environments","/environments","배포 환경"),
+  new Destination("/deployments/oke/configure","/deployments/oke/configure","OKE 배포 설정"),
+  new Destination("/deployments/configure","/deployments/configure","VM 배포 설정"),
+  new Destination("/builds","/builds?tab=history","빌드 이력"),
+  new Destination("/deployments/runs","/deployments/runs","배포 이력"),
+  new Destination("/deployments/rollback","/deployments/runs","배포 이력"),
+  new Destination("/deployments","/deployments","배포 환경"),
+  new Destination("/sources","/sources","소스 목록"));
+ static Destination destination(String path){return DESTINATIONS.stream().filter(d->path.equals(d.prefix())||path.startsWith(d.prefix()+"/")).findFirst().orElse(new Destination("/","/","리소스 목록"));}
  static ModelAndView view(BusinessException error,CatalogPages catalog,Authentication auth,HttpServletRequest request){
   var model=new ExtendedModelMap();try{catalog.navigation(auth,request,model);model.addAttribute("navSelection",catalog.selection(SecurityConfig.connection(auth),request.getSession()));}catch(Exception ignored){}
   model.addAttribute("connection",auth!=null?auth.getPrincipal():null);
@@ -15,10 +30,9 @@ final class OperationErrors {
   model.addAttribute("readRequest",request.getMethod().equals("GET"));
   String path=request.getRequestURI();
   model.addAttribute("backupPolicyError",path.startsWith("/backups/policies"));model.addAttribute("backupManualError",path.startsWith("/backups")&&!path.startsWith("/backups/policies"));
-  String back=path.startsWith("/backups/policies")?"/backups/policies":path.startsWith("/backups")?"/backups":path.startsWith("/environments/containers")?"/environments/containers":path.startsWith("/environments")?"/environments":path.startsWith("/builds")?"/builds?tab=history":path.startsWith("/deployments")?"/deployments/runs":path.startsWith("/sources")?"/sources":"/";
-  model.addAttribute("operationBack",back);
-  model.addAttribute("operationBackLabel",path.startsWith("/backups")?"백업·복구":path.startsWith("/environments/containers")?"Container 상태":path.startsWith("/environments")?"배포 환경":path.startsWith("/builds")?"빌드 이력":path.startsWith("/deployments")?"배포 이력":path.startsWith("/sources")?"소스 목록":"리소스 목록");
-  model.addAttribute("scopeBack",back.equals("/builds?tab=history")?"/builds":back);
+  var destination=destination(path);String back=destination.path();
+  model.addAttribute("operationBack",back);model.addAttribute("operationBackLabel",destination.label());
+  model.addAttribute("scopeBack",back.split("\\?",2)[0]);
   var status=switch(error.category()){case VALIDATION -> HttpStatus.BAD_REQUEST;case CONFLICT -> HttpStatus.CONFLICT;case NOT_FOUND -> HttpStatus.NOT_FOUND;case UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;};
   return new ModelAndView("operation-error",model,status);
  }
