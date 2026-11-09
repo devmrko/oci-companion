@@ -38,4 +38,5 @@ class VolumeBackupsWebTest {
   var reset=mvc.perform(get("/backups").session(session)).andExpect(status().isOk()).andReturn().getModelAndView().getModel();org.junit.jupiter.api.Assertions.assertEquals(all,reset.get("history"));
   mvc.perform(get("/backups").session(session).param("backupSource","<script>alert(1)</script>")).andExpect(status().isOk()).andExpect(content().string(containsString("&lt;script&gt;alert(1)&lt;/script&gt;")));
  }
+ @Test void failedBackupQueryKeepsBackupHelpVisible()throws Exception{setup();var s=connect();when(backups.list(any(),anyString(),anyString())).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());mvc.perform(get("/backups").session(s)).andExpect(status().isServiceUnavailable()).andExpect(content().string(containsString("manage volume-backups"))).andExpect(content().string(containsString("Restore Block Volume"))).andExpect(content().string(matchesPattern("(?s).*<details[^>]*id=\"backup-help\"[^>]*open[^>]*>.*")));verify(backups,never()).apply(any(),anyString(),anyString(),any(),anyString());}
 }
