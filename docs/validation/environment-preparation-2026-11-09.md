@@ -30,8 +30,18 @@
 - SDK 상태 Enum의 toString(Available)과 API 값(AVAILABLE) 차이로 이미지 선택이 비는 문제를 수정했다. Registry 포트에서 API 값을 반환하고 회귀 테스트를 추가했다.
 - 생성 JSON 다운로드 확인: E4 Flex, 1 OCPU / 2GB, 기존 검증 서브넷, 공용 IP 없음. 네이티브 HTTP check /hello:8080, 15초 간격, 실패 시 자동 종료 없음.
 - 실제 생성 요청 접수: `companion-ci-validation-20261109`, `ocid1.computecontainerinstance.oc1.ap-seoul-1.anuwgljrvsea7yiahvm2fo4efmcugxd3wnoo2oi4znipv5zbadddwriucqna`.
-- 첫 생성은 OCI Work Request에서 `400: A container's image could not be pulled due to inadequate network configuration.`으로 실패·롤백됐다. 기존 검증 VM의 서브넷은 Internet Gateway만 있고 Container에는 공용 IP가 없어 OCIR 접근 경로가 없었다. 사설 생성 미리보기에 NAT/전체 OCI Service Gateway 경로 검사를 추가했다. 기존 `launchpad-oke-nodes` 사설 서브넷으로 재검증한다. 기존 네트워크 규칙은 변경하지 않았다.
+- 첫 생성은 OCI Work Request에서 `400: A container's image could not be pulled due to inadequate network configuration.`으로 실패·롤백됐다. 기존 검증 VM의 서브넷은 Internet Gateway만 있고 Container에는 공용 IP가 없어 OCIR 접근 경로가 없었다. 사설 생성 미리보기에 NAT/전체 OCI Service Gateway 경로 검사를 추가했다. 기존 `launchpad-oke-nodes` 사설 서브넷으로 재검증했다. 기존 네트워크 규칙은 변경하지 않았다.
 
 ## 화면·보호 검사
 
 390/768/1440px에서 페이지 가로 넘침과 JavaScript 오류가 없었다. 네이티브 JSON에는 앱 전용 실행 의존성이나 Registry 인증정보가 없다. HTTP 경로·환경변수·CPU/메모리 범위, 다른 구획·부모 리소스, stale snapshot, ETag, CSRF, 티켓 중복 적용을 검사한다.
+
+## 추가 확인·남은 검증
+
+- NAT·Service Gateway 경로가 있는 서브넷에서는 네트워크 오류 대신 사설 이미지 인증 오류가 반환됐다. 화면에서 OCI Work Request 실패 원문과 롤백 상태를 확인했다.
+- 테넌시 동적 그룹 생성은 `IdcsConversionError`(DynamicResourceGroups 한도)로 실패했다. 기존 동적 그룹은 변경하지 않았다.
+- 검증 컨테이너 OCID 하나와 `companion/hello-python` 저장소 하나로 제한한 정책으로도 이미지 다운로드는 실패했다. 이 정책 방식의 유효성을 입증하지 못했다. 구획 전체 컨테이너로 권한을 확대하는 변경은 자동 승인 검토가 거부해 실행하지 않았다.
+- **Container 정상 실행, HTTP Healthy, HTTP 200 로그 검증은 미완료다.** 생성 요청 접수·상태 조회를 성공적인 앱 배포로 취급하지 않는다. OCI 문서의 동적 그룹/Registry 읽기 권한을 준비한 환경에서 후속 검증해야 한다.
+- 검증 중 실패한 컨테이너 3개와 효과를 입증하지 못한 단일 컨테이너 IAM 정책은 삭제 요청을 완료했고 임시 정책은 삭제했다. 기존 네트워크·이미지 공개 여부·다른 동적 그룹에는 변경이 없다.
+- Maven 테스트 184개 통과. VM 사양·OKE 연결·Container 구성 미리보기 화면 검증을 수행했다. 기존 OCI 사용 안내의 IAM 예시는 사용자가 콘솔에서 적용할 수 있으며 앱이 권한을 자동 확대하지 않는다.
+- 볼륨 실제 확장, 사설 OKE 환경 생성, 신규 클러스터 생성, Container 영구 스토리지·교체 배포는 이번 완료 범위가 아니다.
