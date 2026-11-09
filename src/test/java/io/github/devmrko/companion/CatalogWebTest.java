@@ -214,7 +214,7 @@ class CatalogWebTest {
         mvc.perform(post("/builds/registry").session(session).param("ticket",ticket).param("name","builds")).andExpect(status().isForbidden());
         mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",ticket).param("name","builds").param("etag","forged")).andExpect(status().is3xxRedirection());
         org.mockito.Mockito.verify(registry).update(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("GENERIC"),org.mockito.ArgumentMatchers.eq("repo"),org.mockito.ArgumentMatchers.eq("server-etag"),org.mockito.ArgumentMatchers.eq("builds"),org.mockito.ArgumentMatchers.eq(""));
-        mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",ticket).param("name","builds")).andExpect(status().isBadRequest());
+        mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",ticket).param("name","builds")).andExpect(status().isConflict()).andExpect(view().name("operation-error")).andExpect(content().string(containsString("권한 설정 안내"))).andExpect(content().string(containsString("빌드 이력"))).andExpect(content().string(containsString("global-scope")));
         String create=(String)result.getModelAndView().getModel().get("registryTicket");
         mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development"));
         mvc.perform(post("/builds/registry").session(session).with(csrf()).param("ticket",create).param("name","builds")).andExpect(status().isConflict());
@@ -319,7 +319,7 @@ class CatalogWebTest {
         String ticket=(String)result.getModelAndView().getModel().get("ticket");
         mvc.perform(post("/builds/action").session(session).param("ticket",ticket).param("action","run")).andExpect(status().isForbidden());
         mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run").param("runName","test").param("purpose","test")).andExpect(redirectedUrl("/builds?pipeline=p1&run=run1"));
-        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run")).andExpect(status().isBadRequest());
+        mvc.perform(post("/builds/action").session(session).with(csrf()).param("ticket",ticket).param("action","run")).andExpect(status().isConflict()).andExpect(view().name("operation-error")).andExpect(content().string(containsString("권한 설정 안내"))).andExpect(content().string(containsString("빌드 이력"))).andExpect(content().string(containsString("global-scope")));
         org.mockito.Mockito.verify(control,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString());
         result=mvc.perform(get("/builds").session(session).param("tab","execute")).andReturn();
         ticket=(String)result.getModelAndView().getModel().get("ticket");

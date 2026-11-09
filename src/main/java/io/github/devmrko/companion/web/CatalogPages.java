@@ -575,10 +575,8 @@ public class CatalogPages {
     }
     @GetMapping("/guides") String guides(Model model) { model.addAttribute("guides",guides.all());return "guides"; }
     @ExceptionHandler(BusinessException.class)
-    org.springframework.web.servlet.ModelAndView invalid(BusinessException e) {
-        var result=new org.springframework.web.servlet.ModelAndView("error");
-        result.setStatus(org.springframework.http.HttpStatus.BAD_REQUEST);
-        result.addObject("message",e.getMessage());return result;
+    org.springframework.web.servlet.ModelAndView invalid(BusinessException e,Authentication auth,HttpServletRequest request) {
+        return OperationErrors.view(e,this,auth,request);
     }
     private void checkScope(Selection selection,String region,String compartment) {
         if (!selection.region().equals(region) || !selection.compartment().equals(compartment)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"조회 범위 변경 · 새로 고침");
