@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 @SpringBootTest @ActiveProfiles("demo") @AutoConfigureMockMvc
 class CatalogWebTest {
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BackupPolicies backupPolicies;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.VolumeBackups volumeBackups;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentRollback rollback;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkeDeploymentSetup okeDeploymentSetup;
