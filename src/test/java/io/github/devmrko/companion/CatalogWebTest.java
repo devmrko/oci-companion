@@ -83,6 +83,23 @@ class CatalogWebTest {
         org.mockito.Mockito.verify(deploymentRuns,org.mockito.Mockito.never()).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
         mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourceRun","br")).andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("ticket"));
     }
+    @Test void deploymentRetryRetainsBuildAndRechecksItsArtifact() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(deploymentRuns.plan(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.DeploymentRuns.Plan("p","release","VM",java.util.List.of("vm"),"plan"));
+        org.mockito.Mockito.when(handoff.verify(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("bp"),org.mockito.ArgumentMatchers.eq("br"),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.BuildHandoff.Proof("br","proof",1));
+        org.mockito.Mockito.when(deploymentRuns.start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("plan"),org.mockito.ArgumentMatchers.anyString())).thenReturn("run");
+        var page=mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourcePipeline","bp").param("sourceRun","br")).andReturn();
+        String ticket=(String)page.getModelAndView().getModel().get("ticket");
+        mvc.perform(post("/deployments/runs").session(session).with(csrf()).param("ticket",ticket)).andExpect(redirectedUrl("/deployments/runs?pipeline=p&run=run&sourcePipeline=bp&sourceRun=br"));
+        var run=new io.github.devmrko.companion.port.DeploymentRuns.Run("run","release","FAILED","");
+        org.mockito.Mockito.when(deploymentRuns.run(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"),org.mockito.ArgumentMatchers.eq("run"))).thenReturn(run);
+        mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("run","run").param("sourcePipeline","bp").param("sourceRun","br"))
+            .andExpect(status().isOk()).andExpect(content().string(containsString("sourcePipeline=bp&amp;sourceRun=br&amp;pipeline=p")));
+        org.mockito.Mockito.when(handoff.verify(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("bp"),org.mockito.ArgumentMatchers.eq("br"),org.mockito.ArgumentMatchers.eq("p"))).thenThrow(io.github.devmrko.companion.service.Errors.HANDOFF.exception());
+        mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourcePipeline","bp").param("sourceRun","br"))
+            .andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("ticket"));
+        org.mockito.Mockito.verify(deploymentRuns,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
     @Test void deploymentExecutionRequiresCsrfOneUseTicketAndUnchangedScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         org.mockito.Mockito.when(deploymentRuns.plan(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(new io.github.devmrko.companion.port.DeploymentRuns.Plan("p","release 0.4.0","demo VM",java.util.List.of("vm"),"fingerprint"));
