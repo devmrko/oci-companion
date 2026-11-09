@@ -147,7 +147,7 @@ public class CatalogPages {
         var s=selection(SecurityConfig.connection(auth),session);
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
-        String destination=Set.of("/deployments/oke/configure","/backups/policies","/backups","/agents","/environments/containers","/environments/oke","/environments","/deployments","/deployments/runs","/deployments/configure","/sources","/builds","/guides","/builds/functions","/builds/tasks","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
+        String destination=Set.of("/builds/automation","/builds/project-resources","/deployments/oke/configure","/backups/policies","/backups","/agents","/environments/containers","/environments/oke","/environments","/deployments","/deployments/runs","/deployments/configure","/sources","/builds","/guides","/builds/functions","/builds/tasks","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
         try { selections.write(SecurityConfig.connection(auth),region,compartment); }
         catch(IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage());return "redirect:"+destination; }
         if(!s.region().equals(region) || !s.compartment().equals(compartment)) session.removeAttribute("scopeReports");

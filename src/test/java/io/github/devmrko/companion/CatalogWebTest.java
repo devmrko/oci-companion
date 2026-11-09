@@ -480,4 +480,17 @@ class CatalogWebTest {
   }
   org.mockito.Mockito.verifyNoInteractions(deploymentSetup,okeDeploymentSetup,deploymentEnvironments,okePreparation);
  }
+ @Test void buildErrorsKeepTheirPageAndDoNotInvokeCloudWrites()throws Exception{
+  var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+  var requests=java.util.List.of(post("/builds/automation/state").param("ticket","expired").param("id","unused").param("etag","unused").param("active","false"),post("/builds/project-resources").param("ticket","expired").param("action","repository").param("name","unused"),post("/builds/functions/run").param("ticket","expired").param("commit","unused").param("goal","verify"),post("/builds/cancel").param("region","unused").param("compartment","unused").param("pipeline","unused").param("run","unused").param("confirmed","false"));
+  var destinations=java.util.List.of("/builds/automation","/builds/project-resources","/builds/functions","/builds?tab=history");
+  for(int n=0;n<requests.size();n++)mvc.perform(requests.get(n).session(session).with(csrf())).andExpect(status().isConflict()).andExpect(view().name("operation-error")).andExpect(model().attribute("operationBack",destinations.get(n)));
+  mvc.perform(get("/builds/tasks").session(session).param("view","invalid")).andExpect(status().isBadRequest()).andExpect(view().name("operation-error")).andExpect(model().attribute("operationBack","/builds/tasks"));
+  org.mockito.Mockito.verifyNoInteractions(automation,projectResources,functions,control);
+ }
+ @Test void buildDataEndpointsReturnJsonErrorsRatherThanHtml()throws Exception{
+  var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+  mvc.perform(get("/builds/automation/preview").session(session).param("cron","invalid")).andExpect(status().isBadRequest()).andExpect(content().contentTypeCompatibleWith("application/json")).andExpect(jsonPath("$.message").isNotEmpty());
+  mvc.perform(get("/builds/tasks/environments").session(session).param("region","wrong").param("compartment","wrong")).andExpect(status().isConflict()).andExpect(content().contentTypeCompatibleWith("application/json")).andExpect(jsonPath("$.code").value("SCOPE"));
+ }
 }

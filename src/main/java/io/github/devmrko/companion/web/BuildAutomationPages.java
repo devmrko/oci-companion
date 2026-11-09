@@ -15,7 +15,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class BuildAutomationPages {
     private final CatalogPages catalog;private final BuildHistory builds;private final BuildDefinition definitions;private final BuildAutomation automation;
     public BuildAutomationPages(CatalogPages catalog,BuildHistory builds,BuildDefinition definitions,BuildAutomation automation){this.catalog=catalog;this.builds=builds;this.definitions=definitions;this.automation=automation;}
-    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView invalid(BusinessException e){var view=new org.springframework.web.servlet.ModelAndView("error");view.setStatus(Set.of("SCOPE","CONFLICT","BUILD_CHANGED").contains(e.code())?HttpStatus.CONFLICT:HttpStatus.BAD_REQUEST);view.addObject("message",e.getMessage());return view;}
+    @ExceptionHandler(BusinessException.class) Object invalid(io.github.devmrko.companion.error.BusinessException e,Authentication a,jakarta.servlet.http.HttpServletRequest r){return OperationErrors.response(e,catalog,a,r);}
     record Ticket(String region,String compartment,String pipeline,String revision) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession session){var map=(Map<String,Ticket>)session.getAttribute("automationTickets");if(map==null){map=new LinkedHashMap<>();session.setAttribute("automationTickets",map);}return map;}
     @GetMapping("/builds/automation") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String pipeline){

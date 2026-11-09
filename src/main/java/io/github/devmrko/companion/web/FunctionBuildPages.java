@@ -20,11 +20,7 @@ public class FunctionBuildPages {
     private final CatalogPages catalog;
     private final io.github.devmrko.companion.port.Registry registry;
     public FunctionBuildPages(FunctionBuilds builds,CatalogPages catalog,io.github.devmrko.companion.port.Registry registry,io.github.devmrko.companion.port.BuildTaskStore taskStore) { this.taskStore=taskStore; this.builds=builds;this.catalog=catalog;this.registry=registry; }
-    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView invalid(BusinessException error) {
-        var view=new org.springframework.web.servlet.ModelAndView("error");
-        view.setStatus(Set.of("SCOPE","CONFLICT","BUILD_CHANGED").contains(error.code())?HttpStatus.CONFLICT:HttpStatus.BAD_REQUEST);
-        view.addObject("message",error.getMessage());return view;
-    }
+    @ExceptionHandler(BusinessException.class) Object invalid(io.github.devmrko.companion.error.BusinessException e,Authentication a,jakarta.servlet.http.HttpServletRequest r){return OperationErrors.response(e,catalog,a,r);}
     record Ticket(String region,String compartment,String application,String function,String etag,String run,String contract) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession session) {
         var value=(Map<String,Ticket>)session.getAttribute("functionTickets");
