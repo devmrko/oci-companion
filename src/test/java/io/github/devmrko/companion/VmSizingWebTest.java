@@ -27,7 +27,7 @@ class VmSizingWebTest {
   verify(sizing,never()).apply(any(),anyString(),anyString(),any(),any());String ticket=(String)preview.getModelAndView().getModel().get("ticket");
   mvc.perform(post("/environments/sizing/apply").session(session).param("ticket",ticket)).andExpect(status().isForbidden());
   mvc.perform(post("/environments/sizing/apply").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().is3xxRedirection());
-  mvc.perform(post("/environments/sizing/apply").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict());
+  mvc.perform(post("/environments/sizing/apply").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict()).andExpect(content().string(containsString("global-scope"))).andExpect(content().string(containsString("배포 환경")));
   verify(sizing,times(1)).apply(any(),anyString(),anyString(),eq(before),eq(new VmSizing.Change("",2,16,0)));
   mvc.perform(post("/environments/sizing/preview").session(session).with(csrf()).param("instance","vm").param("volume","boot").param("size","60")).andExpect(status().isOk()).andExpect(content().string(containsString("50 → 60 GB")));
  }
