@@ -58,3 +58,11 @@
 빌드 로그 조회 실패 시 이전 로그·마지막 성공 시각을 표시하고 자동 갱신을 중지합니다. 보고서 목록·본문 조회 중 선택을 바꾸면 이전 응답을 무시하며, 조회 실패와 빈 결과를 구분합니다. [로그 검증](../validation/build-log-failure-2026-11-09.md), [보고서 검증](../validation/report-content-selection-2026-11-09.md).
 
 [독립 ZIP · 소스→빌드→VM 배포 검증](../validation/alpha6-flow-2026-11-10.md)
+
+## alpha.7 반영
+
+배포 재시도 시 원본 빌드 선택·산출물 검증을 유지합니다. 배포 전 점검표에 확인·미확인을 구분하고, 없는 OCIR digest와 이미지·명세의 x86/ARM 불일치를 실행 전에 차단합니다. 사설 OCIR 조회는 OCI 프로파일을 사용합니다. 실제 노드·스케줄링·네트워크 연결 성공은 별도 확인입니다. Container Instances 사설 이미지 인증·동적 그룹 한도 해결 안내도 추가했습니다.
+
+[재시도](../validation/deployment-retry-2026-11-10.md), [점검표](../validation/deployment-preflight-2026-11-10.md), [이미지 digest](../validation/deployment-images-2026-11-10.md), [아키텍처](../validation/image-architecture-2026-11-10.md).
+
+[alpha.7 독립 ZIP 설치·업데이트 검증](../validation/alpha7-package-2026-11-10.md): Java 230개, 실제 OCI 화면 10개와 사설 이미지 아키텍처 조회, alpha.6 데이터 복사본의 소스·범위 유지 확인.
