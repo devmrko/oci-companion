@@ -26,4 +26,10 @@ class OciContainerPreparationTest {
   doReturn(new ContainerPreparation.Detail("instance","test","ACTIVE","",List.of(new ContainerPreparation.Process("own","test","ACTIVE","","","image")))).when(adapter).read(c,"r","comp","instance");
   assertThrows(RuntimeException.class,()->adapter.logs(c,"r","comp","instance","other"));verify(adapter,never()).client(any(),any());
  }
+ @Test void internetGatewayAloneCannotPullWithoutPublicIp(){
+  var igw=com.oracle.bmc.core.model.RouteRule.builder().networkEntityId("ocid1.internetgateway.test").destination("0.0.0.0/0").build();
+  var nat=com.oracle.bmc.core.model.RouteRule.builder().networkEntityId("ocid1.natgateway.test").destination("0.0.0.0/0").build();
+  var sg=com.oracle.bmc.core.model.RouteRule.builder().networkEntityId("ocid1.servicegateway.test").destination("all-icn-services-in-oracle-services-network").build();
+  assertFalse(OciContainerPreparation.privateRegistryRoute(List.of(igw)));assertTrue(OciContainerPreparation.privateRegistryRoute(List.of(nat)));assertTrue(OciContainerPreparation.privateRegistryRoute(List.of(sg)));
+ }
 }

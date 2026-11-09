@@ -1,6 +1,7 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    CONTAINER_NETWORK(ErrorCategory.VALIDATION, "공용 IP 없이 Registry에 접근하려면 NAT 또는 서비스 게이트웨이 경로가 필요합니다. 연결 가능한 서브넷을 선택하세요. 사용자 정의 경로는 OCI 콘솔에서 구성하세요."),
     CAPACITY_INPUT(ErrorCategory.VALIDATION, "OCI 허용 범위와 변경값을 확인하세요. 볼륨은 현재보다 큰 용량(최대 32,768GB)만 가능합니다."),
     CAPACITY_STATE(ErrorCategory.CONFLICT, "CPU·메모리 변경은 중지된 VM의 지원되는 Flex Shape에서 가능합니다."),
     CAPACITY_UNKNOWN(ErrorCategory.UNAVAILABLE, "변경 결과를 확인하지 못했습니다. 재요청 전에 OCI 상태·사양을 새로 조회하고 권한·한도를 확인하세요."),

@@ -30,7 +30,7 @@
 - SDK 상태 Enum의 toString(Available)과 API 값(AVAILABLE) 차이로 이미지 선택이 비는 문제를 수정했다. Registry 포트에서 API 값을 반환하고 회귀 테스트를 추가했다.
 - 생성 JSON 다운로드 확인: E4 Flex, 1 OCPU / 2GB, 기존 검증 서브넷, 공용 IP 없음. 네이티브 HTTP check /hello:8080, 15초 간격, 실패 시 자동 종료 없음.
 - 실제 생성 요청 접수: `companion-ci-validation-20261109`, `ocid1.computecontainerinstance.oc1.ap-seoul-1.anuwgljrvsea7yiahvm2fo4efmcugxd3wnoo2oi4znipv5zbadddwriucqna`.
-- 런타임·HTTP·로그의 최종 검증 결과는 아래 후속 기록을 기준으로 판단한다. 생성 접수를 실행 성공으로 간주하지 않는다.
+- 첫 생성은 OCI Work Request에서 `400: A container's image could not be pulled due to inadequate network configuration.`으로 실패·롤백됐다. 기존 검증 VM의 서브넷은 Internet Gateway만 있고 Container에는 공용 IP가 없어 OCIR 접근 경로가 없었다. 사설 생성 미리보기에 NAT/전체 OCI Service Gateway 경로 검사를 추가했다. 기존 `launchpad-oke-nodes` 사설 서브넷으로 재검증한다. 기존 네트워크 규칙은 변경하지 않았다.
 
 ## 화면·보호 검사
 

@@ -18,7 +18,7 @@ VM 볼륨 축소, 자동 VM 시작, 네트워크 보안 규칙 수정은 수행�
 
 ## Container 재사용
 
-생성 요청은 OCI SDK의 직렬화기를 사용해 네이티브 JSON으로 내려받는다. `oci container-instances container-instance create --from-json file://container-instance.json`에 프로파일·리전을 지정해 앱 없이 사용한다. JSON에는 명시적으로 입력한 비밀값 아닌 환경변수와 명령 배열만 넣는다. Registry 인증정보는 저장하지 않는다. 사설 OCIR는 Container Instances 리소스 주체의 IAM 권한을 사용한다.
+생성 요청은 OCI SDK의 직렬화기를 사용해 네이티브 JSON으로 내려받는다. `oci container-instances container-instance create --from-json file://container-instance.json`에 프로파일·리전을 지정해 앱 없이 사용한다. JSON에는 명시적으로 입력한 비밀값 아닌 환경변수와 명령 배열만 넣는다. Registry 인증정보는 저장하지 않는다. 사설 OCIR는 Container Instances 리소스 주체의 IAM 권한을 사용한다. 공용 IP가 없으면 기본 NAT 경로 또는 전체 OCI 서비스 게이트웨이 경로를 미리 검사한다. 사용자 정의 DRG·프록시 경로는 이 도우미의 지원 범위가 아니다. 라우트 존재가 DNS·보안 규칙·IAM 접근 성공을 보장하지는 않는다.
 
 HTTP 상태 확인은 선택 항목이다. 포트·경로를 지정하면 OCI가 15초 간격으로 확인한다. 실패 조치는 NONE으로 설정하며 자동 종료하지 않는다. 기본 임시 저장소 15GB는 이미지·로그·루트 파일시스템이 공유한다. 이 도우미는 FSS·영구 볼륨 연결, 외부 Registry/Vault 인증, 다중 컨테이너를 아직 구성하지 않는다. 현재 OCI 이미지 메타데이터만으로 아키텍처를 확정하지 않으므로 선택한 Shape와 이미지의 CPU 호환 확인을 표시한다.
 

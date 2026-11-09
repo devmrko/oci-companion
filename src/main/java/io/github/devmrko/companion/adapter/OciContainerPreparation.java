@@ -5,6 +5,8 @@ import com.oracle.bmc.containerinstances.model.*;
 import com.oracle.bmc.containerinstances.requests.*;
 import com.oracle.bmc.core.VirtualNetworkClient;
 import com.oracle.bmc.core.requests.ListSubnetsRequest;
+import com.oracle.bmc.core.requests.GetSubnetRequest;
+import com.oracle.bmc.core.requests.GetRouteTableRequest;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.requests.ListAvailabilityDomainsRequest;
 import com.oracle.bmc.artifacts.ArtifactsClient;
@@ -58,7 +60,12 @@ public class OciContainerPreparation implements ContainerPreparation {
    .containers(List.of(CreateContainerDetails.builder().displayName(i.name()).imageUrl(imageUrl).environmentVariables(i.variables()).command(i.command().isEmpty()?null:i.command()).arguments(i.arguments().isEmpty()?null:i.arguments()).healthChecks(i.healthPort()==0?null:List.of(CreateContainerHttpHealthCheckDetails.builder().name("HTTP").port(i.healthPort()).path(i.healthPath()).initialDelayInSeconds(10).intervalInSeconds(15).timeoutInSeconds(5).successThreshold(1).failureThreshold(3).failureAction(ContainerHealthCheckFailureAction.None).build())).build()))
    .containerRestartPolicy(ContainerInstance.ContainerRestartPolicy.Always).freeformTags(Map.of("created-by","oci-companion")).build();
  }
+ static boolean privateRegistryRoute(java.util.List<com.oracle.bmc.core.model.RouteRule> routes){return routes.stream().anyMatch(x->x.getNetworkEntityId()!=null&&((x.getNetworkEntityId().startsWith("ocid1.natgateway.")&&"0.0.0.0/0".equals(x.getDestination()))||(x.getNetworkEntityId().startsWith("ocid1.servicegateway.")&&Objects.toString(x.getDestination(),"").startsWith("all-")&&Objects.toString(x.getDestination(),"").contains("services-in-oracle-services-network"))));}
  public Preview preview(Connection c,String r,String comp,Input i){validate(i);var options=options(c,r,comp,i.domain());if(!options.domains().contains(i.domain()))throw Errors.SCOPE.exception();var shape=options.shapes().stream().filter(x->x.name().equals(i.shape())).findFirst().orElseThrow(Errors.SCOPE::exception);shape.limits().validate(i.cpu(),i.memory());var subnet=options.subnets().stream().filter(x->x.id().equals(i.subnet())).findFirst().orElseThrow(Errors.SCOPE::exception);if(i.publicIp()&&subnet.privateOnly())throw Errors.INVALID.exception();
+  try(var net=network(c,r)){
+   var selected=net.getSubnet(GetSubnetRequest.builder().subnetId(i.subnet()).build()).getSubnet();if(!comp.equals(selected.getCompartmentId()))throw Errors.SCOPE.exception();
+   if(!i.publicIp()&&!privateRegistryRoute(net.getRouteTable(GetRouteTableRequest.builder().rtId(selected.getRouteTableId()).build()).getRouteTable().getRouteRules()))throw Errors.CONTAINER_NETWORK.exception();
+  }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
   try(var registry=artifacts(c,r)){
    var response=registry.getContainerImage(GetContainerImageRequest.builder().imageId(i.image()).build());var image=response.getContainerImage();if(!comp.equals(image.getCompartmentId())||!"AVAILABLE".equals(image.getLifecycleState().getValue())||image.getDigest()==null||!image.getDigest().matches("sha256:[a-f0-9]{64}"))throw Errors.SCOPE.exception();
    var repo=registry.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(image.getRepositoryId()).build()).getContainerRepository();if(!comp.equals(repo.getCompartmentId())||!"AVAILABLE".equals(repo.getLifecycleState().getValue()))throw Errors.SCOPE.exception();
