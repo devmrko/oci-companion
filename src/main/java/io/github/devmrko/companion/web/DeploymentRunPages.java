@@ -45,7 +45,8 @@ public class DeploymentRunPages {
         if(!c.equals(t.connection())||session.getAttribute("scopeInvalid")!=null||!scope.region().equals(t.region())||!scope.compartment().equals(t.compartment()))throw Errors.SCOPE.exception();
         if(!t.sourceRun().isBlank()&&!handoff.verify(c,t.region(),t.compartment(),t.sourcePipeline(),t.sourceRun(),t.pipeline()).fingerprint().equals(t.sourceFingerprint()))throw Errors.BUILD_CHANGED.exception();
         var id=runs.start(c,t.region(),t.compartment(),t.pipeline(),t.fingerprint(),ticket);
-        return "redirect:/deployments/runs?pipeline="+encode(t.pipeline())+"&run="+encode(id);
+        return "redirect:/deployments/runs?pipeline="+encode(t.pipeline())+"&run="+encode(id)
+            +(t.sourceRun().isBlank()?"":"&sourcePipeline="+encode(t.sourcePipeline())+"&sourceRun="+encode(t.sourceRun()));
     }
     private static String encode(String value){return java.net.URLEncoder.encode(value,java.nio.charset.StandardCharsets.UTF_8);}
  @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
