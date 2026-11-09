@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version="${1:-0.1.0-alpha.4}"
+version="${1:-0.1.0-alpha.5}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]] || { echo 'Expected version: x.y.z-alpha.n' >&2; exit 1; }
 jar_path=target/oci-companion-0.1.0-SNAPSHOT.jar
 [[ -f "$jar_path" ]] || { echo 'Run ./scripts/build.sh first.' >&2; exit 1; }
@@ -23,7 +23,9 @@ umask 077
 exec "$java_bin" -jar oci-companion.jar "$@"
 RUN
 chmod +x "$package/run.sh"
-cp docs/releases/alpha-readiness.md "$package/VALIDATION.md"
+mkdir -p "$package/validation"
+cp docs/validation/*.md "$package/validation/"
+sed 's#](../validation/#](validation/#g' docs/releases/alpha-readiness.md > "$package/VALIDATION.md"
 cat > "$package/README.txt" <<GUIDE
 OCI Companion $version — Public Alpha
 

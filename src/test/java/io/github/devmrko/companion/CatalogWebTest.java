@@ -493,4 +493,12 @@ class CatalogWebTest {
   mvc.perform(get("/builds/automation/preview").session(session).param("cron","invalid")).andExpect(status().isBadRequest()).andExpect(content().contentTypeCompatibleWith("application/json")).andExpect(jsonPath("$.message").isNotEmpty());
   mvc.perform(get("/builds/tasks/environments").session(session).param("region","wrong").param("compartment","wrong")).andExpect(status().isConflict()).andExpect(content().contentTypeCompatibleWith("application/json")).andExpect(jsonPath("$.code").value("SCOPE"));
  }
+ @Test void scopeChangePreservesPreviouslyMissingScreens()throws Exception{
+  var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+  for(String path:java.util.List.of("/builds/settings","/builds/configure","/agents/connections")){
+   mvc.perform(get(path).session(session)).andExpect(status().isOk()).andExpect(model().attribute("scopeBack",path)).andExpect(content().string(containsString("name=\"back\" value=\""+path+"\"")));
+   mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back",path)).andExpect(redirectedUrl(path));
+  }
+  for(String path:java.util.List.of("https://example.com","//example.com","/builds/settings?secret=untrusted","/agents/connections/../other"))mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back",path)).andExpect(redirectedUrl("/"));
+ }
 }
