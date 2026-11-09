@@ -81,8 +81,8 @@
 <label class="form-field">단계<select class="ui-control" id="log-stage"><option value="">전체</option></select></label>
 <label class="form-field">현재 조회 로그 검색<input class="ui-control" id="log-search" placeholder="오류·메시지"></label>
 <button type="button" class="ui-button" id="log-refresh">새로 고침</button><button type="button" class="ui-button" id="log-older" disabled>이전 로그</button>
-</div><p id="log-status" role="status"></p><pre class="code-block build-log-output" id="log-output"></pre>
-<p class="small muted">최근 1,000건부터 조회합니다. 이전 로그 조회 시 자동 갱신은 중지됩니다. 로그 미표시는 빌드 성공을 뜻하지 않습니다.</p>
+</div><p id="log-status" role="status"></p><p id="log-visible-count" class="small muted" role="status"></p><pre class="code-block build-log-output" id="log-output"></pre>
+<p class="small muted">최근 1,000건부터 조회합니다. 이전 로그 조회 시 자동 갱신은 중지됩니다. 조회 실패 시 이전 로그를 유지하고 자동 갱신을 중지합니다. 로그 미표시는 빌드 성공을 뜻하지 않습니다.</p>
 <p>로그 활성화: OCI 콘솔 → DevOps → 프로젝트 → 로그 → 로그 사용. <a href="#permissions">권한 설정</a></p>
 </details><script src="/build-logs.js" defer></script></section>
 <section class="card" th:if="${tab == 'execute' and ticket != null}">
