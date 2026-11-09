@@ -89,3 +89,7 @@ Pod가 Ready여도 노드가 NotReady이거나 DiskPressure/MemoryPressure 상�
 2026-11-09 KST: Maven verify 156건 통과(실패·오류 0). 실제 조회 경로에서 Pod nodeName 전달과 노드 권한 실패 후 Pod 결과 유지, 옵션 기본 끔, 중복 제거, 잘못된 이름의 실행 차단, 예상하지 않은 노드 응답 숨김, 조건 누락의 Unknown, 21개 노드의 20+1 페이지를 검증했다. 실제 Edge 화면에서 노드 10.80.1.205는 Ready=True, DiskPressure/MemoryPressure/PIDPressure/NetworkUnavailable=False, 새 Pod 배치 미차단이었다. 앱 UP/0.6.0과 Deployment 1/1/1 및 Pod Running·Ready도 유지됐다. 정상 단일 노드 실측이며 실제 장애를 발생시키지는 않았다.
 
 현재 남은 운영 연동: 로그·이벤트, 상시 알람, 디스크 여유 GB·메모리 사용률 수집과 용량 계획 연결이다. 이 정보는 OCI Monitoring/Logging 등 전문 도구를 우선 활용하며 별도 관측 저장소를 Companion에 만들지 않는다.
+
+## 노드 플랫폼 표시
+
+노드 표에 nodeInfo의 CPU 아키텍처·OS와 kubernetes.io/arch·os 라벨을 별도로 표시한다. 알려진 값의 차이는 불일치, 누락은 미확인이다. 일치가 이미지 호환성이나 새 Pod 배치 성공을 보장하지 않는다. 기존 inspectNodes와 nodes get 권한을 재사용한다. [실제 화면 검증](../validation/oke-node-platforms-2026-11-10.md).
