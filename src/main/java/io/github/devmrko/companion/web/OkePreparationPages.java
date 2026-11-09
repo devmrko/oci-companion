@@ -31,5 +31,5 @@ public class OkePreparationPages {
   if(!c.equals(t.connection())||session.getAttribute("scopeInvalid")!=null||!scope.region().equals(t.region())||!scope.compartment().equals(t.compartment()))throw Errors.SCOPE.exception();
   try{var id=preparation.create(c,t.region(),t.compartment(),t.cluster(),project,name,description,subnet,nsgs==null?List.of():nsgs,ticket);flash.addFlashAttribute("message","OKE 환경 생성 요청 접수 · OCI 상태를 확인하세요.");return "redirect:/environments?environment="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);}catch(BusinessException e){flash.addFlashAttribute("message",e.getMessage());return "redirect:/environments/oke";}
  }
- @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+ @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }

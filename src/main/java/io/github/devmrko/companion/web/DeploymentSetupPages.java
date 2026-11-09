@@ -47,5 +47,5 @@ public class DeploymentSetupPages {
         try{model.addAttribute("created",setup.create(t.c(),t.region(),t.compartment(),t.preview(),ticket));}catch(BusinessException e){model.addAttribute("setupError",e.getMessage());}
         return "deployment-setup";
     }
-    @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+    @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }
