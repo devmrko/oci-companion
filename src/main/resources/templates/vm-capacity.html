@@ -1,9 +1,9 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
 <section th:fragment="capacity" class="card section-stack" th:if="${capacity != null}">
-<h2>CPU·메모리·스토리지</h2><p th:text="${capacity.name() + ' · ' + capacity.state()}"></p>
+<h2>CPU·메모리·스토리지</h2><a th:if="${selectedInstance != null and !selectedInstance.isBlank()}" class="ui-button" th:href="@{/environments/sizing(instance=${selectedInstance})}">사양 변경·스토리지 확장</a><p th:text="${capacity.name() + ' · ' + capacity.state()}"></p>
 <dl class="capacity-grid"><div><dt>Shape</dt><dd th:text="${capacity.shape()}"></dd></div><div><dt>OCPU / vCPU</dt><dd th:text="${capacity.ocpus() + ' / ' + capacity.vcpus()}"></dd></div><div><dt>메모리 (GB)</dt><dd th:text="${capacity.memoryGb()}"></dd></div><div><dt>로컬 디스크 (GB)</dt><dd th:text="${capacity.localDiskGb()}"></dd></div></dl>
 <div class="table-scroll"><table class="data-table"><thead><tr><th class="table-heading">유형</th><th class="table-heading">볼륨</th><th class="table-heading">할당 용량 (GB)</th><th class="table-heading">상태</th></tr></thead><tbody><tr th:each="disk : ${capacity.disks()}"><td class="table-cell" th:text="${disk.kind()}"></td><td class="table-cell" th:text="${disk.name()}"></td><td class="table-cell" th:text="${disk.sizeGb()}"></td><td class="table-cell" th:text="${disk.state()}"></td></tr></tbody></table></div>
 <p th:if="${capacity.disks().isEmpty()}">조회된 연결 볼륨 없음</p><p class="notice" th:each="notice : ${capacity.notices()}" th:text="${notice}"></p>
-<p class="small muted">OCI 할당량입니다. OS 내부 여유 공간·파일시스템 크기는 포함하지 않습니다. 사양 변경은 OCI 콘솔에서 진행하세요.</p>
+<p class="small muted">OCI 할당량입니다. OS 내부 여유 공간·파일시스템 크기는 포함하지 않습니다. </p>
 <details><summary>OCI에서 확인·변경 ?</summary><p>Compute → Instances → 인스턴스 → Shape / Attached boot volumes / Attached block volumes</p><p>CLI: <code>oci compute instance get --instance-id &lt;OCID&gt;</code> · <code>oci bv boot-volume get --boot-volume-id &lt;OCID&gt;</code> · <code>oci bv volume get --volume-id &lt;OCID&gt;</code></p><p class="small muted">프로파일·리전을 지정하세요. 조회 권한이 없으면 관리자에게 Compute·Block Volume 읽기 권한을 요청하세요. 볼륨 확장 후 OS 파일시스템 확장이 필요할 수 있습니다.</p></details>
 </section></body></html>

@@ -1,6 +1,9 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.foundation.core.error.*;
 public enum Errors implements ErrorDescriptor {
+    CAPACITY_INPUT(ErrorCategory.VALIDATION, "OCI 허용 범위와 변경값을 확인하세요. 볼륨은 현재보다 큰 용량(최대 32,768GB)만 가능합니다."),
+    CAPACITY_STATE(ErrorCategory.CONFLICT, "CPU·메모리 변경은 중지된 VM의 지원되는 Flex Shape에서 가능합니다."),
+    CAPACITY_UNKNOWN(ErrorCategory.UNAVAILABLE, "변경 결과를 확인하지 못했습니다. 재요청 전에 OCI 상태·사양을 새로 조회하고 권한·한도를 확인하세요."),
     SCHEDULE_INPUT(ErrorCategory.VALIDATION, "UTC cron 5개 항목을 확인하세요. 최소 1시간 간격이며 분은 0–59 중 하나입니다. 일·요일 중 하나는 *로 두세요."),
     SOURCE_READ(ErrorCategory.UNAVAILABLE, "소스 버전 조회 실패 · 접근 권한·공개 여부·API 조회 한도를 확인하세요. 커밋 SHA 직접 입력도 가능합니다."),
     SOURCE_MISMATCH(ErrorCategory.VALIDATION, "선택한 소스와 파이프라인 소스가 다르거나 여러 단계에 중복됩니다. 소스 연결을 확인하세요."),
