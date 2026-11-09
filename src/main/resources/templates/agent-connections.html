@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('등록 앱 상태')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
-<h1>등록 앱 상태</h1><p>VM·OKE 등 실행 위치와 관계없이 등록한 앱의 상태를 확인합니다. 상세 추적과 평가는 연결한 전문 도구에서 확인하세요.</p><a href="/operations/tools" class="ui-button">Langfuse·외부 운영 도구</a>
+<h1>등록 앱 상태</h1><p>VM·OKE 등 실행 위치와 관계없이 등록한 앱의 상태를 확인합니다. 상세 추적과 평가는 연결한 전문 도구에서 확인하세요.</p>
 <p class="notice" th:if="${connectionError != null}" th:text="${connectionError}"></p>
 <section th:if="${chosen != null}" class="card"><h2 th:text="${chosen.name()}"></h2><p><strong th:text="${health.state()}"></strong> · 버전 <span th:text="${health.version()}"></span></p><p>조회 시각(UTC): <span th:text="${health.checkedAt()}"></span></p><p>앱 health 응답이며 모델·메모리·도구의 정상 여부를 보장하지 않습니다. 조회 실패 시 터널·앱·인증을 확인하세요.</p>
 <form action="/agents/connections" method="get"><input type="hidden" name="selected" th:value="${selected}"><label class="form-field"><input type="checkbox" name="refresh" value="true" th:checked="${refresh}">이 화면에서 30초마다 갱신</label> <div class="form-toolbar"><button class="ui-button">조회·설정 적용</button></div></form><p class="small muted">화면을 닫으면 갱신이 멈춥니다. 서버측 상시 수집·알림은 별도 운영 도구에서 설정하세요.</p></section>

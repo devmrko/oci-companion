@@ -1,0 +1,8 @@
+const {chromium}=require('../.tools/browser/node_modules/playwright');
+(async()=>{
+ if(process.env.COMPANION_TEST_PROFILE!=='DEFAULT')throw Error('Explicit DEFAULT required');const base=process.env.COMPANION_TEST_URL||'http://127.0.0.1:8091';const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(90000);
+ try{await page.goto(base+'/login');await page.locator('[name=profile]').selectOption('DEFAULT');await page.getByRole('button',{name:'연결',exact:true}).click();await page.waitForLoadState('load');const scope=page.locator('.global-scope');await scope.locator('[name=region]').selectOption('ap-seoul-1');await scope.locator('[name=compartment]').selectOption({label:'Joungmin.Ko'});await scope.getByRole('button',{name:'적용',exact:true}).click();await page.waitForLoadState('load');
+ for(const path of ['/builds/settings','/builds/configure','/agents/connections']){await page.goto(base+path);if(await scope.locator('[name=back]').inputValue()!==path)throw Error('Missing back value '+path);await scope.getByRole('button',{name:'적용',exact:true}).click();await page.waitForLoadState('load');if(new URL(page.url()).pathname!==path)throw Error('Scope returned to wrong page');for(const width of [390,768,1440]){await page.setViewportSize({width,height:1000});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Overflow '+path+' '+width);}if(await page.locator('a[href="/operations/tools"]').count())throw Error('Dead operations link');console.log('PASS scope return',path);}
+ await page.screenshot({path:'.tools/scope-navigation.png',fullPage:true});
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1)});
