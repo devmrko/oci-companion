@@ -157,3 +157,14 @@ the necessary permissions, map pre-existing build and VM pipelines, verify their
 artifact and target settings, then execute a build and deployment and compare remote
 status with the OCI console. Private Git authentication and VM agent/network readiness
 must be prepared in OCI first.
+
+
+## agent-operations 머지 전 재검증 — 2026-11-09
+
+- `./scripts/build.sh`: Java 154개 통과, 실패·오류·건너뜀 0.
+- `/opt/homebrew/bin/python3 -m unittest discover -s tests -v`: Python 3.14.7에서 15개 통과. macOS 기본 Python 3.9는 tomllib이 없어 사용할 수 없었다. 대상 Python 3.12 컨테이너 재검증은 이번 범위가 아니다.
+- `COMPANION_TEST_PROFILE=DEFAULT node scripts/browser-merge-review.cjs`: 최신 빌드를 별도 8092 서버에서 실제 Chromium으로 확인. DEFAULT / ap-seoul-1 / Joungmin.Ko.
+- 환경 목록·OKE 상세·배포 파이프라인 목록과 OKE 대상 확인, Functions 화면, 에이전트 및 등록 앱 화면을 조회했다. 390/768/1440px 검사에서 등록 앱 표의 넘침을 발견해 기존 table-scroll·table-cell·form-field·ui-control 클래스를 적용했다.
+- VM 대상은 실제 STOPPED여서 실행 준비가 거부됐다. 부정확한 저장소 URL 오류 대신 VM 실행 상태 확인 안내로 수정했다. 대상 VM을 시작하거나 배포를 실행하지 않았다.
+- 이 호스트에는 등록 앱 인증·터널 설정이 없어 앱 연결의 미설정 화면을 검증했다. 실제 앱 health·Pod·노드 상태와 Python Function 호출은 이번에 재검증하지 않았다. 이전 세션의 실환경 검증 기록과 구분한다.
+- 원격 실행·인프라 변경 없이 현재 조회 조건을 검증했다. 화면 스크립트는 확인한 배포 실행 버튼을 누르지 않는다. 테스트용 8092 서버와 데이터 디렉터리는 기존 8091 앱과 분리했다.

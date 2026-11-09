@@ -97,7 +97,7 @@ public class OciDeploymentRuns implements DeploymentRuns {
             for(var id:ids){
                 var instance=client.getInstance(com.oracle.bmc.core.requests.GetInstanceRequest.builder().instanceId(id).build()).getInstance();
                 if(!compartment.equals(instance.getCompartmentId()))throw Errors.SCOPE.exception();
-                if(instance.getLifecycleState()!=com.oracle.bmc.core.model.Instance.LifecycleState.Running)throw Errors.INVALID.exception();
+                if(instance.getLifecycleState()!=com.oracle.bmc.core.model.Instance.LifecycleState.Running)throw Errors.DEPLOYMENT_VM_STATE.exception();
             }
         }
     }
