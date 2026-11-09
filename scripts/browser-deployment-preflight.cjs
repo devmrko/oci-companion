@@ -8,7 +8,7 @@ const {chromium}=require('../.tools/browser/node_modules/playwright');const fs=r
  await page.goto(base+'/deployments/runs?'+new URLSearchParams({pipeline:oke.pipeline}));
  const panel=page.locator('#deployment-preflight');await panel.getByRole('heading',{name:'배포 전 점검',exact:true}).waitFor();
  for(const title of ['파이프라인·대상','배포 명세']){const row=panel.getByRole('row').filter({has:page.getByRole('cell',{name:title,exact:true})});if(await row.getByRole('cell',{name:'확인',exact:true}).count()!==1)throw Error(title+' not checked');}
- for(const title of ['실행 주체 권한','이미지 인증·아키텍처','네트워크·앱 응답']){const row=panel.getByRole('row').filter({has:page.getByRole('cell',{name:title,exact:true})});if(await row.getByRole('cell',{name:'미확인',exact:true}).count()!==1)throw Error(title+' falsely checked');}
+ for(const title of ['실행 주체 권한','노드·이미지 인증','네트워크·앱 응답']){const row=panel.getByRole('row').filter({has:page.getByRole('cell',{name:title,exact:true})});if(await row.getByRole('cell',{name:'미확인',exact:true}).count()!==1)throw Error(title+' falsely checked');}
  await page.getByRole('button',{name:'확인한 배포 실행',exact:true}).waitFor();
  for(const width of [390,768,1440]){await page.setViewportSize({width,height:1000});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Overflow '+width);await panel.scrollIntoViewIfNeeded();await page.screenshot({path:'.tools/deployment-preflight-'+width+'.png'});}
  await page.goto(base+'/deployments/runs?'+new URLSearchParams({pipeline:vm.pipelines.alpha6}));
