@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('배포 실행')}"></head><body><header th:replace="~{layout :: header}"></header>
-<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>배포 실행</h1>
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>배포 실행</h1><a class="ui-button" href="/deployments/configure">새 배포 구성</a>
 <p>준비된 VM 또는 OKE 배포를 실행합니다. 아래에서 파이프라인과 대상을 확인한 뒤 실행하세요.</p>
 <p class="small muted">단일 Instance Group 단계 또는 인라인 Kubernetes 명세를 사용하는 단일 OKE 단계를 지원합니다. 파이프라인·대상 환경·런타임 설정은 먼저 준비해야 합니다.</p>
 <p th:if="${sourceRun != null and !#strings.isEmpty(sourceRun)}">선택한 빌드: <code th:text="${sourceRun}"></code><br>이 빌드에서 전달한 파일을 사용하는 준비된 파이프라인을 선택하세요. 파일이 다르면 실행할 수 없습니다.</p><a class="ui-button" href="/deployments">배포 환경 보기</a><p class="notice" th:if="${deploymentError != null}" th:text="${deploymentError}"></p>
