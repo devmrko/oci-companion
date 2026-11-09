@@ -26,10 +26,10 @@ public class OciDeploymentRuns implements DeploymentRuns {
         try(var client=clients.client(c,region)){
             var p=client.getDeployPipeline(GetDeployPipelineRequest.builder().deployPipelineId(pipeline).build()).getDeployPipeline();
             if(!compartment.equals(p.getCompartmentId()))throw Errors.SCOPE.exception();
-            if(p.getLifecycleState()!=DeployPipeline.LifecycleState.Active)throw Errors.INVALID.exception();
+            if(p.getLifecycleState()!=DeployPipeline.LifecycleState.Active)throw Errors.DEPLOYMENT_INPUT.exception();
             var stages=new ArrayList<DeployStageSummary>();
             for(var s:client.getPaginators().listDeployStagesRecordIterator(ListDeployStagesRequest.builder().deployPipelineId(pipeline).build()))stages.add(s);
-            if(stages.size()!=1)throw Errors.INVALID.exception();
+            if(stages.size()!=1)throw Errors.DEPLOYMENT_INPUT.exception();
             var stage=client.getDeployStage(GetDeployStageRequest.builder().deployStageId(stages.getFirst().getId()).build()).getDeployStage();
             if(stage instanceof OkeDeployStage oke)return okePlan(c,region,compartment,p,oke,client);
             if(!(stage instanceof ComputeInstanceGroupDeployStage s)||!compartment.equals(s.getCompartmentId())||!pipeline.equals(s.getDeployPipelineId()))throw Errors.SCOPE.exception();
@@ -42,10 +42,10 @@ public class OciDeploymentRuns implements DeploymentRuns {
             if(!(env instanceof ComputeInstanceGroupDeployEnvironment e)||!compartment.equals(e.getCompartmentId()))throw Errors.SCOPE.exception();
             var ids=new ArrayList<String>();
             for(var selector:e.getComputeInstanceGroupSelectors().getItems()){
-                if(!(selector instanceof ComputeInstanceGroupByIdsSelector selected))throw Errors.INVALID.exception();
+                if(!(selector instanceof ComputeInstanceGroupByIdsSelector selected))throw Errors.DEPLOYMENT_INPUT.exception();
                 ids.addAll(selected.getComputeInstanceIds());
             }
-            if(ids.isEmpty())throw Errors.INVALID.exception();
+            if(ids.isEmpty())throw Errors.DEPLOYMENT_INPUT.exception();
             validateInstances(c,region,compartment,ids);
             var artifact=client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(s.getDeploymentSpecDeployArtifactId()).build()).getDeployArtifact();
             if(!compartment.equals(artifact.getCompartmentId())||!(artifact.getDeployArtifactSource() instanceof InlineDeployArtifactSource))throw Errors.SCOPE.exception();
@@ -55,12 +55,12 @@ public class OciDeploymentRuns implements DeploymentRuns {
     }
     private Plan okePlan(Connection c,String region,String compartment,DeployPipeline pipeline,OkeDeployStage stage,com.oracle.bmc.devops.DevopsClient client) throws Exception {
         if(!compartment.equals(stage.getCompartmentId())||!pipeline.getId().equals(stage.getDeployPipelineId())||!pipeline.getProjectId().equals(stage.getProjectId()))throw Errors.SCOPE.exception();
-        if(stage.getLifecycleState()!=DeployStage.LifecycleState.Active)throw Errors.INVALID.exception();
+        if(stage.getLifecycleState()!=DeployStage.LifecycleState.Active)throw Errors.DEPLOYMENT_INPUT.exception();
         var environment=client.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(stage.getOkeClusterDeployEnvironmentId()).build()).getDeployEnvironment();
         if(!(environment instanceof OkeClusterDeployEnvironment env)||!compartment.equals(env.getCompartmentId())||!pipeline.getProjectId().equals(env.getProjectId()))throw Errors.SCOPE.exception();
-        if(env.getLifecycleState()!=DeployEnvironment.LifecycleState.Active)throw Errors.INVALID.exception();
+        if(env.getLifecycleState()!=DeployEnvironment.LifecycleState.Active)throw Errors.DEPLOYMENT_INPUT.exception();
         validateCluster(c,region,compartment,env.getClusterId());
-        if(stage.getKubernetesManifestDeployArtifactIds()==null||stage.getKubernetesManifestDeployArtifactIds().isEmpty())throw Errors.INVALID.exception();
+        if(stage.getKubernetesManifestDeployArtifactIds()==null||stage.getKubernetesManifestDeployArtifactIds().isEmpty())throw Errors.DEPLOYMENT_INPUT.exception();
         var artifacts=new ArrayList<DeployArtifact>();
         for(var id:stage.getKubernetesManifestDeployArtifactIds())artifacts.add(client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build()).getDeployArtifact());
         var checked=OkeManifests.inspect(artifacts,compartment,pipeline.getProjectId(),stage.getNamespace());
@@ -77,16 +77,16 @@ public class OciDeploymentRuns implements DeploymentRuns {
         client.setRegion(region);return client;
     }
     void validateCluster(Connection c,String region,String compartment,String id) throws java.io.IOException {
-        if(id==null||id.isBlank())throw Errors.INVALID.exception();
+        if(id==null||id.isBlank())throw Errors.DEPLOYMENT_INPUT.exception();
         try(var client=clusters(c,region)){
             var cluster=client.getCluster(com.oracle.bmc.containerengine.requests.GetClusterRequest.builder().clusterId(id).build()).getCluster();
             if(!compartment.equals(cluster.getCompartmentId()))throw Errors.SCOPE.exception();
-            if(cluster.getLifecycleState()!=com.oracle.bmc.containerengine.model.ClusterLifecycleState.Active)throw Errors.INVALID.exception();
+            if(cluster.getLifecycleState()!=com.oracle.bmc.containerengine.model.ClusterLifecycleState.Active)throw Errors.DEPLOYMENT_INPUT.exception();
         }
     }
     static void validatePackage(DeployArtifact pkg,String compartment,String project){
         if(!compartment.equals(pkg.getCompartmentId())||!project.equals(pkg.getProjectId()))throw Errors.SCOPE.exception();
-        if(!(pkg.getDeployArtifactSource() instanceof GenericDeployArtifactSource source)||source.getDeployArtifactVersion()==null||source.getDeployArtifactVersion().isBlank()||source.getDeployArtifactVersion().contains("${")||pkg.getArgumentSubstitutionMode()!=DeployArtifact.ArgumentSubstitutionMode.None)throw Errors.INVALID.exception();
+        if(!(pkg.getDeployArtifactSource() instanceof GenericDeployArtifactSource source)||source.getDeployArtifactVersion()==null||source.getDeployArtifactVersion().isBlank()||source.getDeployArtifactVersion().contains("${")||pkg.getArgumentSubstitutionMode()!=DeployArtifact.ArgumentSubstitutionMode.None)throw Errors.DEPLOYMENT_INPUT.exception();
     }
     com.oracle.bmc.core.ComputeClient compute(Connection c,String region) throws java.io.IOException {
         var client=com.oracle.bmc.core.ComputeClient.builder().configuration(com.oracle.bmc.ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(clients.authentication(c));
@@ -109,7 +109,7 @@ public class OciDeploymentRuns implements DeploymentRuns {
         }catch(Exception e){throw Errors.CLOUD.exception();}
     }
     public History history(Connection c,String region,String compartment,String pipeline,String page){
-        if(page.length()>8192)throw Errors.INVALID.exception();
+        if(page.length()>8192)throw Errors.DEPLOYMENT_INPUT.exception();
         try(var client=clients.client(c,region)){
             var p=client.getDeployPipeline(GetDeployPipelineRequest.builder().deployPipelineId(pipeline).build()).getDeployPipeline();
             if(!compartment.equals(p.getCompartmentId()))throw Errors.SCOPE.exception();

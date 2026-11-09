@@ -1,0 +1,18 @@
+const {chromium}=require('../.tools/browser/node_modules/playwright');const fs=require('fs');
+(async()=>{
+ if(process.env.COMPANION_TEST_MUTATE!=='oke-existing')throw Error('Explicit oke-existing mutation flag required');
+ if(process.env.COMPANION_TEST_PROFILE!=='DEFAULT')throw Error('Explicit DEFAULT required');
+ const base=process.env.COMPANION_TEST_URL||'http://127.0.0.1:8092';const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ try{
+ await page.goto(base+'/login');await page.locator('[name=profile]').selectOption('DEFAULT');await page.getByRole('button',{name:'연결',exact:true}).click();await page.waitForLoadState('load');const scope=page.locator('.global-scope');await scope.locator('[name=region]').selectOption('ap-seoul-1');await scope.locator('[name=compartment]').selectOption({label:'Joungmin.Ko'});await scope.getByRole('button',{name:'적용',exact:true}).click();await page.waitForLoadState('load');
+ await page.goto(base+'/sources');const external=page.locator('section').filter({has:page.getByRole('heading',{name:'외부 Git',exact:true})});await external.locator('[name=name]').fill('alpha-db-companion');await external.locator('[name=url]').fill('https://github.com/devmrko/db-companion');await external.getByRole('button',{name:'등록',exact:true}).click();await page.getByText('alpha-db-companion',{exact:true}).first().waitFor();
+ const pipeline=JSON.parse(fs.readFileSync('.tools/oke-pipeline-audit.json')).find(p=>p.pipeline==='launchpad-hello-agent-oke');await page.goto(base+'/deployments/runs?pipeline='+encodeURIComponent(pipeline.id));await page.getByRole('link',{name:'상태·로그',exact:true}).first().click();await page.getByRole('link',{name:'이 버전으로 복구',exact:true}).click();await page.getByRole('heading',{name:'복구 대상 확인',exact:true}).waitFor();
+ for(const width of [390,768,1440]){await page.setViewportSize({width,height:1000});if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw Error('Overflow '+width);}
+ await page.screenshot({path:'.tools/alpha-rollback-preview.png',fullPage:true});await page.getByRole('link',{name:'취소',exact:true}).click();
+ const p=JSON.parse(fs.readFileSync('.tools/oke-wizard-created.json'));if(!p.name.startsWith('companion-oke-wizard-'))throw Error('Dedicated validation pipeline required');await page.goto(base+'/deployments/runs?pipeline='+encodeURIComponent(p.pipeline));await page.getByRole('button',{name:'확인한 배포 실행',exact:true}).click();await page.waitForURL(/\/deployments\/runs/);await page.waitForLoadState('load');const run=new URL(page.url()).searchParams.get('run');
+ if(!run){await page.screenshot({path:'.tools/alpha-execution-error.png',fullPage:true});if(!await page.getByRole('heading',{name:'요청 결과 확인',exact:true}).count())throw Error('Run not accepted and no error screen');fs.writeFileSync('.tools/alpha-onboarding-result.json',JSON.stringify({sourceRegistered:true,rollbackPreview:true,runAccepted:false,errors},null,2));}
+ else{p.run=run;fs.writeFileSync('.tools/oke-wizard-created.json',JSON.stringify(p));fs.writeFileSync('.tools/alpha-onboarding-result.json',JSON.stringify({sourceRegistered:true,rollbackPreview:true,runAccepted:true,run,errors},null,2));}
+ const checked=3;
+ if(errors.length)throw Error(errors.join('\n'));console.log('PASS',JSON.stringify({checked,errors}));
+ }catch(e){await page.screenshot({path:'.tools/container-preparation-error.png',fullPage:true}).catch(()=>{});throw e;}finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1)});

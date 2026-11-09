@@ -48,5 +48,5 @@ public class DeploymentRunPages {
         return "redirect:/deployments/runs?pipeline="+encode(t.pipeline())+"&run="+encode(id);
     }
     private static String encode(String value){return java.net.URLEncoder.encode(value,java.nio.charset.StandardCharsets.UTF_8);}
-    @ExceptionHandler(BusinessException.class) @ResponseBody org.springframework.http.ResponseEntity<String> error(BusinessException e){return org.springframework.http.ResponseEntity.status(409).body(e.getMessage());}
+ @ExceptionHandler(BusinessException.class) org.springframework.web.servlet.ModelAndView error(BusinessException e,Authentication a,HttpServletRequest r){return OperationErrors.view(e,catalog,a,r);}
 }

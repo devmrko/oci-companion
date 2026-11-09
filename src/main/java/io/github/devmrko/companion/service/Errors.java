@@ -28,6 +28,7 @@ public enum Errors implements ErrorDescriptor {
     BUILD_LOGS_NOT_FOUND(ErrorCategory.CONFLICT, "현재 구획에서 이 프로젝트의 DevOps 서비스 로그를 찾지 못해 빌드를 요청하지 않았습니다. 프로젝트 리소스 화면에서 로그를 준비하세요. 다른 구획의 로그는 OCI 콘솔에서 확인하세요."),
     BUILD_LOGS_UNVERIFIED(ErrorCategory.UNAVAILABLE, "현재 구획에서 활성 프로젝트 로그를 확인하지 못해 빌드를 요청하지 않았습니다. 프로젝트 리소스 화면이나 OCI 콘솔에서 로그 위치·활성 상태·Logging 읽기 권한을 확인하세요. 다른 구획의 로그는 이 점검 범위에 포함되지 않습니다."),
     BUILD_UNKNOWN(ErrorCategory.UNAVAILABLE, "실행 결과를 확인하지 못했습니다. 다시 실행하기 전에 이력과 OCI 콘솔을 확인하세요."),
+    DEPLOYMENT_INPUT(ErrorCategory.VALIDATION, "배포 설정을 확인하세요. 지원하는 대상·단계·명세 형식과 실행 상태가 필요합니다."),
     INVALID(ErrorCategory.VALIDATION, "입력값을 확인하세요. 저장소에는 인증정보 없는 HTTPS URL을 사용하세요."),
     CONFIG(ErrorCategory.UNAVAILABLE, "OCI 프로파일을 읽거나 연결할 수 없습니다. API 키 설정과 tenancy 조회 권한을 확인하세요."),
     DRAFT_STALE(ErrorCategory.CONFLICT, "원본 커밋이 변경되어 로컬 초안을 적용하지 않았습니다. 초안은 유지됩니다."),

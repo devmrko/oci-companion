@@ -2,6 +2,10 @@
 
 OCI 프로파일 기반 리소스·소스 관리. Java 21 · Spring Foundation · OCI Java SDK.
 
+## 제한적 알파 준비
+
+검증 범위와 공개 전 조건은 [알파 기준](docs/releases/alpha-readiness.md)을 참고하세요. 빌드 후 `./scripts/package-alpha.sh`로 로컬 실행 묶음을 만듭니다. 공개 릴리스는 아직 제공하지 않습니다.
+
 ## 실행
 
 JDK 21+, GitHub CLI 필요. Maven Wrapper 포함.
