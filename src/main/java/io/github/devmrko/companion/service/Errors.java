@@ -17,6 +17,7 @@ public enum Errors implements ErrorDescriptor {
     OUTPUT_UNKNOWN(ErrorCategory.VALIDATION, "빌드 사양에서 출력 이름을 확인할 수 없습니다. outputArtifacts와 소스 읽기 권한을 확인하세요."),
     DEPLOYMENT_SETUP(ErrorCategory.VALIDATION, "배포 설정을 확인하세요. 절대 경로·실행 계정·설치/상태 확인 명령·변수 형식이 필요합니다."),
     DEPLOYMENT_ARTIFACT(ErrorCategory.VALIDATION, "선택 구획의 사용 가능한 불변 저장소와 고정 버전 배포본을 선택하세요."),
+    DEPLOYMENT_IMAGE(ErrorCategory.CONFLICT, "지정 이미지 digest를 사용할 수 없습니다. OCIR 점검 결과를 확인하고 배포 이미지를 다시 선택하세요."),
     DEPLOYMENT_VM_STATE(ErrorCategory.CONFLICT, "대상 VM이 RUNNING 상태가 아닙니다. OCI Compute에서 VM 상태를 확인한 뒤 다시 조회하세요."),
     ADMIN_INPUT(ErrorCategory.VALIDATION, "이름(1–255자)과 설명(400자 이하)을 확인하세요."),
     ADMIN_UNKNOWN(ErrorCategory.UNAVAILABLE, "생성 결과를 확인하지 못했습니다. 재생성 전에 목록과 OCI 콘솔을 확인하세요."),
