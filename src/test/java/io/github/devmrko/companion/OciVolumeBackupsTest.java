@@ -23,4 +23,11 @@ class OciVolumeBackupsTest {
  @Test void invalidInputDoesNotCreateResources()throws Exception{
   var x=mock(BlockstorageClient.class);var a=adapter(x);for(var i:List.of(new Input("DELETE","b","n","",""),new Input("BACKUP","b","n","INVALID",""),new Input("BACKUP","b","\n","FULL",""),new Input("BACKUP","b","n",null,"")))assertThrows(RuntimeException.class,()->a.plan(c,"region","comp",i));verify(x,never()).createVolumeBackup(any());verify(x,never()).createVolume(any());
  }
+ @Test void nativeHistoryDistinguishesExpiryFromRetentionAndUnknownSource(){
+  var base=VolumeBackup.builder().id("b").displayName("snapshot").lifecycleState(VolumeBackup.LifecycleState.Available).sizeInGBs(50L).type(VolumeBackup.Type.Incremental);
+  var scheduled=OciVolumeBackups.backup(base.sourceType(VolumeBackup.SourceType.Scheduled).expirationTime(java.util.Date.from(java.time.Instant.parse("2026-12-01T00:00:00Z"))).timeRetentionExpiresAt(java.util.Date.from(java.time.Instant.parse("2026-11-10T00:00:00Z"))).isRetentionLockEnabled(true).isIndefiniteRetentionEnabled(true).build());
+  assertEquals("예약",scheduled.source());assertEquals("2026-12-01T00:00:00Z",scheduled.expires());assertEquals("2026-11-10T00:00:00Z",scheduled.retentionExpires());assertTrue(scheduled.protection().contains("법적 보존"));assertTrue(scheduled.protection().contains("보존 잠금"));
+  var manual=OciVolumeBackups.backup(base.sourceType(VolumeBackup.SourceType.Manual).expirationTime(null).build());assertEquals("자동 만료 없음",manual.expires());
+  var unknown=OciVolumeBackups.backup(base.sourceType(null).build());assertEquals("미제공",unknown.expires());assertEquals("미제공·알 수 없음",unknown.source());
+ }
 }
