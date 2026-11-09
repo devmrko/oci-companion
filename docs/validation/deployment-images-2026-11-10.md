@@ -23,3 +23,5 @@
 - 실제 브라우저 390/768/1440px 페이지 가로 넘침 없음. `scripts/browser-deployment-images.cjs` 사용. 로컬 증거 `.tools/deployment-image-available.png`, `.tools/deployment-image-missing.png`.
 
 다른 리전·구획 및 외부 Registry의 존재 여부와 x86/ARM 호환성, 실제 pull·앱 응답은 이 검증 범위 밖입니다.
+
+후속 구현: [동일 프로파일의 Registry 토큰으로 manifest 조회·명세 아키텍처 대조](image-architecture-2026-11-10.md). 위 API 필드 제한은 그대로이며 별도 네이티브 API 경로로 보완했습니다.
