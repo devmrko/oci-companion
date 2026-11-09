@@ -40,7 +40,7 @@ class ContainerPreparationWebTest {
   var result=mvc.perform(post("/environments/containers/action/preview").session(session).with(csrf()).param("instance","id").param("action","DELETE")).andExpect(status().isOk()).andExpect(content().string(containsString("삭제할 인스턴스 이름"))).andReturn();
   var token=(String)result.getModelAndView().getModel().get("actionTicket");
   mvc.perform(post("/environments/containers/action/apply").session(session).param("ticket",token).param("confirmation","hello")).andExpect(status().isForbidden());
-  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","wrong")).andExpect(status().isConflict());verify(preparation,never()).applyAction(any(),anyString(),anyString(),any());
+  mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","wrong")).andExpect(status().isBadRequest()).andExpect(content().string(containsString("Container 상태")));verify(preparation,never()).applyAction(any(),anyString(),anyString(),any());
   result=mvc.perform(post("/environments/containers/action/preview").session(session).with(csrf()).param("instance","id").param("action","DELETE")).andReturn();token=(String)result.getModelAndView().getModel().get("actionTicket");
   mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","hello")).andExpect(status().is3xxRedirection());
   mvc.perform(post("/environments/containers/action/apply").session(session).with(csrf()).param("ticket",token).param("confirmation","hello")).andExpect(status().isConflict());verify(preparation,times(1)).applyAction(any(),anyString(),anyString(),eq(op));

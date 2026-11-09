@@ -23,7 +23,10 @@ public interface ContainerPreparation {
  record Shape(String name,String processor,VmSizing.Limits limits) {}
  record Subnet(String id,String name,String vcn,boolean privateOnly) {}
  record Options(List<String> domains,List<Shape> shapes,List<Subnet> subnets) {}
- record Input(String name,String domain,String shape,float cpu,float memory,String subnet,boolean publicIp,String image,Map<String,String> variables,List<String> command,List<String> arguments,int healthPort,String healthPath) {
+ record PullSecret(String id,String name) {}
+ default List<PullSecret> pullSecrets(Connection c,String region,String compartment){return List.of();}
+ record Input(String name,String domain,String shape,float cpu,float memory,String subnet,boolean publicIp,String image,Map<String,String> variables,List<String> command,List<String> arguments,int healthPort,String healthPath,String externalImage,String pullSecret) {
+  public Input(String name,String domain,String shape,float cpu,float memory,String subnet,boolean publicIp,String image,Map<String,String> variables,List<String> command,List<String> arguments,int healthPort,String healthPath){this(name,domain,shape,cpu,memory,subnet,publicIp,image,variables,command,arguments,healthPort,healthPath,"","");}
   public Input(String name,String domain,String shape,float cpu,float memory,String subnet,boolean publicIp,String image,Map<String,String> variables,List<String> command,List<String> arguments){this(name,domain,shape,cpu,memory,subnet,publicIp,image,variables,command,arguments,0,"");}
  }
  record Preview(Input input,String imageUrl,String json,String fingerprint) {}
