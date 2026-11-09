@@ -42,6 +42,10 @@ DB Companion과 같은 좌측 그룹 메뉴·접기/펼치기·상단 연결 정
 워크스페이스 / 빌드·배포 / 인프라·운영 / 관리로 구분합니다.
 미구현 메뉴는 `예정`으로 표시하며 실행되지 않습니다.
 
+## 환경 프로파일
+
+[로컬 환경·인증 프로파일](docs/design/local-environment-profiles.md)을 템플릿으로 작성하고 JSON export/import로 옮길 수 있습니다. 필수 누락 안내와 초안 저장을 제공하며 실제 인증·배포 적용은 후속 단계입니다.
+
 ## 저장
 
 기본 경로: `.data/catalog`. 변경: `COMPANION_DATA_DIR`.

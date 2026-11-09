@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('환경 프로파일')}"></head>
+<body><header th:replace="~{layout :: header}"></header>
+<main class="catalog-shell page-content app-content">
+<div th:replace="~{layout :: notice}"></div>
+<h1>환경 프로파일</h1>
+<p>개발·시험·운영 설정을 각각 저장하고 다른 Companion으로 옮깁니다. 필요한 값을 채운 뒤 JSON으로 내보낼 수 있습니다.</p>
+<p class="banner">현재는 설정 작성·검증 단계입니다. 저장·가져오기만으로 인증, 배포 또는 OCI 권한이 적용되지는 않습니다.</p>
+<section class="card"><h2>저장된 프로파일</h2>
+<p th:if="${items.isEmpty()}">저장된 프로파일이 없습니다. 아래에서 템플릿을 선택하거나 JSON을 가져오세요.</p>
+<ul><li th:each="item : ${items}"><a th:href="@{/settings/profiles(selected=${item.id()},page=${page})}" th:text="${item.document().name()}"></a> · <span th:text="${item.document().template()}"></span> · revision <span th:text="${item.revision()}"></span></li></ul>
+<nav aria-label="프로파일 페이지"><a th:if="${page > 0}" th:href="@{/settings/profiles(page=${page - 1},selected=${selected})}">이전</a> <span th:text="${(page + 1) + ' / ' + (last + 1) + ' · 전체 ' + total + '개'}"></span> <a th:if="${page < last}" th:href="@{/settings/profiles(page=${page + 1},selected=${selected})}">다음</a></nav>
+</section>
+<section class="card"><h2>새 프로파일</h2>
+<form action="/settings/profiles" method="get" class="section-stack"><label class="form-field">인증 템플릿<select class="ui-control" name="template"><option th:each="t : ${templates}" th:value="${t.id()}" th:text="${t.name()}" th:selected="${t.id() == chosenTemplate.id()}"></option></select></label><div class="form-toolbar"><button class="ui-button">새로 작성</button></div></form>
+<h3>JSON 가져오기</h3><p>최대 256 KiB. 내용을 미리 확인하고 새 프로파일로 저장합니다. 기존 프로파일은 덮어쓰지 않습니다.</p>
+<form th:action="@{/settings/profiles/import}" method="post" enctype="multipart/form-data" class="section-stack"><label class="form-field">설정 JSON 파일<input class="ui-control" type="file" name="file" accept=".json,application/json" required></label><div class="form-toolbar"><button class="ui-button">가져오기 미리보기</button></div></form>
+</section>
+<section class="card"><h2 th:text="${selected.isEmpty() ? '새 프로파일 작성' : '프로파일 편집'}"></h2>
+<p><strong th:text="${chosenTemplate.name()}"></strong> · 설정 버전 1 · 템플릿 버전 1 · revision <span th:text="${revision}"></span></p>
+<p><strong th:text="${assessment.complete() ? '필수 입력 완료 · 연결 미검증' : '작성 중'}"></strong></p>
+<p>누락된 항목이 있어도 초안으로 저장할 수 있습니다. OKE 선택 시 namespace, 관측 주소 입력 시 관측 인증 참조가 필요합니다.</p>
+<div th:if="${!assessment.missing().isEmpty()}"><h3>채워야 할 항목</h3><ul><li th:each="v : ${assessment.missing()}" th:text="${v}"></li></ul></div>
+<div role="alert" th:if="${!assessment.errors().isEmpty()}"><h3>수정할 항목</h3><ul><li th:each="v : ${assessment.errors()}" th:text="${v}"></li></ul></div>
+<form th:action="@{/settings/profiles}" method="post" class="section-stack" autocomplete="off">
+<input type="hidden" name="selected" th:value="${selected}"><input type="hidden" name="revision" th:value="${revision}"><input type="hidden" name="template" th:value="${chosenTemplate.id()}">
+<label class="form-field">이름 · 필수<input class="ui-control" name="name" maxlength="100" required th:value="${document.name()}"></label>
+<div class="form-grid"><label class="form-field" th:each="f : ${chosenTemplate.fields()}"><span th:text="${f.label() + (f.required() ? ' · 필수' : ' · 선택/조건부')}"></span>
+<select class="ui-control" th:if="${f.kind() == 'enum'}" th:name="${'v.' + f.key()}"><option value="">선택하세요</option><option th:each="o : ${f.options()}" th:value="${o}" th:text="${o}" th:selected="${o == document.values().get(f.key())}"></option></select>
+<input class="ui-control" th:unless="${f.kind() == 'enum'}" th:name="${'v.' + f.key()}" th:value="${document.values().get(f.key())}" maxlength="1024">
+<small th:text="${f.hint()}"></small></label></div>
+<p>비밀번호·토큰·개인 키를 입력하지 마세요. 인증은 credential:논리이름 또는 vault:Secret-OCID 참조만 보관하며 실제 연결 기능은 후속 단계입니다.</p>
+<div class="form-toolbar"><button class="ui-button">프로파일 저장</button><a class="ui-button" th:if="${!selected.isEmpty()}" th:href="@{/settings/profiles/{id}/export(id=${selected})}">저장본 JSON 내보내기</a></div>
+</form>
+<p>로컬 저장 위치는 Companion 실행 호스트입니다. 내보낸 파일에는 환경 식별자가 포함되며 암호화되어 있지 않습니다. 다른 호스트에서 가져온 뒤 대상 리전·구획·인증 참조를 확인하세요.</p>
+</section></main><footer th:replace="~{layout :: footer}"></footer></body></html>
