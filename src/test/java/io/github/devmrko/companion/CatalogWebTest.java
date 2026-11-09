@@ -476,7 +476,7 @@ class CatalogWebTest {
   var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
   for(var entry:java.util.Map.of("/environments","/environments","/environments/oke","/environments/oke","/deployments/configure/create","/deployments/configure","/deployments/oke/configure/create","/deployments/oke/configure").entrySet()){
    mvc.perform(post(entry.getKey()).session(session).with(csrf()).param("ticket","expired").param("project","p").param("name","n"))
-    .andExpect(status().isConflict()).andExpect(view().name("operation-error")).andExpect(model().attribute("operationBack",entry.getValue())).andExpect(model().attribute("scopeBack",entry.getValue())).andExpect(content().string(containsString("자동으로 다시 실행하지 않습니다")));
+    .andExpect(status().isConflict()).andExpect(view().name("operation-error")).andExpect(model().attribute("operationBack",entry.getValue())).andExpect(model().attribute("scopeBack",entry.getValue())).andExpect(content().string(containsString("자동으로 다시 실행하지 않습니다"))).andExpect(content().string(containsString("확인 정보가 만료되었거나 설정이 변경되었습니다")));
   }
   org.mockito.Mockito.verifyNoInteractions(deploymentSetup,okeDeploymentSetup,deploymentEnvironments,okePreparation);
  }
