@@ -21,7 +21,15 @@ public class OkeWorkloadHealth {
     public record Pod(String name, String phase, String ready, int restarts, String reason, String node) {
         public Pod(String name,String phase,String ready,int restarts,String reason){this(name,phase,ready,restarts,reason,"");}
     }
-    public record Node(String name,String ready,String diskPressure,String memoryPressure,String pidPressure,String networkUnavailable,boolean unschedulable) {}
+    public record Node(String name,String ready,String diskPressure,String memoryPressure,String pidPressure,String networkUnavailable,boolean unschedulable,
+            String architecture,String operatingSystem,String architectureLabel,String operatingSystemLabel) {
+        public String platformState(){
+            if((!"Unknown".equals(architecture)&&!"Unknown".equals(architectureLabel)&&!architecture.equals(architectureLabel))||
+               (!"Unknown".equals(operatingSystem)&&!"Unknown".equals(operatingSystemLabel)&&!operatingSystem.equals(operatingSystemLabel)))return "불일치";
+            if(List.of(architecture,operatingSystem,architectureLabel,operatingSystemLabel).contains("Unknown"))return "미확인";
+            return "일치";
+        }
+    }
     public record NodeReport(String state,String guidance,String checkedAt,int total,int page,int last,List<Node> items) {}
     private static NodeReport disabledNodes(){return new NodeReport("미설정","관리자 옵션 inspectNodes와 nodes get 권한을 확인하세요.",Instant.now().toString(),0,0,0,List.of());}
     public record Status(String state, String namespace, String deployment, int desired,
@@ -155,6 +163,9 @@ public class OkeWorkloadHealth {
         }
         return "Unknown";
     }
+    private static String platform(JsonNode value){
+        String text=value.asText("");return text.matches("[a-z0-9_]{1,32}")?text:"Unknown";
+    }
     static NodeReport summarizeNodes(JsonNode response,List<String> selected,int total,int page,int last) {
         var items=new ArrayList<JsonNode>();
         if("Node".equals(response.path("kind").asText()))items.add(response);
@@ -164,7 +175,9 @@ public class OkeWorkloadHealth {
         for(var node:items) {
             String name=node.path("metadata").path("name").asText();
             if(!"Node".equals(node.path("kind").asText())||!selected.contains(name))continue;
-            nodes.put(name,new Node(name,condition(node,"Ready"),condition(node,"DiskPressure"),condition(node,"MemoryPressure"),condition(node,"PIDPressure"),condition(node,"NetworkUnavailable"),node.path("spec").path("unschedulable").asBoolean(false)));
+            nodes.put(name,new Node(name,condition(node,"Ready"),condition(node,"DiskPressure"),condition(node,"MemoryPressure"),condition(node,"PIDPressure"),condition(node,"NetworkUnavailable"),node.path("spec").path("unschedulable").asBoolean(false),
+                platform(node.path("status").path("nodeInfo").path("architecture")),platform(node.path("status").path("nodeInfo").path("operatingSystem")),
+                platform(node.path("metadata").path("labels").path("kubernetes.io/arch")),platform(node.path("metadata").path("labels").path("kubernetes.io/os"))));
         }
         return new NodeReport(nodes.size()==selected.size()?"조회 완료":"일부 조회됨","Ready=True는 준비됨, 압박·NetworkUnavailable=True는 확인이 필요합니다. Unknown은 확인되지 않은 값입니다. 디스크 여유 공간·메모리 사용률 측정은 아닙니다.",Instant.now().toString(),total,page,last,List.copyOf(nodes.values()));
     }
