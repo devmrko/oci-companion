@@ -12,6 +12,7 @@ public final class OkeDeploymentManifest {
   if(!image.matches("[a-z0-9][a-z0-9./:_-]*@sha256:[a-f0-9]{64}"))throw Errors.DEPLOYMENT_INPUT.exception();
   if(!i.claim().isBlank()&&(!label(i.claim())||i.replicas()!=1||!i.mountPath().matches("/[A-Za-z0-9_./-]+")||i.mountPath().contains("..")||i.mountPath().equals("/")))throw Errors.DEPLOYMENT_INPUT.exception();
   if(i.claim().isBlank()&&!i.mountPath().isBlank())throw Errors.DEPLOYMENT_INPUT.exception();
+  if(i.fsGroup()!=null&&(i.claim().isBlank()||i.fsGroup()<0||i.fsGroup()>2147483647L))throw Errors.DEPLOYMENT_INPUT.exception();
   var labels=Map.of("app.kubernetes.io/name",i.app());var container=new LinkedHashMap<String,Object>();container.put("name",i.app());container.put("image",image);container.put("ports",List.of(Map.of("name","http","containerPort",i.port())));
   var resources=Map.of("cpu",i.cpuMillis()+"m","memory",i.memoryMi()+"Mi");container.put("resources",Map.of("requests",new LinkedHashMap<>(resources),"limits",new LinkedHashMap<>(resources)));
   var names=new HashSet<String>();var env=new ArrayList<Map<String,String>>();
@@ -20,6 +21,7 @@ public final class OkeDeploymentManifest {
   var pod=new LinkedHashMap<String,Object>();pod.put("containers",List.of(container));pod.put("nodeSelector",Map.of("kubernetes.io/arch",i.architecture()));
   if(!i.pullSecret().isBlank())pod.put("imagePullSecrets",List.of(Map.of("name",i.pullSecret())));
   if(!i.claim().isBlank()){container.put("volumeMounts",List.of(Map.of("name","data","mountPath",i.mountPath())));pod.put("volumes",List.of(Map.of("name","data","persistentVolumeClaim",Map.of("claimName",i.claim()))));}
+  if(i.fsGroup()!=null)pod.put("securityContext",Map.of("fsGroup",i.fsGroup(),"fsGroupChangePolicy","OnRootMismatch"));
   var spec=new LinkedHashMap<String,Object>();spec.put("replicas",i.replicas());spec.put("revisionHistoryLimit",5);spec.put("progressDeadlineSeconds",600);spec.put("selector",Map.of("matchLabels",new LinkedHashMap<>(labels)));spec.put("strategy",Map.of("type",i.claim().isBlank()?"RollingUpdate":"Recreate"));spec.put("template",Map.of("metadata",Map.of("labels",new LinkedHashMap<>(labels)),"spec",pod));
   var docs=List.of(Map.of("apiVersion","v1","kind","Namespace","metadata",Map.of("name",i.namespace())),Map.of("apiVersion","apps/v1","kind","Deployment","metadata",Map.of("name",i.app(),"namespace",i.namespace()),"spec",spec),Map.of("apiVersion","v1","kind","Service","metadata",Map.of("name",i.app(),"namespace",i.namespace()),"spec",Map.of("type","ClusterIP","selector",new LinkedHashMap<>(labels),"ports",List.of(Map.of("port",i.port(),"targetPort",i.port(),"name","http")))));
   var options=new DumperOptions();options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);return new Yaml(options).dumpAll(docs.iterator());
