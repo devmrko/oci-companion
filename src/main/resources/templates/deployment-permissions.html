@@ -1,0 +1,10 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
+<details th:fragment="oke(plan, scope)" class="form-group"><summary>OKE 실행 권한·이미지 준비 ?</summary>
+<p>현재 프로파일의 조회 권한과 파이프라인의 실행 권한은 별도입니다. OCI 콘솔 → ID 및 보안 → 정책에서 관리자가 필요한 항목만 적용하세요.</p>
+<p class="small muted">아래 예제는 이 파이프라인·구획·클러스터로 제한합니다. 클러스터의 Kubernetes 관리 권한을 포함하므로 배포 명세 수정 권한도 함께 관리하세요. 앱은 IAM 정책을 변경하지 않습니다.</p>
+<pre class="code-block" th:text="|Allow any-user to {CLUSTER_READ, CLUSTER_USE, CLUSTER_MANAGE} in compartment id ${scope.compartment()} where all {request.principal.type='devopsdeploypipeline', request.principal.id='${plan.pipeline()}', target.cluster.id='${plan.cluster()}'}
+Allow any-user to read subnets in compartment id ${scope.compartment()} where all {request.principal.type='devopsdeploypipeline', request.principal.id='${plan.pipeline()}', request.operation='GetSubnet'}|"></pre>
+<p class="small muted">서브넷 조회는 클러스터 API·노드·배포 환경에서 필요할 수 있습니다. 지원되지 않는 target.subnet.id 조건은 사용하지 않습니다. 산출물·알림 주제는 해당 리소스 구획의 읽기·사용 권한을 별도로 설정하세요.</p>
+<ul><li>사설 OCIR 이미지: 대상 Namespace의 imagePullSecret과 명세 참조를 준비하세요.</li><li>이미지 아키텍처와 노드의 x86·ARM이 일치해야 합니다.</li><li>명세 적용 성공 후에도 Pod 상태·readiness·이벤트를 확인하세요. 실행 중 취소는 즉시 종료를 보장하지 않습니다.</li></ul>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm" target="_blank" rel="noopener noreferrer">DevOps IAM ↗</a> · <a href="https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/contengpolicyreference.htm" target="_blank" rel="noopener noreferrer">OKE 권한 ↗</a>
+</details></body></html>
