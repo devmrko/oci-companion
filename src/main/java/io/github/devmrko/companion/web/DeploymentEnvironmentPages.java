@@ -16,8 +16,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller @Profile("!legacy")
 public class DeploymentEnvironmentPages {
-    private final CatalogPages catalog;private final DeploymentEnvironments environments;private final BuildAdministration projects;
-    public DeploymentEnvironmentPages(CatalogPages catalog,DeploymentEnvironments environments,BuildAdministration projects){this.catalog=catalog;this.environments=environments;this.projects=projects;}
+    private final CatalogPages catalog;private final DeploymentEnvironments environments;private final BuildAdministration projects;private final VmCapacity capacity;
+    public DeploymentEnvironmentPages(CatalogPages catalog,DeploymentEnvironments environments,BuildAdministration projects,VmCapacity capacity){this.catalog=catalog;this.environments=environments;this.projects=projects;this.capacity=capacity;}
     record Ticket(Connection connection,String region,String compartment,Instant expires) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession s){var m=(Map<String,Ticket>)s.getAttribute("deploymentEnvironmentTickets");if(m==null){m=new LinkedHashMap<>();s.setAttribute("deploymentEnvironmentTickets",m);}return m;}
     @GetMapping({"/environments","/deployments"}) String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="existing") String tab,@RequestParam(defaultValue="") String environment,@RequestParam(defaultValue="") String instance,@RequestParam(defaultValue="0") int page){
@@ -29,6 +29,7 @@ public class DeploymentEnvironmentPages {
         if(!environment.isBlank())try{model.addAttribute("selectedEnvironment",environments.environment(c,scope.region(),scope.compartment(),environment));}catch(BusinessException e){model.addAttribute("environmentError",e.getMessage());}
         if(tab.equals("new")||tab.equals("vms")||(model.getAttribute("selectedEnvironment") instanceof DeploymentEnvironments.Environment selected && selected.type().equals("VM")))try{var vms=environments.instances(c,scope.region(),scope.compartment());model.addAttribute("instances",vms);var names=new HashMap<String,String>();for(var vm:vms)names.put(vm.id(),vm.name());model.addAttribute("instanceNames",names);}catch(BusinessException e){model.addAttribute("instanceError",e.getMessage());}
         if(!instance.isBlank())try{model.addAttribute("inspection",environments.inspect(c,scope.region(),scope.compartment(),instance));}catch(BusinessException e){model.addAttribute("instanceError",e.getMessage());}
+        if(!instance.isBlank())try{model.addAttribute("capacity",capacity.read(c,scope.region(),scope.compartment(),instance));}catch(BusinessException e){model.addAttribute("capacityError",e.getMessage());}
         if(tab.equals("new"))try{
             model.addAttribute("projects",projects.projects(c,scope.region(),scope.compartment()));
             synchronized(request.getSession()){var m=tickets(request.getSession());m.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));if(m.size()>=32)m.remove(m.keySet().iterator().next());var token=UUID.randomUUID().toString();m.put(token,new Ticket(c,scope.region(),scope.compartment(),Instant.now().plusSeconds(1800)));model.addAttribute("ticket",token);}

@@ -977,3 +977,12 @@ a:focus-visible, .ui-button:focus-visible {
 .form-group { min-width:0; max-width:100%; margin:0; padding:16px; border:1px solid var(--border,#ddd); }
 .form-group > legend { max-width:100%; padding:0 6px; overflow-wrap:anywhere; }
 .table-scroll--bounded { max-height:420px; overflow:auto; }
+
+/* Shared deployment forms and resource capacity displays. */
+.deployment-fields, .capacity-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:16px; min-width:0; }
+.deployment-fields > *, .capacity-grid > * { min-width:0; }
+.capacity-grid dd { margin:4px 0 0; overflow-wrap:anywhere; font-weight:600; }
+.deployment-fields .command-input { height:120px; resize:vertical; font-family:monospace; }
+.deployment-spec { white-space:pre-wrap; overflow-wrap:anywhere; max-width:100%; }
+
+.resource-details dd, .section-stack > .notice { overflow-wrap:anywhere; }

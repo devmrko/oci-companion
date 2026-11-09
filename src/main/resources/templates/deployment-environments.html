@@ -6,7 +6,7 @@
 <nav class="build-tabs" aria-label="환경 구성"><a class="build-tab" href="/environments" th:classappend="${tab == 'existing'} ? 'is-active'">기존 환경</a><a class="build-tab" href="/environments?tab=new" th:classappend="${tab == 'new'} ? 'is-active'">새 환경 구성</a><a class="build-tab" href="/environments?tab=vms" th:classappend="${tab == 'vms'} ? 'is-active'">VM 조회·확인</a></nav>
 <p class="notice" th:if="${environmentError != null}" th:text="${environmentError}"></p><p class="notice" th:if="${instanceError != null}" th:text="${instanceError}"></p><p class="notice" th:if="${projectError != null}" th:text="${projectError}"></p>
 <section class="card section-stack" th:if="${selectedEnvironment != null}">
-<h2 th:text="${deploying ? '선택한 환경' : '환경 상세'}"></h2>
+<a th:if="${selectedEnvironment.type() == 'VM' and selectedEnvironment.state() == 'ACTIVE'}" class="ui-button primary" th:href="@{/deployments/configure(environment=${selectedEnvironment.id()})}">배포본·설정 구성</a><h2 th:text="${deploying ? '선택한 환경' : '환경 상세'}"></h2>
 <p class="task-selection-summary" th:text="${selectedEnvironment.name() + ' · ' + selectedEnvironment.type() + ' · ' + selectedEnvironment.state()}"></p><p th:text="${selectedEnvironment.description()}"></p>
 <details><summary>환경·프로젝트 OCID</summary><p class="source-url" th:text="${selectedEnvironment.id()}"></p><p class="source-url" th:text="${selectedEnvironment.project()}"></p></details>
 <div th:if="${selectedEnvironment.type() == 'OKE'}"><h3>OKE 클러스터</h3><p class="source-url" th:text="${selectedEnvironment.clusterId()}"></p><p>클러스터 연결 정보입니다. Pod·앱 상태는 별도로 확인하세요.</p></div><h3 th:if="${selectedEnvironment.type() == 'VM'}">연결된 VM</h3><ul><li th:each="id : ${selectedEnvironment.instances()}"><a class="source-url" th:href="@{/environments(tab='vms',environment=${selectedEnvironment.id()},instance=${id})}" th:text="${instanceNames.containsKey(id) ? instanceNames.get(id) : id}"></a></li></ul>
@@ -36,4 +36,4 @@ Allow group &lt;그룹&gt; to manage devops-deploy-environment in compartment id
 oci compute instance list --compartment-id &lt;구획 OCID&gt; --all
 oci devops deploy-environment list --compartment-id &lt;구획 OCID&gt; --all
 oci devops deploy-environment create-compute-instance-environment --project-id &lt;프로젝트 OCID&gt; --compute-instance-group-selectors file://selectors.json</pre><p class="small muted">CLI에는 현재 --profile, --region을 지정하세요. 위 정책은 사용자 조회·환경 관리용이며 실제 배포 서비스 권한과 다릅니다.</p><a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/deploy_instancegroups.htm" target="_blank" rel="noopener noreferrer">배포 실행 권한·준비 조건</a></details>
-</main><footer th:replace="~{layout :: footer}"></footer></body></html>
+<p class="notice" th:if="${capacityError != null}" th:text="${capacityError}"></p><div th:replace="~{vm-capacity :: capacity}"></div></main><footer th:replace="~{layout :: footer}"></footer></body></html>

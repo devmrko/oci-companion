@@ -15,17 +15,18 @@ import org.springframework.web.bind.annotation.*;
 
 @Controller @Profile("!legacy")
 public class DeploymentRunPages {
-    private final CatalogPages catalog;private final DeploymentRuns runs;private final BuildHandoff handoff;
-    public DeploymentRunPages(CatalogPages catalog,DeploymentRuns runs,BuildHandoff handoff){this.catalog=catalog;this.runs=runs;this.handoff=handoff;}
+    private final CatalogPages catalog;private final DeploymentRuns runs;private final BuildHandoff handoff;private final io.github.devmrko.companion.port.DeploymentLogs logs;
+    public DeploymentRunPages(CatalogPages catalog,DeploymentRuns runs,BuildHandoff handoff,io.github.devmrko.companion.port.DeploymentLogs logs){this.catalog=catalog;this.runs=runs;this.handoff=handoff;this.logs=logs;}
     record Ticket(Connection connection,String region,String compartment,String pipeline,String fingerprint,String sourcePipeline,String sourceRun,String sourceFingerprint,Instant expires) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession s){var m=(Map<String,Ticket>)s.getAttribute("deploymentRunTickets");if(m==null){m=new LinkedHashMap<>();s.setAttribute("deploymentRunTickets",m);}return m;}
-    @GetMapping("/deployments/runs") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,@RequestParam(defaultValue="") String sourcePipeline,@RequestParam(defaultValue="") String sourceRun){
+    @GetMapping("/deployments/runs") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,@RequestParam(defaultValue="") String sourcePipeline,@RequestParam(defaultValue="") String sourceRun,@RequestParam(defaultValue="") String historyPage,@RequestParam(defaultValue="") String logPage,@RequestParam(defaultValue="") String logUntil){
         var c=SecurityConfig.connection(auth);catalog.navigation(auth,request,model);var scope=catalog.selection(c,request.getSession());model.addAttribute("scopeBack","/deployments/runs");model.addAttribute("pipelineId",pipeline);model.addAttribute("sourcePipeline",sourcePipeline);model.addAttribute("sourceRun",sourceRun);
         if(request.getSession().getAttribute("scopeInvalid")!=null)return "deployment-runs";
         try{
             if(sourcePipeline.isBlank()!=sourceRun.isBlank())throw Errors.HANDOFF.exception();
             model.addAttribute("pipelines",runs.pipelines(c,scope.region(),scope.compartment()));
-            if(!run.isBlank())model.addAttribute("run",runs.run(c,scope.region(),scope.compartment(),pipeline,run));
+            if(!pipeline.isBlank())model.addAttribute("history",runs.history(c,scope.region(),scope.compartment(),pipeline,historyPage));
+            if(!run.isBlank()){model.addAttribute("run",runs.run(c,scope.region(),scope.compartment(),pipeline,run));model.addAttribute("deploymentLogs",logs.read(c,scope.region(),scope.compartment(),pipeline,run,logPage,logUntil));}
             else if(!pipeline.isBlank()){
                 var plan=runs.plan(c,scope.region(),scope.compartment(),pipeline);
                 var proof=sourceRun.isBlank()?null:handoff.verify(c,scope.region(),scope.compartment(),sourcePipeline,sourceRun,pipeline);

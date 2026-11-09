@@ -108,11 +108,28 @@ public class OciDeploymentRuns implements DeploymentRuns {
                 CreateDeployPipelineDeploymentDetails.builder().deployPipelineId(pipeline).displayName("companion-"+token).build()).build()).getDeployment().getId();
         }catch(Exception e){throw Errors.CLOUD.exception();}
     }
+    public History history(Connection c,String region,String compartment,String pipeline,String page){
+        if(page.length()>8192)throw Errors.INVALID.exception();
+        try(var client=clients.client(c,region)){
+            var p=client.getDeployPipeline(GetDeployPipelineRequest.builder().deployPipelineId(pipeline).build()).getDeployPipeline();
+            if(!compartment.equals(p.getCompartmentId()))throw Errors.SCOPE.exception();
+            var response=client.listDeployments(ListDeploymentsRequest.builder().deployPipelineId(pipeline).limit(50).page(page.isBlank()?null:page).sortOrder(SortOrder.Desc).build());
+            return new History(response.getDeploymentCollection().getItems().stream().map(r->new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),Objects.toString(r.getTimeCreated(),""))).toList(),Objects.toString(response.getOpcNextPage(),""));
+        }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
+    }
     public Run run(Connection c,String region,String compartment,String pipeline,String id){
         try(var client=clients.client(c,region)){
             var r=client.getDeployment(GetDeploymentRequest.builder().deploymentId(id).build()).getDeployment();
             if(!compartment.equals(r.getCompartmentId())||!pipeline.equals(r.getDeployPipelineId()))throw Errors.SCOPE.exception();
-            return new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),Objects.toString(r.getLifecycleDetails(),""));
+            var steps=new ArrayList<Step>();
+            if(r.getDeploymentExecutionProgress()!=null&&r.getDeploymentExecutionProgress().getDeployStageExecutionProgress()!=null)
+                r.getDeploymentExecutionProgress().getDeployStageExecutionProgress().forEach((stageId,progress)->{
+                    if(progress.getDeployStageExecutionProgressDetails()!=null)for(var target:progress.getDeployStageExecutionProgressDetails()){
+                        if(target.getSteps()!=null)for(var step:target.getSteps())steps.add(new Step(Objects.toString(progress.getDeployStageDisplayName(),stageId),Objects.toString(target.getTargetId(),""),step.getName(),step.getState()==null?"UNKNOWN":step.getState().getValue()));
+                        if(target.getRollbackSteps()!=null)for(var step:target.getRollbackSteps())steps.add(new Step(Objects.toString(progress.getDeployStageDisplayName(),stageId),Objects.toString(target.getTargetId(),""),"복구 · "+step.getName(),step.getState()==null?"UNKNOWN":step.getState().getValue()));
+                    }
+                });
+            return new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),Objects.toString(r.getLifecycleDetails(),""),List.copyOf(steps));
         }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
     }
 }
