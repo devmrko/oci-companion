@@ -11,5 +11,6 @@
 <tr th:if="${plan == null or plan.targetType() == 'OKE'}"><td class="table-cell">이미지 인증·아키텍처</td><td class="table-cell table-cell--status">미확인</td><td class="table-cell">대상 Namespace의 imagePullSecret과 이미지 참조, 노드의 x86·ARM 일치를 확인하세요. 이 화면은 클러스터 내부 Secret·노드를 조회하지 않습니다.</td></tr>
 <tr th:if="${plan != null and plan.targetType() == 'VM'}"><td class="table-cell">VM 실행 준비</td><td class="table-cell table-cell--status">미확인</td><td class="table-cell"><a href="/agents">에이전트 상태</a>와 배포 스크립트에 필요한 런타임·디스크 공간을 확인하세요.</td></tr>
 <tr><td class="table-cell">네트워크·앱 응답</td><td class="table-cell table-cell--status">미확인</td><td class="table-cell">대상 서브넷의 저장소 접근 경로·DNS·보안 규칙을 확인하세요. 실제 통신·앱 응답은 배포 후 확인합니다.</td></tr>
+<tr th:each="check : ${imageChecks}"><td class="table-cell">OCIR 이미지</td><td class="table-cell table-cell--status" th:text="${check.label()}"></td><td class="table-cell"><p class="source-url" th:text="${check.image()}"></p><p th:text="${check.note()}"></p></td></tr>
 </tbody></table></div>
 </section></body></html>

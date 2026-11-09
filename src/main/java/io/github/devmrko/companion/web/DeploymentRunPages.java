@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.*;
 
 @Controller @Profile("!legacy")
 public class DeploymentRunPages {
-    private final CatalogPages catalog;private final DeploymentRuns runs;private final BuildHandoff handoff;private final io.github.devmrko.companion.port.DeploymentLogs logs;
-    public DeploymentRunPages(CatalogPages catalog,DeploymentRuns runs,BuildHandoff handoff,io.github.devmrko.companion.port.DeploymentLogs logs){this.catalog=catalog;this.runs=runs;this.handoff=handoff;this.logs=logs;}
+    private final io.github.devmrko.companion.port.DeploymentImages images;private final CatalogPages catalog;private final DeploymentRuns runs;private final BuildHandoff handoff;private final io.github.devmrko.companion.port.DeploymentLogs logs;
+    public DeploymentRunPages(CatalogPages catalog,DeploymentRuns runs,BuildHandoff handoff,io.github.devmrko.companion.port.DeploymentLogs logs,io.github.devmrko.companion.port.DeploymentImages images){this.images=images;this.catalog=catalog;this.runs=runs;this.handoff=handoff;this.logs=logs;}
     record Ticket(Connection connection,String region,String compartment,String pipeline,String fingerprint,String sourcePipeline,String sourceRun,String sourceFingerprint,Instant expires) {}
     @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession s){var m=(Map<String,Ticket>)s.getAttribute("deploymentRunTickets");if(m==null){m=new LinkedHashMap<>();s.setAttribute("deploymentRunTickets",m);}return m;}
     @GetMapping("/deployments/runs") String page(Authentication auth,HttpServletRequest request,Model model,@RequestParam(defaultValue="") String pipeline,@RequestParam(defaultValue="") String run,@RequestParam(defaultValue="") String sourcePipeline,@RequestParam(defaultValue="") String sourceRun,@RequestParam(defaultValue="") String historyPage,@RequestParam(defaultValue="") String logPage,@RequestParam(defaultValue="") String logUntil){
@@ -31,6 +31,8 @@ public class DeploymentRunPages {
                 var plan=runs.plan(c,scope.region(),scope.compartment(),pipeline);
                 var proof=sourceRun.isBlank()?null:handoff.verify(c,scope.region(),scope.compartment(),sourcePipeline,sourceRun,pipeline);
                 model.addAttribute("plan",plan);model.addAttribute("buildProof",proof);
+                var checks=images.inspect(c,scope.region(),scope.compartment(),plan.images());model.addAttribute("imageChecks",checks);
+                if(checks.stream().anyMatch(x->x.state()==io.github.devmrko.companion.port.DeploymentImages.State.BLOCKED))throw Errors.DEPLOYMENT_IMAGE.exception();
                 synchronized(request.getSession()){
                     var map=tickets(request.getSession());map.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));if(map.size()>=32)map.remove(map.keySet().iterator().next());
                     var token=UUID.randomUUID().toString();map.put(token,new Ticket(c,scope.region(),scope.compartment(),pipeline,plan.fingerprint(),sourcePipeline,sourceRun,proof==null?"":proof.fingerprint(),Instant.now().plusSeconds(600)));model.addAttribute("ticket",token);
@@ -44,6 +46,9 @@ public class DeploymentRunPages {
         var c=SecurityConfig.connection(auth);var scope=catalog.selection(c,session);
         if(!c.equals(t.connection())||session.getAttribute("scopeInvalid")!=null||!scope.region().equals(t.region())||!scope.compartment().equals(t.compartment()))throw Errors.SCOPE.exception();
         if(!t.sourceRun().isBlank()&&!handoff.verify(c,t.region(),t.compartment(),t.sourcePipeline(),t.sourceRun(),t.pipeline()).fingerprint().equals(t.sourceFingerprint()))throw Errors.BUILD_CHANGED.exception();
+        var current=runs.plan(c,t.region(),t.compartment(),t.pipeline());
+        if(!current.fingerprint().equals(t.fingerprint()))throw Errors.BUILD_CHANGED.exception();
+        if(images.inspect(c,t.region(),t.compartment(),current.images()).stream().anyMatch(x->x.state()==io.github.devmrko.companion.port.DeploymentImages.State.BLOCKED))throw Errors.DEPLOYMENT_IMAGE.exception();
         var id=runs.start(c,t.region(),t.compartment(),t.pipeline(),t.fingerprint(),ticket);
         return "redirect:/deployments/runs?pipeline="+encode(t.pipeline())+"&run="+encode(id)
             +(t.sourceRun().isBlank()?"":"&sourcePipeline="+encode(t.sourcePipeline())+"&sourceRun="+encode(t.sourceRun()));

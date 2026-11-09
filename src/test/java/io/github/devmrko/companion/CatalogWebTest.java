@@ -33,6 +33,7 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildLogs logs;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.Registry registry;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildAutomation automation;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentImages deploymentImages;
     @Autowired MockMvc mvc;
     @Autowired ApplicationContext context;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildDefinition definitions;
@@ -99,6 +100,18 @@ class CatalogWebTest {
         mvc.perform(get("/deployments/runs").session(session).param("pipeline","p").param("sourcePipeline","bp").param("sourceRun","br"))
             .andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("ticket"));
         org.mockito.Mockito.verify(deploymentRuns,org.mockito.Mockito.times(1)).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
+    }
+    @Test void missingImagePreventsTicketAndIsCheckedAgainBeforeExecution() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        var plan=new io.github.devmrko.companion.port.DeploymentRuns.Plan("p","release","env",java.util.List.of(),"plan","OKE","cluster","ns",java.util.List.of("image"));
+        org.mockito.Mockito.when(deploymentRuns.plan(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("p"))).thenReturn(plan);
+        var missing=new io.github.devmrko.companion.port.DeploymentImages.Check("image",io.github.devmrko.companion.port.DeploymentImages.State.BLOCKED,"digest 없음");
+        org.mockito.Mockito.when(deploymentImages.inspect(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList())).thenReturn(java.util.List.of(missing));
+        mvc.perform(get("/deployments/runs").session(session).param("pipeline","p")).andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("ticket")).andExpect(content().string(not(containsString("확인한 배포 실행"))));
+        org.mockito.Mockito.when(deploymentImages.inspect(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyList())).thenReturn(java.util.List.of(new io.github.devmrko.companion.port.DeploymentImages.Check("image",io.github.devmrko.companion.port.DeploymentImages.State.VERIFIED,"AVAILABLE")),java.util.List.of(missing));
+        var page=mvc.perform(get("/deployments/runs").session(session).param("pipeline","p")).andReturn();String ticket=(String)page.getModelAndView().getModel().get("ticket");assertNotNull(ticket);
+        mvc.perform(post("/deployments/runs").session(session).with(csrf()).param("ticket",ticket)).andExpect(status().isConflict());
+        org.mockito.Mockito.verify(deploymentRuns,org.mockito.Mockito.never()).start(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString());
     }
     @Test void deploymentExecutionRequiresCsrfOneUseTicketAndUnchangedScope() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
