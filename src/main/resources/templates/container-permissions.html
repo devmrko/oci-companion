@@ -1,6 +1,29 @@
 <!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
 <details th:fragment="privateRegistry" class="card section-stack"><summary>사설 OCIR 인증 확인 ?</summary>
 <p>화면에서 이미지가 보여도 Container Instances의 다운로드 권한은 별도로 필요합니다.</p>
+<details class="section-stack"><summary>생성 전에 policy 준비 ?</summary>
+<p>OCI 콘솔 → ID 및 보안 → 정책 → 저장소 구획 또는 상위 구획 → 정책 생성 → 수동 편집기. 실행 구획과 저장소를 지정하고 정책 전파 후 생성하세요.</p>
+<pre class="code-block">Allow any-user to read repos in compartment id &lt;저장소 구획 OCID&gt; where all {
+  request.principal.type='computecontainerinstance',
+  request.principal.compartment.id='&lt;실행 구획 OCID&gt;',
+  request.region='ICN',
+  target.repo.name='&lt;저장소 이름&gt;'
+}</pre>
+<p class="small muted">해당 실행 구획의 현재·향후 Container Instances에 적용됩니다. 전용 실행 구획을 사용하세요. ICN은 서울 리전 키입니다. 다른 리전은 공식 리전 키로 바꾸세요. 저장소 이름에는 namespace·태그·digest를 넣지 않습니다.</p>
+<p class="small muted">인스턴스가 생성되면 아래 OCID 조건으로 한 대만 허용할 수 있습니다. 기존 정책을 그대로 두고 좁은 정책을 추가하면 기존 허용 범위는 유지되므로, 기존 문장을 교체해야 합니다.</p>
+</details>
+<details class="section-stack"><summary>인스턴스 한 대에 policy 적용 ?</summary>
+<p>OCI 콘솔 → ID 및 보안 → 정책 → 저장소 구획 또는 상위 구획 → 정책 생성 → 수동 편집기. 아래 저장소 구획 OCID와 이름을 바꿔 적용하세요.</p>
+<pre class="code-block">Allow any-user to read repos in compartment id &lt;저장소 구획 OCID&gt; where all {
+  request.principal.type='computecontainerinstance',
+  request.principal.id='<span th:text="${detail != null ? detail.id() : '&lt;인스턴스 OCID&gt;'}"></span>',
+  target.repo.name='&lt;저장소 이름&gt;'
+}</pre>
+<p class="small muted">any-user는 위 조건으로 지정한 인스턴스 한 대만 허용합니다. 세 조건을 모두 유지하세요. 저장소 이름은 namespace·태그·digest 없이 입력합니다. 새 동적 그룹은 필요하지 않습니다.</p>
+<p class="small muted">생성된 인스턴스의 OCID가 필요합니다. 재생성하면 OCID가 바뀌므로 정책도 갱신해야 합니다. 정책 저장과 이미지 다운로드 성공은 별개이며 전파 후 상태·로그를 확인하세요.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/policyreference_topic-General_Variables_for_All_Requests.htm" target="_blank" rel="noopener noreferrer">정책 주체 조건 ↗</a> · <a href="https://docs.oracle.com/en-us/iaas/Content/Registry/Concepts/registrypolicyrepoaccess.htm" target="_blank" rel="noopener noreferrer">저장소 읽기 권한 ↗</a>
+</details>
+<h3>동적 그룹으로 관리</h3>
 <ol><li>OCI 콘솔 → Developer Services → Container Registry: 이미지 경로·digest와 저장소 구획을 확인하세요.</li><li>ID 및 보안 → 도메인 → 동적 그룹: 대상 Container Instance가 일치 규칙에 포함되는지 확인하세요.</li><li>ID 및 보안 → 정책: 해당 동적 그룹에 대상 저장소의 읽기 권한을 부여하세요.</li><li>Networking → 서브넷: OCIR 접근 경로·DNS·보안 규칙을 확인하세요. 권한 변경은 반영에 시간이 걸릴 수 있습니다.</li></ol>
 <p class="small muted">기존 인스턴스 한 대로 제한하는 동적 그룹 예시입니다. 새 인스턴스에는 그 인스턴스의 OCID를 사용해야 합니다.</p>
 <pre class="code-block">ALL {resource.type='computecontainerinstance', resource.id='&lt;인스턴스 OCID&gt;'}

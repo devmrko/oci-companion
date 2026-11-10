@@ -32,7 +32,7 @@
 - [OCI Container Instances 이미지 인증](https://docs.oracle.com/en-us/iaas/Content/container-instances/vault-secrets-image-authorization.htm)
 - [Container Instances IAM](https://docs.oracle.com/en-us/iaas/Content/container-instances/permissions/policy-reference.htm)
 
-사설 OCIR → Container Instances의 정상 실행은 **미완료**입니다. 관리자가 기존 그룹 용도와 한도를 확인한 뒤 좁은 범위의 리소스 주체 인증을 준비해야 후속 검증할 수 있습니다.
+이 초기 시점에는 사설 OCIR → Container Instances의 정상 실행이 **미완료**였다. 이후 사용자 요청으로 조건부 policy를 적용해 실행에 성공했다. [후속 policy 검증](container-pull-policy-2026-11-10.md)을 참고한다.
 
 ## alpha.9 이후 인증 재점검
 
