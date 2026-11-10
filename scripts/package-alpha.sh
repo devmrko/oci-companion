@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version="${1:-0.1.0-alpha.9}"
+version="${1:-0.1.0-alpha.10}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]] || { echo 'Expected version: x.y.z-alpha.n' >&2; exit 1; }
 jar_path=target/oci-companion-0.1.0-SNAPSHOT.jar
 [[ -f "$jar_path" ]] || { echo 'Run ./scripts/build.sh first.' >&2; exit 1; }

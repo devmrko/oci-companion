@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
+<section th:fragment="help" class="card"><details>
+<summary>OKE 조회 권한 설정 ?</summary>
+<div class="section-stack">
+<p>OCI IAM은 클러스터 접속을, Kubernetes RBAC는 namespace 안의 조회를 허용합니다. 각각 관리자에게 요청하세요.</p>
+<h3>1. OCI 콘솔</h3>
+<p>아이덴티티 및 보안 → 정책 → 대상 구획 → 정책 생성. 프로파일 사용자가 속한 그룹과 클러스터 구획 OCID를 넣으세요.</p>
+<pre class="code-block">Allow group id &lt;GROUP_OCID&gt; to use clusters in compartment id &lt;COMPARTMENT_OCID&gt;</pre>
+<h3>2. Kubernetes 조회 권한</h3>
+<p>클러스터 관리자가 아래 내용을 <code>companion-reader.yaml</code>로 저장합니다. 두 곳의 <code>NAMESPACE</code>와 프로파일의 <code>OCI_USER_OCID</code>를 바꾸세요.</p>
+<pre class="code-block">apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: companion-reader
+  namespace: NAMESPACE
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: companion-reader
+  namespace: NAMESPACE
+subjects:
+  - kind: User
+    name: OCI_USER_OCID
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: companion-reader
+  apiGroup: rbac.authorization.k8s.io</pre>
+<pre class="code-block">kubectl --context ADMIN_CONTEXT apply -f companion-reader.yaml</pre>
+<p>같은 이름의 Role이 있으면 기존 규칙을 먼저 확인하세요. 로그가 필요 없으면 <code>pods/log</code> 규칙을 제외합니다. namespace 목록 권한은 포함하지 않으므로 화면에서 이름을 직접 입력하세요.</p>
+<p>경고 이벤트는 해당 namespace의 <code>events list</code>, 할당 노드는 클러스터 범위의 <code>nodes get</code> 권한을 별도로 사용합니다. 배포·수정 권한은 이 예제에 포함하지 않습니다.</p>
+<h3>3. 다시 조회</h3>
+<p>권한 반영 후 Deployment·로그를 다시 조회하세요. 사설 API는 앱 서버에서 VCN까지의 네트워크 경로도 필요합니다. 브라우저의 접속 경로와는 별개입니다.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengaboutaccesscontrol.htm" target="_blank" rel="noopener noreferrer">OCI 공식 접근 권한 안내</a>
+</div></details></section>
+</body></html>
