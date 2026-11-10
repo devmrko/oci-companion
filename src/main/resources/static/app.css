@@ -1001,3 +1001,7 @@ a:focus-visible, .ui-button:focus-visible {
 .setup-steps .form-toolbar { margin:0; flex-wrap:wrap; }
 
 .table-cell--status { white-space: nowrap; }
+
+/* Connection setup fields share responsive sizing and alignment. */
+.connection-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:16px; align-items:end; }
+.connection-fields .form-field { min-width:0; }

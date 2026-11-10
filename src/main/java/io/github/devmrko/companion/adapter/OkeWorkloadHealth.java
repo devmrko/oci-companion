@@ -15,10 +15,12 @@ import tools.jackson.databind.json.JsonMapper;
 public class OkeWorkloadHealth {
     public record Target(String appId, String profile, String tenancy, String user, String region,
             String compartment, String clusterId, String kubeconfig, String namespace,
-            String deployment, String server, String tlsServerName, boolean inspectNodes) {
+            String deployment, String server, String tlsServerName, boolean inspectNodes, String endpoint) {
+        public Target(String appId,String profile,String tenancy,String user,String region,String compartment,String clusterId,String kubeconfig,String namespace,String deployment,String server,String tlsServerName,boolean inspectNodes){this(appId,profile,tenancy,user,region,compartment,clusterId,kubeconfig,namespace,deployment,server,tlsServerName,inspectNodes,"PUBLIC_ENDPOINT");}
         public Target(String appId,String profile,String tenancy,String user,String region,String compartment,String clusterId,String kubeconfig,String namespace,String deployment,String server,String tlsServerName){this(appId,profile,tenancy,user,region,compartment,clusterId,kubeconfig,namespace,deployment,server,tlsServerName,false);}
     }
-    public record Pod(String name, String phase, String ready, int restarts, String reason, String node) {
+    public record Pod(String name, String phase, String ready, int restarts, String reason, String node, String uid) {
+        public Pod(String name,String phase,String ready,int restarts,String reason,String node){this(name,phase,ready,restarts,reason,node,"");}
         public Pod(String name,String phase,String ready,int restarts,String reason){this(name,phase,ready,restarts,reason,"");}
     }
     public record Node(String name,String ready,String diskPressure,String memoryPressure,String pidPressure,String networkUnavailable,boolean unschedulable,
@@ -32,11 +34,16 @@ public class OkeWorkloadHealth {
     }
     public record NodeReport(String state,String guidance,String checkedAt,int total,int page,int last,List<Node> items) {}
     private static NodeReport disabledNodes(){return new NodeReport("미설정","관리자 옵션 inspectNodes와 nodes get 권한을 확인하세요.",Instant.now().toString(),0,0,0,List.of());}
+    public record Warning(String pod,String reason,String guidance,String observedAt) {}
+    public record Events(String state,String guidance,List<Warning> items) {}
+    private static Events noEvents(){return new Events("미조회","경고 이벤트는 현재 장애 여부를 확정하지 않습니다.",List.of());}
     public record Status(String state, String namespace, String deployment, int desired,
-            int ready, int updated, String checkedAt, String guidance, List<Pod> pods, NodeReport nodes) {
+            int ready, int updated, String checkedAt, String guidance, List<Pod> pods, NodeReport nodes, Events events) {
+        public Status(String state,String namespace,String deployment,int desired,int ready,int updated,String checkedAt,String guidance,List<Pod> pods,NodeReport nodes){this(state,namespace,deployment,desired,ready,updated,checkedAt,guidance,pods,nodes,noEvents());}
         public Status(String state,String namespace,String deployment,int desired,int ready,int updated,String checkedAt,String guidance,List<Pod> pods){this(state,namespace,deployment,desired,ready,updated,checkedAt,guidance,pods,disabledNodes());}
     }
     private final Path config;
+    private OkeConnectionStore managed;
     private final String kubectl;
     private final AgentConnectionRegistry registry;
     private final OciAgentDependencies cloud;
@@ -47,6 +54,12 @@ public class OkeWorkloadHealth {
             AgentConnectionRegistry registry, OciAgentDependencies cloud) {
         this.config=Path.of(config);this.kubectl=kubectl;this.registry=registry;this.cloud=cloud;
     }
+    @org.springframework.beans.factory.annotation.Autowired
+    public OkeWorkloadHealth(@Value("${companion.oke-workloads:.tools/oke-workloads.json}") String config,
+            @Value("${companion.kubectl:/usr/local/bin/kubectl}") String kubectl,
+            AgentConnectionRegistry registry,OciAgentDependencies cloud,OkeConnectionStore managed){
+        this(config,kubectl,registry,cloud);this.managed=managed;
+    }
     private Status empty(String state,String guidance) {
         return new Status(state,"","",0,0,0,Instant.now().toString(),guidance,List.of());
     }
@@ -55,21 +68,24 @@ public class OkeWorkloadHealth {
         try {
             if(c.demo())throw new IllegalArgumentException();
             var app=registry.get(c,region,compartment,appId);
-            if(!Files.exists(config))return empty("미설정","관리자가 앱별 Kubernetes 조회 연결을 설정해야 합니다.");
-            if(Files.isSymbolicLink(config)||Files.size(config)>1_000_000)throw new IllegalArgumentException();
-            var matches=Arrays.stream(json.readValue(Files.readString(config),Target[].class))
-                .filter(t->appId.equals(t.appId())&&c.profile().equals(t.profile())&&c.tenancy().equals(t.tenancy())
-                    &&c.user().equals(t.user())&&region.equals(t.region())&&compartment.equals(t.compartment())).toList();
-            if(matches.isEmpty())return empty("미설정","현재 앱·사용자·리전·구획에 맞는 Kubernetes 조회 연결이 없습니다.");
-            if(matches.size()!=1)throw new IllegalArgumentException();
-            var t=matches.getFirst();validate(t);
-            var cluster=app.dependencies().stream().filter(d->d.type().equals("OKE")&&d.ocid().equals(t.clusterId())).findFirst().orElseThrow();
+            var t=managed==null?null:managed.get(c,region,compartment,appId);
+            if(t==null){
+                if(!Files.exists(config))return empty("미설정","OKE 조회 연결에서 클러스터와 앱을 선택하세요.");
+                if(Files.isSymbolicLink(config)||Files.size(config)>1_000_000)throw new IllegalArgumentException();
+                var matches=Arrays.stream(json.readValue(Files.readString(config),Target[].class))
+                    .filter(x->appId.equals(x.appId())&&c.profile().equals(x.profile())&&c.tenancy().equals(x.tenancy())
+                        &&c.user().equals(x.user())&&region.equals(x.region())&&compartment.equals(x.compartment())).toList();
+                if(matches.isEmpty())return empty("미설정","현재 앱·사용자·리전·구획에 맞는 Kubernetes 조회 연결이 없습니다.");
+                if(matches.size()!=1)throw new IllegalArgumentException();t=matches.getFirst();
+            }
+            validate(t);final var target=t;
+            var cluster=app.dependencies().stream().filter(d->d.type().equals("OKE")&&d.ocid().equals(target.clusterId())).findFirst().orElseThrow();
             if(!cloud.check(c,region,compartment,cluster).verified())throw new IllegalArgumentException();
             var deployment=read(t,"deployment",t.deployment());
             var sets=read(t,"replicasets",null);
             var pods=read(t,"pods",null);
             var summary=summarize(t,deployment,sets,pods);
-            return withNodes(summary,inspectNodes(t,summary.pods(),nodePage));
+            return withEvents(withNodes(summary,inspectNodes(t,summary.pods(),nodePage)),inspectEvents(t,summary.pods()));
         } catch(Exception e) {
             if(e instanceof InterruptedException)Thread.currentThread().interrupt();
             return empty("조회 불가","관리자 연결 설정·OCI 조회 권한·Kubernetes RBAC·API 터널을 확인하세요. 앱 중지로 단정할 수 없습니다.");
@@ -135,7 +151,7 @@ public class OkeWorkloadHealth {
             }
             boolean terminating=!item.path("metadata").path("deletionTimestamp").isMissingNode()&&!item.path("metadata").path("deletionTimestamp").isNull();
             if(!ready&&!terminating)podIssue=true;
-            pods.add(new Pod(item.path("metadata").path("name").asText(),terminating?"Terminating":status.path("phase").asText("Unknown"),ready?"Ready":"NotReady",restarts,String.join(", ",reasons),item.path("spec").path("nodeName").asText("")));
+            pods.add(new Pod(item.path("metadata").path("name").asText(),terminating?"Terminating":status.path("phase").asText("Unknown"),ready?"Ready":"NotReady",restarts,String.join(", ",reasons),item.path("spec").path("nodeName").asText(""),item.path("metadata").path("uid").asText("")));
         }
         pods.sort(Comparator.comparing(Pod::name));
         var status=deployment.path("status");int desired=deployment.path("spec").path("replicas").asInt(1),ready=status.path("readyReplicas").asInt(0),updated=status.path("updatedReplicas").asInt(0);
@@ -145,7 +161,38 @@ public class OkeWorkloadHealth {
         String state=desired==0?"복제본 0개":failed?"배포 확인 필요":!observed?"변경 반영 대기":ready>=desired&&updated==desired&&status.path("availableReplicas").asInt(0)>=desired&&status.path("replicas").asInt(0)==desired&&!podIssue&&pods.size()==desired?"준비 완료":"배포 진행·준비 확인 필요";
         return new Status(state,t.namespace(),t.deployment(),desired,ready,updated,Instant.now().toString(),"Deployment·Pod 조회 시점의 상태입니다. 실제 요청 성공·로그·알람은 별도로 확인하세요. 노드 상태는 아래 별도 조회 결과를 확인하세요.",List.copyOf(pods));
     }
-    private static Status withNodes(Status s,NodeReport nodes){return new Status(s.state(),s.namespace(),s.deployment(),s.desired(),s.ready(),s.updated(),s.checkedAt(),s.guidance(),s.pods(),nodes);}
+    private static Status withNodes(Status s,NodeReport nodes){return new Status(s.state(),s.namespace(),s.deployment(),s.desired(),s.ready(),s.updated(),s.checkedAt(),s.guidance(),s.pods(),nodes,s.events());}
+    private static Status withEvents(Status s,Events events){return new Status(s.state(),s.namespace(),s.deployment(),s.desired(),s.ready(),s.updated(),s.checkedAt(),s.guidance(),s.pods(),s.nodes(),events);}
+    JsonNode readEvents(Target t)throws Exception{return execute(t,List.of("events","--field-selector=type=Warning"));}
+    Events inspectEvents(Target t,List<Pod> pods){
+        if(pods.stream().noneMatch(p->!p.uid().isBlank()))return new Events("대상 Pod 없음","조회할 Pod가 없습니다.",List.of());
+        try{return summarizeEvents(t.namespace(),pods,readEvents(t));}
+        catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();return new Events("조회 불가","Pod 결과는 유지됩니다. namespace의 events list RBAC와 API 연결을 확인하세요.",List.of());}
+    }
+    static Events summarizeEvents(String namespace,List<Pod> pods,JsonNode response){
+        if(!response.path("items").isArray())throw new IllegalArgumentException();
+        var owners=new HashMap<String,String>();for(var p:pods)if(!p.uid().isBlank())owners.put(p.uid(),p.name());
+        var warnings=new ArrayList<Warning>();
+        for(var e:response.path("items")){
+            var ref=e.has("involvedObject")?e.path("involvedObject"):e.path("regarding");String pod=owners.get(ref.path("uid").asText());
+            if(pod==null||!pod.equals(ref.path("name").asText())||!"Pod".equals(ref.path("kind").asText())||!namespace.equals(e.path("metadata").path("namespace").asText())||!namespace.equals(ref.path("namespace").asText())||!"Warning".equals(e.path("type").asText()))continue;
+            String reason=e.path("reason").asText("Unknown");if(!reason.matches("[A-Za-z0-9]{1,80}"))reason="Unknown";
+            String message=e.path("message").asText(e.path("note").asText("")).toLowerCase(Locale.ROOT),guidance;
+            if(reason.equals("FailedScheduling")){
+                var causes=new ArrayList<String>();if(message.contains("insufficient cpu"))causes.add("CPU 부족");if(message.contains("insufficient memory"))causes.add("메모리 부족");if(message.contains("untolerated taint"))causes.add("허용하지 않은 taint");if(message.contains("node affinity")||message.contains("node selector"))causes.add("노드 선택 조건 불일치");
+                guidance=causes.isEmpty()?"배치 실패 · 자원 요청량·노드 조건·볼륨 바인딩을 확인하세요.":String.join(" · ",causes)+" · 당시 배치 실패 이벤트입니다.";
+            }else if(message.contains("pull image")||message.contains("pulling image"))guidance="이미지 받기 실패 · 이미지 경로·인증·레지스트리 연결을 확인하세요.";
+            else if(reason.equals("FailedMount")||reason.equals("FailedAttachVolume"))guidance="볼륨 연결 실패 · PVC·CSI·접근 권한을 확인하세요.";
+            else if(reason.equals("Unhealthy"))guidance="상태 검사 실패 · startup/readiness/liveness 설정과 앱 응답을 확인하세요.";
+            else if(reason.equals("BackOff"))guidance="재시도 대기 · 컨테이너 종료 이유와 로그를 확인하세요.";
+            else guidance="Kubernetes 경고 · OCI 클러스터 액세스에서 해당 Pod 이벤트를 확인하세요.";
+            String at=e.path("series").path("lastObservedTime").asText("");if(at.isBlank())at=e.path("lastTimestamp").asText("");if(at.isBlank())at=e.path("eventTime").asText("");if(at.isBlank())at=e.path("metadata").path("creationTimestamp").asText("");
+            try{at=Instant.parse(at).toString();}catch(Exception ignored){at="미확인";}
+            warnings.add(new Warning(pod,reason,guidance,at));
+        }
+        warnings.sort(Comparator.comparing((Warning w)->{try{return Instant.parse(w.observedAt());}catch(Exception e){return Instant.MIN;}}).reversed());
+        return new Events("조회 완료","현재 앱 소유 Pod의 경고 이벤트 중 최근 최대 20개입니다. 보존 기간이 지난 이벤트는 없을 수 있으며, 현재 장애를 뜻하지는 않습니다. 원문 메시지는 표시·저장하지 않습니다.",warnings.stream().limit(20).toList());
+    }
     NodeReport inspectNodes(Target t,List<Pod> pods,int requestedPage) {
         if(!t.inspectNodes())return disabledNodes();
         var names=pods.stream().map(Pod::node).filter(n->!n.isBlank()).distinct().sorted().toList();
