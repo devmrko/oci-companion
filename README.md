@@ -18,6 +18,8 @@ JDK 21 이상이 필요합니다. ZIP을 풀고 `./run.sh`를 실행하세요(ma
 ```
 
 <http://127.0.0.1:8091> → OCI 프로파일 선택 → 리전·구획 선택 → 새로 고침.
+
+개인 Tailscale 접속에는 `COMPANION_EXTRA_HOSTS=<이 서버의 Tailscale IPv4>`를 설정하고 앱을 시작한 뒤 `tailscale serve --bg --tcp=8091 tcp://127.0.0.1:8091`로 연결할 수 있습니다. 접속 주소는 `http://<Tailscale IPv4>:8091`입니다. 기존 loopback 접속은 유지하며 추가 호스트는 정확히 일치할 때만 허용합니다. 접속자는 서버의 OCI 프로파일을 사용할 수 있으므로 Tailscale 접근 권한을 신뢰한 사용자로 제한하세요. 인터넷 공개·다중 사용자 인증 기능은 아닙니다. 전달 해제는 `tailscale serve --tcp=8091 off`입니다.
 배포 JAR에는 샘플 응답 어댑터를 포함하지 않습니다.
 
 ```sh
