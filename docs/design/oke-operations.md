@@ -93,3 +93,7 @@ Pod가 Ready여도 노드가 NotReady이거나 DiskPressure/MemoryPressure 상�
 ## 노드 플랫폼 표시
 
 노드 표에 nodeInfo의 CPU 아키텍처·OS와 kubernetes.io/arch·os 라벨을 별도로 표시한다. 알려진 값의 차이는 불일치, 누락은 미확인이다. 일치가 이미지 호환성이나 새 Pod 배치 성공을 보장하지 않는다. 기존 inspectNodes와 nodes get 권한을 재사용한다. [실제 화면 검증](../validation/oke-node-platforms-2026-11-10.md).
+
+## 화면 기반 OKE 조회 연결·경고 이벤트
+
+등록 앱 상태의 OKE 조회 연결에서 클러스터·namespace·Deployment를 선택해 등록·수정한다. 네이티브 OCI kubeconfig와 현재 프로파일을 사용하며 HTTP health 인증 없이 Kubernetes 상태를 조회할 수 있다. 기존 관리자 설정은 유지한다. 현재 소유 Pod의 경고 이벤트를 최대 20개 표시하고 조회 실패를 Pod 상태와 분리한다. [구현·권한·실제 검증](../validation/oke-connections-2026-11-10.md).

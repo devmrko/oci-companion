@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OKE 조회 연결')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
+<div class="form-toolbar"><h1>OKE 조회 연결</h1><a class="ui-button" href="/agents/connections">등록 앱 상태</a></div>
+<p class="notice" th:if="${setupError != null}" th:text="${setupError}"></p>
+<section class="card" th:if="${settings != null and clusters != null}">
+<form id="oke-connection-form" th:action="@{/agents/connections/oke}" method="post" class="section-stack">
+<input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="selected" th:value="${settings.id()}">
+<div class="connection-fields"><label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="100" th:value="${settings.name()}"></label><label class="form-field">환경 · 필수<input class="ui-control" name="environment" required maxlength="80" placeholder="개발 / 검증 / 운영" th:value="${settings.environment()}"></label></div>
+<div class="connection-fields"><label class="form-field">클러스터 · 필수<select class="ui-control" name="cluster" required><option value="">선택</option><option th:each="x:${clusters}" th:value="${x.id()}" th:selected="${x.id()==settings.cluster()}" th:text="${x.name()+' · '+x.state()}"></option></select></label>
+<label class="form-field">API 접속 경로<select class="ui-control" name="endpoint"><option value="PUBLIC_ENDPOINT" th:selected="${settings.endpoint()=='PUBLIC_ENDPOINT'}">공인 엔드포인트</option><option value="PRIVATE_ENDPOINT" th:selected="${settings.endpoint()=='PRIVATE_ENDPOINT'}">사설 엔드포인트</option></select></label></div>
+<p class="small muted">현재 OCI 프로파일을 사용합니다. 사설 엔드포인트는 이 앱 서버에서 해당 네트워크에 접근할 수 있어야 합니다.</p>
+<div class="form-toolbar"><button type="button" class="ui-button" data-namespaces>namespace 조회</button></div>
+<div class="connection-fields"><label class="form-field">namespace · 필수<input class="ui-control" name="namespace" list="oke-namespaces" required maxlength="63" th:value="${settings.namespace()}" placeholder="조회 후 선택 또는 직접 입력"><datalist id="oke-namespaces"></datalist></label><div class="form-field"><span>배포 앱 목록</span><button type="button" class="ui-button" data-deployments>Deployment 조회</button></div></div>
+<label class="form-field">Deployment · 필수<select class="ui-control" name="deployment" required><option value="">namespace를 지정하고 조회하세요</option><option th:if="${!settings.deployment().isEmpty()}" th:value="${settings.deployment()}" th:text="${settings.deployment()}" selected></option></select></label>
+<label><input type="checkbox" name="inspectNodes" value="true" th:checked="${settings.inspectNodes()}"> 할당 노드 상태도 조회 · nodes get 권한 필요</label>
+<p data-oke-status role="status" aria-live="polite"></p><div class="form-toolbar"><button class="ui-button" type="submit">연결 확인·저장</button></div>
+<p class="small muted">Deployment·ReplicaSet·Pod 조회를 확인한 뒤 로컬에 저장합니다. 클러스터와 앱은 변경하지 않습니다.</p>
+</form></section>
+<section class="card"><details><summary>접속 준비·권한 ?</summary><p>Companion 서버에 OCI CLI와 kubectl이 필요합니다. OCI 콘솔 → 개발자 서비스 → Kubernetes 클러스터 → 클러스터 액세스에서 접속 방법을 확인할 수 있습니다.</p><p>OCI 클러스터 조회·접근 권한과 Kubernetes RBAC를 확인하세요. namespace 목록은 namespaces list, 배포 앱 선택은 deployments list, 상태 조회는 deployments get·replicasets/pods list 권한을 사용합니다. namespace 목록 권한이 없으면 이름을 직접 입력하세요.</p><p>경고 이벤트 조회에는 해당 namespace의 events list 권한이 필요합니다. 권한이 없으면 이벤트 영역만 조회 불가로 표시합니다.</p><p>할당 노드 조회는 선택 사항이며 클러스터 범위 nodes get 권한이 필요합니다. 노드 조회 실패는 Pod 결과와 별도로 표시됩니다. 이 화면은 IAM·RBAC를 변경하지 않습니다.</p><p>OCI 네이티브 kubeconfig의 서버 주소·CA를 사용하며, 토큰 생성에는 현재 프로파일을 고정합니다. 기존 ~/.kube/config는 변경하지 않습니다. HTTP health와 로그·알림은 별도 연동입니다.</p></details></section>
+<script src="/oke-connection.js" defer></script></main></body></html>

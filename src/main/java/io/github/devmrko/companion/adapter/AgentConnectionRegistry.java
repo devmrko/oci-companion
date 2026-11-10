@@ -36,6 +36,15 @@ public class AgentConnectionRegistry {
   if(credentials(c,r,comp).stream().noneMatch(x->x.id().equals(credential)))throw new IllegalArgumentException("현재 범위의 인증 참조를 선택하세요.");
   try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));if(items.size()>=100)throw new IllegalArgumentException();String id=UUID.randomUUID().toString();items.add(new Registration(id,name,environment,"monitoring-http-v1",address,credential,c.profile(),c.tenancy(),c.user(),r,comp));write(items);return id;}catch(Exception e){throw new IllegalArgumentException("연결 등록을 저장하지 못했습니다.");}
  }
+ public synchronized String registerOke(Connection c,String r,String comp,String id,String name,String environment,Dependency cluster){
+  if(c.demo()||name==null||name.isBlank()||name.length()>100||environment==null||environment.isBlank()||environment.length()>80||!"OKE".equals(cluster.type()))throw new IllegalArgumentException("이름·환경·클러스터를 확인하세요.");
+  try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));
+   if(!id.isBlank()){if(!"oke-workload-v1".equals(get(c,r,comp,id).adapter()))throw new IllegalArgumentException();}
+   else {if(all.size()>=100)throw new IllegalArgumentException();id=UUID.randomUUID().toString();}
+   final String selected=id;all.removeIf(x->x.id().equals(selected));
+   all.add(new Registration(id,name,environment,"oke-workload-v1","","",c.profile(),c.tenancy(),c.user(),r,comp,List.of(cluster)));write(all);return id;
+  }catch(Exception e){throw new IllegalArgumentException("OKE 연결 등록을 저장하지 못했습니다.");}
+ }
  public synchronized void remove(Connection c,String r,String comp,String id){get(c,r,comp,id);try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));items.removeIf(x->x.id().equals(id));write(items);}catch(Exception e){throw new IllegalArgumentException("연결 해제를 저장하지 못했습니다.");}}
  public synchronized void dependency(Connection c,String r,String comp,String id,Dependency dependency,boolean remove){
   var current=get(c,r,comp,id);var refs=new ArrayList<>(current.dependencies());
