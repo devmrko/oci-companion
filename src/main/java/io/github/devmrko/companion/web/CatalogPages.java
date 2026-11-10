@@ -166,20 +166,20 @@ public class CatalogPages {
         if(!Set.of("registry","topics","projects","pipelines","execute","history").contains(tab)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         model.addAttribute("pipeline",pipeline);model.addAttribute("registryItems",List.of());model.addAttribute("registryLoaded",false);model.addAttribute("kind",kind);model.addAttribute("repository",repository);
         model.addAttribute("topicItems",List.of());model.addAttribute("selectedTopic",topic);model.addAttribute("topicsLoaded",false);
-        model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
+        model.addAttribute("projectsLoaded",false);model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
             if(!registeredSource.isEmpty())model.addAttribute("handoffSource",service.sources(c,s.region(),s.compartment()).stream().filter(v->v.id().equals(registeredSource)).findFirst().orElseThrow(Errors.MISSING::exception));
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
             if(tab.equals("registry")) {
                 if(!Set.of("GENERIC","CONTAINER").contains(kind))throw Errors.REGISTRY_INPUT.exception();
-                model.addAttribute("registryTicket",registryTicket(session,s,kind,pipeline,null));
-                model.addAttribute("registryItems",registry.list(c,s.region(),s.compartment(),kind));
-                model.addAttribute("registryLoaded",true);
                 String args=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment());
                 String command=kind.equals("GENERIC")?"repository":"container repository";
                 model.addAttribute("registryListCli","oci artifacts "+command+" list"+args+" --all");
                 model.addAttribute("registryCreateCli","oci artifacts "+command+" create"+args+(kind.equals("GENERIC")?" --repository-type GENERIC":" --is-public false")+" --display-name '<저장소 이름>'"+(kind.equals("GENERIC")?" --is-immutable true":""));
+                model.addAttribute("registryItems",registry.list(c,s.region(),s.compartment(),kind));
+                model.addAttribute("registryLoaded",true);
+                model.addAttribute("registryTicket",registryTicket(session,s,kind,pipeline,null));
                 if(!repository.isEmpty()) {
                     var detail=registry.read(c,s.region(),s.compartment(),kind,repository);
                     model.addAttribute("registryDetail",detail);
@@ -194,21 +194,22 @@ public class CatalogPages {
                 return "build-registry";
             }
             if(tab.equals("topics")) {
-                model.addAttribute("adminTicket",adminTicket(session,s,tab));
                 String args=" --profile "+quote(c.profile())+" --region "+quote(s.region())+" --compartment-id "+quote(s.compartment());
                 model.addAttribute("topicListCli","oci ons topic list"+args+" --all");
                 model.addAttribute("topicCreateCli","oci ons topic create"+args+" --name '<주제 이름>'");
                 model.addAttribute("topicItems",administration.topicDetails(c,s.region(),s.compartment()));
                 model.addAttribute("topicsLoaded",true);
+                model.addAttribute("adminTicket",adminTicket(session,s,tab));
                 return "build-topics";
             }
             if(tab.equals("projects") || tab.equals("pipelines")) {
                 model.addAttribute("projectItems",administration.projects(c,s.region(),s.compartment()));
+                model.addAttribute("projectsLoaded",true);
                 model.addAttribute("adminTicket",adminTicket(session,s,tab));
                 if(tab.equals("projects")) {
                     model.addAttribute("topics",List.of());
                     try { model.addAttribute("topics",administration.topics(c,s.region(),s.compartment())); }
-                    catch(BusinessException e) { model.addAttribute("topicError","알림 주제 조회 실패 · Notifications 읽기 권한을 확인하세요."); }
+                    catch(BusinessException e) { model.addAttribute("topicError","알림 주제 조회 실패 · 연결·리전·구획·Notifications 읽기 권한을 확인하세요."); }
                     return "build-projects";
                 }
             }
