@@ -8,5 +8,6 @@ public interface OkeWorkloadConnections {
  List<String> namespaces(Connection c,String region,String compartment,String cluster,String endpoint);
  List<String> deployments(Connection c,String region,String compartment,String cluster,String endpoint,String namespace);
  Settings current(Connection c,String region,String compartment,String id);
+ void remove(Connection c,String region,String compartment,String id);
  String save(Connection c,String region,String compartment,Settings settings);
 }
