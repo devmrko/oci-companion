@@ -42,6 +42,17 @@ roleRef:
 <p>경고 이벤트는 해당 namespace의 <code>events list</code>, 할당 노드는 클러스터 범위의 <code>nodes get</code> 권한을 별도로 사용합니다. 배포·수정 권한은 이 예제에 포함하지 않습니다.</p>
 <h3>3. 다시 조회</h3>
 <p>권한 반영 후 Deployment·로그를 다시 조회하세요. 사설 API는 앱 서버에서 VCN까지의 네트워크 경로도 필요합니다. 브라우저의 접속 경로와는 별개입니다.</p>
+<details><summary>사설 API 접속 준비 ?</summary><div class="section-stack">
+<p>앱 서버를 VCN 안에서 실행하거나 VPN·전용망으로 연결한 뒤 ‘사설 엔드포인트’를 선택하세요. API 주소의 TCP 6443 통신이 허용돼야 합니다.</p>
+<p>기존 SSH 접속 서버가 있다면 앱 서버에서 터널을 열고, 별도 터미널에서 Companion을 실행할 수도 있습니다. <code>SSH_HOST</code>는 사설 API에 접근 가능한 SSH 호스트로 바꾸세요.</p>
+<pre class="code-block">ssh -N -D 127.0.0.1:10891 SSH_HOST
+
+# 별도 터미널: 이 앱 실행에만 적용
+HTTPS_PROXY=socks5://127.0.0.1:10891 \
+NO_PROXY=localhost,127.0.0.1,.oraclecloud.com,.oracle.com \
+./run.sh</pre>
+<p>터널을 유지한 상태에서 namespace·Deployment·로그를 조회하세요. 이 환경 변수는 하위 HTTPS 도구에도 적용됩니다. 기존 프록시 설정이 있다면 병합하고, 사설 API 주소를 NO_PROXY에 넣지 마세요. 인증서 검증은 해제하지 않습니다.</p>
+</div></details>
 <a href="https://docs.oracle.com/en-us/iaas/Content/ContEng/Concepts/contengaboutaccesscontrol.htm" target="_blank" rel="noopener noreferrer">OCI 공식 접근 권한 안내</a>
 </div></details></section>
 </body></html>
