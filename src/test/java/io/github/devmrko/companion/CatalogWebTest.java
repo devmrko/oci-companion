@@ -325,8 +325,34 @@ class CatalogWebTest {
         org.mockito.Mockito.when(administration.topicDetails(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString()))
             .thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
         mvc.perform(get("/builds").session(session).param("tab","topics")).andExpect(status().isOk())
+            .andExpect(model().attributeDoesNotExist("adminTicket"))
+            .andExpect(model().attributeExists("topicListCli","topicCreateCli"))
             .andExpect(content().string(containsString("목록을 조회하지 못했습니다.")))
             .andExpect(content().string(not(containsString("현재 리전·구획에 알림 주제가 없습니다."))));
+    }
+
+    @Test void registryLookupFailureDoesNotOfferCreation() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(registry.list(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        mvc.perform(get("/builds").session(session).param("tab","registry").param("kind","GENERIC")).andExpect(status().isOk())
+            .andExpect(model().attribute("registryLoaded",false)).andExpect(model().attributeDoesNotExist("registryTicket"))
+            .andExpect(model().attributeExists("registryListCli","registryCreateCli"));
+    }
+
+    @Test void projectLookupFailureIsNotAnEmptyListAndDoesNotOfferCreation() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        mvc.perform(get("/builds").session(session).param("tab","projects")).andExpect(status().isOk())
+            .andExpect(model().attribute("projectsLoaded",false)).andExpect(model().attributeDoesNotExist("adminTicket"));
+    }
+
+    @Test void emptyProjectsAreLoadedAndTopicFailureDoesNotSuggestCreatingAnotherTopic() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        org.mockito.Mockito.when(administration.projects(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.List.of());
+        org.mockito.Mockito.when(administration.topics(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenThrow(io.github.devmrko.companion.service.Errors.CLOUD.exception());
+        mvc.perform(get("/builds").session(session).param("tab","projects")).andExpect(status().isOk())
+            .andExpect(model().attribute("projectsLoaded",true)).andExpect(model().attributeExists("topicError"))
+            .andExpect(content().string(not(containsString("선택 가능한 알림 주제가 없습니다."))));
     }
 
     @Test void projectAndPipelineTabsUseRealAdministrationPortAndScopedSingleUseCreation() throws Exception {
