@@ -97,3 +97,7 @@ Pod가 Ready여도 노드가 NotReady이거나 DiskPressure/MemoryPressure 상�
 ## 화면 기반 OKE 조회 연결·경고 이벤트
 
 등록 앱 상태의 OKE 조회 연결에서 클러스터·namespace·Deployment를 선택해 등록·수정한다. 네이티브 OCI kubeconfig와 현재 프로파일을 사용하며 HTTP health 인증 없이 Kubernetes 상태를 조회할 수 있다. 기존 관리자 설정은 유지한다. 현재 소유 Pod의 경고 이벤트를 최대 20개 표시하고 조회 실패를 Pod 상태와 분리한다. [구현·권한·실제 검증](../validation/oke-connections-2026-11-10.md).
+
+## Pod 로그·배포 이력 연결·로컬 해제
+
+등록 앱의 Pod 로그에서 일반·init 컨테이너, 최근 줄 수, 현재/직전 실행을 선택한다. 조회 전후 Pod UID를 확인하고 최대 64KiB만 반환한다. 배포 이력은 기록된 환경 ID를 기준으로 현재 OKE 연결을 찾으며 당시 앱/버전 일치를 추정하지 않는다. OKE 연결 해제는 로컬 등록·현재 생성 kubeconfig만 정리한다. [권한·실제 검증](../validation/oke-logs-2026-11-10.md).

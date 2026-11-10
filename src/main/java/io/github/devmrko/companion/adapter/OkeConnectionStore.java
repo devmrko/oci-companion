@@ -27,6 +27,9 @@ public class OkeConnectionStore {
   if(!id.equals(t.appId())||!c.profile().equals(t.profile())||!c.tenancy().equals(t.tenancy())||!c.user().equals(t.user())||!r.equals(t.region())||!comp.equals(t.compartment()))throw new IllegalArgumentException();
   return t;
  }catch(Exception e){throw new IllegalArgumentException("OKE 조회 연결 설정을 읽지 못했습니다.");}}
+ public synchronized void remove(Connection c,String r,String comp,String id)throws Exception{
+  get(c,r,comp,id);var p=path(c,r,comp,id);if(Files.isSymbolicLink(root)||Files.isSymbolicLink(p))throw new IllegalArgumentException();Files.deleteIfExists(p);
+ }
  public synchronized void save(Connection c,String r,String comp,String id,OkeWorkloadHealth.Target t)throws Exception{
   if(!id.equals(t.appId())||!c.profile().equals(t.profile())||!c.tenancy().equals(t.tenancy())||!c.user().equals(t.user())||!r.equals(t.region())||!comp.equals(t.compartment()))throw new IllegalArgumentException();
   Files.createDirectories(root);if(Files.isSymbolicLink(root))throw new IllegalArgumentException();

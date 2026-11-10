@@ -66,21 +66,8 @@ public class OkeWorkloadHealth {
     public Status check(Connection c,String region,String compartment,String appId) {return check(c,region,compartment,appId,0);}
     public Status check(Connection c,String region,String compartment,String appId,int nodePage) {
         try {
-            if(c.demo())throw new IllegalArgumentException();
-            var app=registry.get(c,region,compartment,appId);
-            var t=managed==null?null:managed.get(c,region,compartment,appId);
-            if(t==null){
-                if(!Files.exists(config))return empty("미설정","OKE 조회 연결에서 클러스터와 앱을 선택하세요.");
-                if(Files.isSymbolicLink(config)||Files.size(config)>1_000_000)throw new IllegalArgumentException();
-                var matches=Arrays.stream(json.readValue(Files.readString(config),Target[].class))
-                    .filter(x->appId.equals(x.appId())&&c.profile().equals(x.profile())&&c.tenancy().equals(x.tenancy())
-                        &&c.user().equals(x.user())&&region.equals(x.region())&&compartment.equals(x.compartment())).toList();
-                if(matches.isEmpty())return empty("미설정","현재 앱·사용자·리전·구획에 맞는 Kubernetes 조회 연결이 없습니다.");
-                if(matches.size()!=1)throw new IllegalArgumentException();t=matches.getFirst();
-            }
-            validate(t);final var target=t;
-            var cluster=app.dependencies().stream().filter(d->d.type().equals("OKE")&&d.ocid().equals(target.clusterId())).findFirst().orElseThrow();
-            if(!cloud.check(c,region,compartment,cluster).verified())throw new IllegalArgumentException();
+            var t=target(c,region,compartment,appId);
+            if(t==null)return empty("미설정","OKE 조회 연결에서 클러스터와 앱을 선택하세요.");
             var deployment=read(t,"deployment",t.deployment());
             var sets=read(t,"replicasets",null);
             var pods=read(t,"pods",null);
@@ -90,6 +77,24 @@ public class OkeWorkloadHealth {
             if(e instanceof InterruptedException)Thread.currentThread().interrupt();
             return empty("조회 불가","관리자 연결 설정·OCI 조회 권한·Kubernetes RBAC·API 터널을 확인하세요. 앱 중지로 단정할 수 없습니다.");
         }
+    }
+    Target target(Connection c,String region,String compartment,String appId)throws Exception {
+            if(c.demo())throw new IllegalArgumentException();
+            var app=registry.get(c,region,compartment,appId);
+            var t=managed==null?null:managed.get(c,region,compartment,appId);
+            if(t==null){
+                if(!Files.exists(config))return null;
+                if(Files.isSymbolicLink(config)||Files.size(config)>1_000_000)throw new IllegalArgumentException();
+                var matches=Arrays.stream(json.readValue(Files.readString(config),Target[].class))
+                    .filter(x->appId.equals(x.appId())&&c.profile().equals(x.profile())&&c.tenancy().equals(x.tenancy())
+                        &&c.user().equals(x.user())&&region.equals(x.region())&&compartment.equals(x.compartment())).toList();
+                if(matches.isEmpty())return null;
+                if(matches.size()!=1)throw new IllegalArgumentException();t=matches.getFirst();
+            }
+            validate(t);final var target=t;
+            var cluster=app.dependencies().stream().filter(d->d.type().equals("OKE")&&d.ocid().equals(target.clusterId())).findFirst().orElseThrow();
+            if(!cloud.check(c,region,compartment,cluster).verified())throw new IllegalArgumentException();
+            return t;
     }
     private static void validate(Target t) {
         for(String name:List.of(t.namespace(),t.deployment()))
@@ -109,18 +114,22 @@ public class OkeWorkloadHealth {
         var arguments=new ArrayList<String>();arguments.add("nodes");arguments.addAll(names);return execute(t,arguments);
     }
     private JsonNode execute(Target t,List<String> resourceArguments)throws Exception {
+        var args=new ArrayList<String>();args.add("get");args.addAll(resourceArguments);args.addAll(List.of("-o","json"));
+        return json.readTree(command(t,args,2_000_000));
+    }
+    byte[] command(Target t,List<String> command,int limit)throws Exception {
         if(!Path.of(kubectl).isAbsolute())throw new IllegalArgumentException();
         var args=new ArrayList<>(List.of(kubectl,"--kubeconfig",t.kubeconfig(),"--namespace",t.namespace(),"--request-timeout=5s"));
-        if(t.server()!=null&&!t.server().isBlank()){args.add("--server="+t.server());}
-        if(t.tlsServerName()!=null&&!t.tlsServerName().isBlank()){args.add("--tls-server-name="+t.tlsServerName());}
-        args.add("get");args.addAll(resourceArguments);args.add("-o");args.add("json");
+        if(t.server()!=null&&!t.server().isBlank())args.add("--server="+t.server());
+        if(t.tlsServerName()!=null&&!t.tlsServerName().isBlank())args.add("--tls-server-name="+t.tlsServerName());
+        args.addAll(command);
         var process=new ProcessBuilder(args).redirectError(ProcessBuilder.Redirect.DISCARD).start();
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
-            var output=executor.submit(()->{try(var in=process.getInputStream()){return in.readNBytes(2_000_001);}});
+            var output=executor.submit(()->{try(var in=process.getInputStream()){return in.readNBytes(limit+1);}});
             try {
                 var bytes=output.get(8,TimeUnit.SECONDS);
-                if(bytes.length>2_000_000||!process.waitFor(1,TimeUnit.SECONDS)||process.exitValue()!=0)throw new IllegalArgumentException();
-                return json.readTree(bytes);
+                if(bytes.length>limit||!process.waitFor(1,TimeUnit.SECONDS)||process.exitValue()!=0)throw new IllegalArgumentException();
+                return bytes;
             } finally {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();output.cancel(true);
             }

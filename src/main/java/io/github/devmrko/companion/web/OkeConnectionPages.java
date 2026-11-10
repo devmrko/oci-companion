@@ -13,9 +13,9 @@ import java.util.List;
 public class OkeConnectionPages {
  private final CatalogPages catalog;private final OkeWorkloadConnections connections;
  public OkeConnectionPages(CatalogPages catalog,OkeWorkloadConnections connections){this.catalog=catalog;this.connections=connections;}
- @GetMapping("/agents/connections/oke") String page(Authentication auth,HttpServletRequest req,Model model,@RequestParam(defaultValue="") String selected){
+ @GetMapping("/agents/connections/oke") String page(Authentication auth,HttpServletRequest req,Model model,@RequestParam(defaultValue="") String selected,@RequestParam(defaultValue="") String cluster){
   var c=SecurityConfig.connection(auth);catalog.navigation(auth,req,model);var scope=catalog.selection(c,req.getSession());model.addAttribute("selection",scope);model.addAttribute("scopeBack","/agents/connections/oke");
-  try{if(c.demo()||req.getSession().getAttribute("scopeInvalid")!=null)throw new IllegalArgumentException("실제 OCI 프로파일과 리전·구획을 선택하세요.");if(!model.containsAttribute("settings"))model.addAttribute("settings",connections.current(c,scope.region(),scope.compartment(),selected));model.addAttribute("clusters",connections.clusters(c,scope.region(),scope.compartment()));}
+  try{if(c.demo()||req.getSession().getAttribute("scopeInvalid")!=null)throw new IllegalArgumentException("실제 OCI 프로파일과 리전·구획을 선택하세요.");var available=connections.clusters(c,scope.region(),scope.compartment());if(!model.containsAttribute("settings")){var current=connections.current(c,scope.region(),scope.compartment(),selected);if(selected.isBlank()&&!cluster.isBlank()&&available.stream().anyMatch(x->x.id().equals(cluster)))current=new OkeWorkloadConnections.Settings("","","",cluster,"PUBLIC_ENDPOINT","","",false);model.addAttribute("settings",current);}model.addAttribute("clusters",available);}
   catch(Exception e){model.addAttribute("setupError","OKE 연결 정보를 읽지 못했습니다. 현재 범위의 클러스터 조회 권한과 연결 설정을 확인하세요.");}return "oke-connection";
  }
  public record Options(List<String> items,String error){}
@@ -23,6 +23,10 @@ public class OkeConnectionPages {
   try{var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(c.demo()||session.getAttribute("scopeInvalid")!=null||!region.equals(s.region())||!compartment.equals(s.compartment()))throw new IllegalArgumentException("리전·구획이 바뀌었습니다. 화면을 다시 여세요.");
    return new Options(namespace.isBlank()?connections.namespaces(c,region,compartment,cluster,endpoint):connections.deployments(c,region,compartment,cluster,endpoint,namespace),"");
   }catch(IllegalArgumentException e){return new Options(List.of(),e.getMessage());}
+ }
+ @PostMapping("/agents/connections/oke/remove") String remove(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam String selected,@RequestParam(defaultValue="false") boolean confirmed){
+  try{var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(!confirmed||c.demo()||session.getAttribute("scopeInvalid")!=null||!region.equals(s.region())||!compartment.equals(s.compartment()))throw new IllegalArgumentException("현재 범위와 연결 해제 확인을 확인하세요.");connections.remove(c,region,compartment,selected);flash.addFlashAttribute("message","조회 연결과 현재 kubeconfig를 해제했습니다. 클라우드 앱은 유지됩니다.");}
+  catch(IllegalArgumentException e){flash.addFlashAttribute("message",e.getMessage());}return "redirect:/agents/connections";
  }
  @PostMapping("/agents/connections/oke") String save(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam(defaultValue="") String selected,@RequestParam String name,@RequestParam String environment,@RequestParam String cluster,@RequestParam String endpoint,@RequestParam String namespace,@RequestParam String deployment,@RequestParam(defaultValue="false") boolean inspectNodes){
   try{var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(c.demo()||session.getAttribute("scopeInvalid")!=null||!region.equals(s.region())||!compartment.equals(s.compartment()))throw new IllegalArgumentException("리전·구획이 바뀌었습니다. 다시 선택하세요.");
