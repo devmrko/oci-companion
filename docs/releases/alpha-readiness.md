@@ -39,7 +39,7 @@
 
 OKE 상태·Pod 로그 조회에는 앱 서버의 OCI CLI와 kubectl이 필요합니다. `COMPANION_OCI_CLI`, `COMPANION_KUBECTL`에 실행 파일의 절대 경로를 지정하고 실행하세요. OKE 조회 연결 화면에서 파일·실행 권한을 확인합니다. 인증·API 네트워크·RBAC 성공을 의미하지는 않습니다.
 
-OKE 공인 API와 임시 계정의 실제 RBAC 거부·부여·로그 권한 회수를 화면에서 검증했습니다. namespace 목록 권한 없이 이름을 직접 입력해 연결할 수 있습니다. [권한 검증](../validation/oke-rbac-2026-11-10.md). 사설 API 성공은 미검증입니다. 앱 서버에 사설 경로가 없고, 임시 Bastion 생성은 한도 초과, 대체 VM 생성은 404로 실패했습니다. 권한만으로 네트워크 경로가 생기지는 않습니다.
+OKE 공인 API와 임시 계정의 실제 RBAC 거부·부여·로그 권한 회수를 화면에서 검증했습니다. namespace 목록 권한 없이 이름을 직접 입력해 연결할 수 있습니다. [권한 검증](../validation/oke-rbac-2026-11-10.md). 사설 API는 같은 VCN의 SSH 접속 서버와 SOCKS5 경로로 namespace·Deployment·상태·Pod 로그를 실제 조회했습니다. 터널 중단 시 조회 불가, 복원 시 준비 완료를 확인했습니다. 앱 서버에 해당 경로를 별도로 준비해야 합니다. VPN·전용회선과 관리형 Bastion은 이번 검증 범위가 아닙니다. [사설 접속 검증](../validation/oke-private-api-2026-11-10.md).
 
 ## 권한·실패 처리
 
@@ -98,3 +98,7 @@ OKE 도구 경로·실행 권한 안내, `.data`와 `.tools` 보존 안내를 �
 Container Instances의 사설 OCIR policy 준비·단일 인스턴스 제한 안내와 OKE IAM·namespace RBAC 예제를 추가했습니다. 실제 최소 권한 계정에서 OKE 조회·로그 허용 및 거부를 확인했습니다. 기존 기능의 검증 범위와 외부 신규 사용자 검증의 제한은 유지합니다.
 
 [설치·업데이트 검증](../validation/alpha10-package-2026-11-10.md).
+
+## alpha.11 반영
+
+사설 OKE 접속 도움말에 앱 서버의 네트워크 준비와 기존 SSH 서버를 이용하는 실행 예제를 추가했습니다. OCI 네이티브 사설 kubeconfig·CA 인증서 검증을 유지하며 kubectl의 HTTPS_PROXY 환경 설정을 사용합니다. 외부 신규 사용자 사용성 검증은 여전히 별도입니다.
