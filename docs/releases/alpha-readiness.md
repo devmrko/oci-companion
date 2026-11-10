@@ -82,3 +82,13 @@ OKE 도구 경로·실행 권한 안내, `.data`와 `.tools` 보존 안내를 �
 [조회 연결·이벤트](../validation/oke-connections-2026-11-10.md), [Pod 로그·이력 연결](../validation/oke-logs-2026-11-10.md), [서버 도구](../validation/oke-tools-2026-11-10.md).
 
 [alpha.8 설치·업데이트·전체 흐름 검증](../validation/alpha8-release-2026-11-10.md).
+
+## alpha.9 반영
+
+새 프로젝트의 첫 소스·빌드 명세 업로드, 명세 읽기 실패, 산출물 전달 권한 확인 방법을 화면 도움말에 추가했습니다. 프로젝트 조회 실패와 정상 빈 목록을 구분하고, 알림·Registry 조회 실패 시 생성 폼을 숨깁니다. CLI 확인 방법은 유지합니다.
+
+새 프로젝트의 빌드·보고서·VM 배포와 임시 조회 전용 계정의 조회 성공·작업 거부를 실제 화면에서 검증했습니다. 404 응답만으로 권한 부족을 단정하지 않으며, 조회 성공도 생성 권한을 보장하지 않습니다. 기존 alpha.8의 미검증 범위는 유지합니다.
+
+[새 프로젝트 검증](../validation/first-project-2026-11-10.md), [조회 전용 계정 검증](../validation/restricted-profile-2026-11-10.md).
+
+[alpha.9 설치·업데이트 검증](../validation/alpha9-package-2026-11-10.md).
