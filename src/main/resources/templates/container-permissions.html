@@ -6,7 +6,7 @@
 <pre class="code-block">ALL {resource.type='computecontainerinstance', resource.id='&lt;인스턴스 OCID&gt;'}
 
 Allow dynamic-group &lt;동적 그룹&gt; to read repos in compartment id &lt;저장소 구획 OCID&gt; where target.repo.name='&lt;저장소 이름&gt;'</pre>
-<p class="small muted">동적 그룹 생성이 한도 초과로 거절되면 관리자가 그룹 사용 현황과 서비스 한도를 확인해야 합니다. 앱은 기존 그룹을 삭제하거나 IAM 권한을 자동 변경하지 않습니다.</p>
+<p class="small muted">동적 그룹 생성이 한도 초과로 거절되면 관리자가 그룹 사용 현황과 서비스 한도를 확인해야 합니다. 기존 그룹을 재사용하려면 일치 규칙뿐 아니라 연결 정책 전체와 다른 리소스에 미치는 영향도 확인하세요. 앱은 기존 그룹을 삭제하거나 IAM 권한을 자동 변경하지 않습니다.</p>
 <p class="small muted">OCIR 사설 이미지는 리소스 주체 IAM을 사용합니다. Vault 이미지 인증은 외부 Registry용입니다. FAILED 생성 건은 원인을 해결한 뒤 삭제·재생성하세요. 같은 생성 요청을 반복하기 전에 OCI 작업 상태를 확인하세요.</p>
 <a href="https://docs.oracle.com/en-us/iaas/Content/container-instances/permissions/policy-reference.htm" target="_blank" rel="noopener noreferrer">Container Instances IAM ↗</a>
 </details></body></html>

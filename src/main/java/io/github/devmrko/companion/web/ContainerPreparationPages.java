@@ -25,7 +25,7 @@ public class ContainerPreparationPages {
   try{model.addAttribute("instances",preparation.list(c,scope.region(),scope.compartment()));}catch(BusinessException e){model.addAttribute("listError",e.getMessage());}
   if(!instance.isBlank())return "container-preparation";
   model.addAttribute("images",new Registry.Page(List.of(),""));
-  try{model.addAttribute("pullSecrets",preparation.pullSecrets(c,scope.region(),scope.compartment()));}catch(BusinessException e){model.addAttribute("pullSecretError","Vault 목록 조회 실패 · secrets 조회 권한을 확인하세요. 공개 이미지는 Secret 없이 사용할 수 있습니다.");}
+  try{model.addAttribute("pullSecrets",preparation.pullSecrets(c,scope.region(),scope.compartment()));}catch(BusinessException e){model.addAttribute("pullSecretError","Vault 목록 조회 실패 · secrets 조회 권한을 확인하세요. 공개 이미지·OCIR 리소스 주체 IAM에는 Vault Secret이 필요하지 않습니다.");}
   try{var options=preparation.options(c,scope.region(),scope.compartment(),domain);model.addAttribute("options",options);model.addAttribute("selectedShape",options.shapes().stream().filter(x->x.name().equals(shape)).findFirst().orElse(null));model.addAttribute("repositories",registry.list(c,scope.region(),scope.compartment(),"CONTAINER"));if(!repository.isBlank())model.addAttribute("images",registry.artifacts(c,scope.region(),scope.compartment(),"CONTAINER",repository,imagePage));}catch(BusinessException e){model.addAttribute("message",e.getMessage());}
   return "container-preparation";
  }
