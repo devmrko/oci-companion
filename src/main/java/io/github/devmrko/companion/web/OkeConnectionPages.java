@@ -11,9 +11,11 @@ import java.util.List;
 
 @Controller @Profile("!legacy")
 public class OkeConnectionPages {
+ private final OkeToolReadiness tools;
  private final CatalogPages catalog;private final OkeWorkloadConnections connections;
- public OkeConnectionPages(CatalogPages catalog,OkeWorkloadConnections connections){this.catalog=catalog;this.connections=connections;}
+ public OkeConnectionPages(CatalogPages catalog,OkeWorkloadConnections connections,OkeToolReadiness tools){this.catalog=catalog;this.connections=connections;this.tools=tools;}
  @GetMapping("/agents/connections/oke") String page(Authentication auth,HttpServletRequest req,Model model,@RequestParam(defaultValue="") String selected,@RequestParam(defaultValue="") String cluster){
+  model.addAttribute("okeTools",tools.tools());
   var c=SecurityConfig.connection(auth);catalog.navigation(auth,req,model);var scope=catalog.selection(c,req.getSession());model.addAttribute("selection",scope);model.addAttribute("scopeBack","/agents/connections/oke");
   try{if(c.demo()||req.getSession().getAttribute("scopeInvalid")!=null)throw new IllegalArgumentException("실제 OCI 프로파일과 리전·구획을 선택하세요.");var available=connections.clusters(c,scope.region(),scope.compartment());if(!model.containsAttribute("settings")){var current=connections.current(c,scope.region(),scope.compartment(),selected);if(selected.isBlank()&&!cluster.isBlank()&&available.stream().anyMatch(x->x.id().equals(cluster)))current=new OkeWorkloadConnections.Settings("","","",cluster,"PUBLIC_ENDPOINT","","",false);model.addAttribute("settings",current);}model.addAttribute("clusters",available);}
   catch(Exception e){model.addAttribute("setupError","OKE 연결 정보를 읽지 못했습니다. 현재 범위의 클러스터 조회 권한과 연결 설정을 확인하세요.");}return "oke-connection";

@@ -1,6 +1,15 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OKE 조회 연결')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
 <div class="form-toolbar"><h1>OKE 조회 연결</h1><a class="ui-button" href="/agents/connections">등록 앱 상태</a></div>
 <p class="notice" th:if="${setupError != null}" th:text="${setupError}"></p>
+<section class="card section-stack" aria-label="서버 도구 확인">
+<h2>서버 도구</h2>
+<div class="connection-fields"><div class="form-field" th:each="tool:${okeTools}">
+<strong th:text="${tool.name()+' · '+(tool.available()?'실행 파일 확인':'설정 필요')}"></strong>
+<code class="code-block" th:text="${tool.available()?tool.resolved():tool.configured()}"></code>
+<span class="small muted" th:unless="${tool.available()}">앱 서버에 설치한 후 <code th:text="${tool.setting()}"></code>에 실행 파일의 절대 경로를 지정하고 앱을 재시작하세요.</span>
+</div></div>
+<p class="small muted">파일과 실행 권한만 확인합니다. 인증·클러스터 접근·RBAC는 아래 조회에서 확인합니다. 원격 접속 중이면 브라우저 기기가 아닌 앱 서버에 설치하세요.</p>
+</section>
 <section class="card" th:if="${settings != null and clusters != null}">
 <form id="oke-connection-form" th:action="@{/agents/connections/oke}" method="post" class="section-stack">
 <input type="hidden" name="region" th:value="${selection.region()}"><input type="hidden" name="compartment" th:value="${selection.compartment()}"><input type="hidden" name="selected" th:value="${settings.id()}">
