@@ -102,3 +102,7 @@ Container Instances의 사설 OCIR policy 준비·단일 인스턴스 제한 안
 ## alpha.11 반영
 
 사설 OKE 접속 도움말에 앱 서버의 네트워크 준비와 기존 SSH 서버를 이용하는 실행 예제를 추가했습니다. OCI 네이티브 사설 kubeconfig·CA 인증서 검증을 유지하며 kubectl의 HTTPS_PROXY 환경 설정을 사용합니다. 외부 신규 사용자 사용성 검증은 여전히 별도입니다.
+
+## VM 신규 생성 검증 범위
+
+[프로파일 비교 검증](../validation/vm-creation-comparison-2026-11-11.md): 다른 프로파일에서 SDK 생성·SSH 접속·앱 화면 조회가 성공했습니다. DEFAULT 생성 404의 원인은 미확정입니다. 새 VM 생성 도우미와 외부 신규 사용자의 전체 흐름 검증은 남아 있습니다.
