@@ -56,7 +56,8 @@ public class OciBuildHandoff implements BuildHandoff {
     }
     public Proof verify(Connection c,String region,String compartment,String buildPipeline,String buildRun,String deployPipeline){
         var detail=builds.detail(c,region,compartment,buildPipeline,buildRun);
-        if(!"SUCCEEDED".equals(detail.state())||!"SUCCEEDED".equals(detail.buildState())||!"SUCCEEDED".equals(detail.storageState()))throw Errors.HANDOFF.exception();
+        if(!"SUCCEEDED".equals(detail.state())||!"SUCCEEDED".equals(detail.buildState()))throw Errors.HANDOFF.exception();
+        if(!"SUCCEEDED".equals(detail.storageState())&&BuildImageIdentity.inspect(detail).stream().noneMatch(BuildImageIdentity.Image::verified))throw Errors.HANDOFF.exception();
         try(var devops=builds.client(c,region);var registry=artifacts(c,region)){
             var pipeline=devops.getDeployPipeline(GetDeployPipelineRequest.builder().deployPipelineId(deployPipeline).build()).getDeployPipeline();
             if(!compartment.equals(pipeline.getCompartmentId()))throw Errors.SCOPE.exception();
@@ -71,6 +72,7 @@ public class OciBuildHandoff implements BuildHandoff {
                 for(var id:oke.getKubernetesManifestDeployArtifactIds())manifests.add(devops.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build()).getDeployArtifact());
                 return imageProof(detail,region,buildPipeline,deployPipeline,OkeManifests.inspect(manifests,compartment,pipeline.getProjectId(),oke.getNamespace()));
             }
+            if(!"SUCCEEDED".equals(detail.storageState()))throw Errors.HANDOFF.exception();
             var sources=new TreeSet<String>();
             for(var a:detail.artifacts())if("Artifact Registry".equals(a.kind())){
                 var stored=registry.getGenericArtifact(GetGenericArtifactRequest.builder().artifactId(a.id()).build()).getGenericArtifact();

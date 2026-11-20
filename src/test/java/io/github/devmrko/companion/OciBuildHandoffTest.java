@@ -39,6 +39,9 @@ class OciBuildHandoffTest {
   when(devops.getDeployStage(any())).thenReturn(GetDeployStageResponse.builder().deployStage(OkeDeployStage.builder().id("stage").deployPipelineId("dp").projectId("project").compartmentId("comp").namespace("testing").kubernetesManifestDeployArtifactIds(List.of("manifest")).build()).build());
   when(devops.getDeployArtifact(any())).thenReturn(GetDeployArtifactResponse.builder().deployArtifact(OkeManifestsTest.artifact(OkeManifestsTest.YAML)).build());
   assertEquals("IMAGE",adapter.verify(c,"ap-seoul-1","comp","bp","br","dp").kind());
+  var exported=io.github.devmrko.companion.service.BuildImageIdentity.exported("publish",OkeManifestsTest.IMAGE,"stage").orElseThrow();
+  when(builds.detail(c,"ap-seoul-1","comp","bp","br")).thenReturn(new BuildHistory.Detail("br","run","SUCCEEDED","",List.of(new BuildHistory.Step("build","SUCCEEDED","BUILD")),List.of(exported)));
+  assertEquals("IMAGE",adapter.verify(c,"ap-seoul-1","comp","bp","br","dp").kind());
   when(devops.getDeployArtifact(any())).thenReturn(GetDeployArtifactResponse.builder().deployArtifact(OkeManifestsTest.artifact(OkeManifestsTest.YAML.replace("a".repeat(64),"b".repeat(64)))).build());
   assertThrows(RuntimeException.class,()->adapter.verify(c,"ap-seoul-1","comp","bp","br","dp"));
   verify(registry,never()).getGenericArtifact(any());

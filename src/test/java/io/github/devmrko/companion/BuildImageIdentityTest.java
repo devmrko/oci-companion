@@ -6,6 +6,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 class BuildImageIdentityTest {
  String digest="sha256:"+"a".repeat(64),address="icn.ocir.io/namespace/repo/app";
+ @Test void exportedImageDoesNotInventDeliverStageSuccess(){
+  var output=BuildImageIdentity.exported("publish",address+"@"+digest,"stage").orElseThrow();
+  var detail=new BuildHistory.Detail("run","run","SUCCEEDED","",List.of(new BuildHistory.Step("build","SUCCEEDED","BUILD")),List.of(output));
+  assertTrue(BuildImageIdentity.inspect(detail).getFirst().verified());
+  assertEquals("기록 없음",detail.storageState());
+  assertTrue(Readiness.deploymentLink(detail,"pipeline").contains("sourceRun=run"));
+  assertTrue(BuildImageIdentity.exported("publish",address+":latest","stage").isEmpty());
+  assertTrue(BuildImageIdentity.exported("publish","secret-value","stage").isEmpty());
+ }
  @Test void pinsRecordedHashWithoutResolvingCurrentTag(){
   assertEquals(address+"@"+digest,BuildImageIdentity.reference(address+":latest",digest));
   assertEquals(address+"@"+digest,BuildImageIdentity.reference(address+"@"+digest,digest));

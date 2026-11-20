@@ -23,7 +23,7 @@ public final class Readiness {
    State state=switch(check.state()){case "확인"->State.PASS;case "누락"->State.FAIL;case "오류"->check.message().contains("불일치")?State.FAIL:State.UNKNOWN;default->inactive?State.NA:State.UNKNOWN;};
    if(storage&&state==State.PASS&&stages.stream().anyMatch(s->!specs.containsKey(s.id())||specs.get(s.id()).content().isBlank()))state=State.UNKNOWN;
    String name=check.name().equals("단계 상태")?"빌드 설정":check.name().equals("실행 권한·로그")?"권한·로그":check.name().replace("명세 · ","빌드 명세 · ").replace("저장 위치","산출물 저장");
-   String note=storage&&state==State.PASS?"출력 이름·저장소 연결 확인":storage&&state==State.UNKNOWN&&check.state().equals("확인")?"저장 위치 연결 · 명세 출력 미확인":inactive?"빌드·테스트만 실행 · 저장 생략":check.name().equals("실행 권한·로그")?"조회 권한과 실행 주체 권한은 별도":check.message().equals("ACTIVE 빌드 단계")?"실행 가능한 빌드 단계":check.message();
+   String note=storage&&state==State.PASS?"출력 이름·저장소 연결 확인":storage&&state==State.UNKNOWN&&check.state().equals("확인")?"저장 위치 연결 · 명세 출력 미확인":inactive?"OCI 전달 단계 없음 · 사용자 명령은 별도":check.name().equals("실행 권한·로그")?"조회 권한과 실행 주체 권한은 별도":check.message().equals("ACTIVE 빌드 단계")?"실행 가능한 빌드 단계":check.message();
    out.add(new Item(storage?"storage":check.name().startsWith("명세")?"spec":check.name().equals("단계 상태")?"build":"permissions",name,storage?"조건부 필수":"필수",!inactive,state,note,check.name().equals("실행 권한·로그")?execute+"#permissions":config+(storage?"#build-storage-setup":check.name().startsWith("명세")?"#build-specification-form":state==State.FAIL?"#build-stage-create":"#build-pipeline-setup"),check.name().equals("실행 권한·로그")?"권한 안내":"설정 확인"));
   }
   boolean deploy=BuildChecks.purpose(definition).equals("deploy");
