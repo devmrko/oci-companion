@@ -1,0 +1,7 @@
+<!DOCTYPE html><html xmlns:th="http://www.thymeleaf.org"><body>
+<nav th:fragment="links(pipeline)" th:if="${!#strings.isEmpty(pipeline)}" class="form-toolbar build-context" aria-label="선택한 빌드 작업">
+<span class="small muted">선택한 파이프라인</span>
+<a class="ui-button" th:href="@{/readiness(pipeline=${pipeline})}">준비 상태 재조회</a>
+<a class="ui-button" th:href="@{/builds(tab='execute',pipeline=${pipeline})}">실행 설정</a>
+<a class="ui-button" th:href="@{/builds(tab='history',pipeline=${pipeline})}">이력·보고서</a>
+</nav></body></html>

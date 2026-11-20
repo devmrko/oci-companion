@@ -302,7 +302,7 @@ public class CatalogPages {
                 if(!selectedRun.isEmpty()) {
                     if(runs.stream().noneMatch(r->r.id().equals(selectedRun))) throw Errors.MISSING.exception();
                     var execution=builds.detail(c,s.region(),s.compartment(),selected,selectedRun);
-                    model.addAttribute("detail",execution);model.addAttribute("executionChecks",Readiness.result(execution));
+                    model.addAttribute("detail",execution);model.addAttribute("executionChecks",Readiness.result(execution,pipeline));
                 }
             }
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }

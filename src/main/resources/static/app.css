@@ -1049,3 +1049,5 @@ a:focus-visible, .ui-button:focus-visible {
 .check-note { margin:0; font-size:12px; color:#625f5b; overflow-wrap:anywhere; }
 .check-action { margin-top:auto; }
 .status-legend { font-size:12px; }
+
+.build-context { margin-block: .75rem 1rem; }
