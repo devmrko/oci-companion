@@ -13,6 +13,14 @@ class ReadinessTest {
   var failed=new BuildHistory.Detail("run/1","run","FAILED","",steps,artifacts);
   assertEquals("/deployments",Readiness.result(failed,"pipe/1").items().get(3).href());
  }
+ @Test void containerOnlyBuildDoesNotEnterVmFileVerification(){
+  var steps=List.of(new BuildHistory.Step("build","SUCCEEDED","BUILD"),new BuildHistory.Step("save","SUCCEEDED","DELIVER"));
+  var image=new BuildHistory.StoredArtifact("image","Container Registry","repo:tag","sha256:abc","image-id");
+  var detail=new BuildHistory.Detail("run","run","SUCCEEDED","",steps,List.of(image));
+  assertFalse(Readiness.fileHandoff(detail));
+  assertEquals("/deployments",Readiness.deploymentLink(detail,"pipeline"));
+  assertEquals("/deployments",Readiness.result(detail,"pipeline").items().get(3).href());
+ }
  private BuildDefinition.Definition definition(boolean source,boolean deliver){
   var stages=new ArrayList<BuildDefinition.Stage>();stages.add(new BuildDefinition.Stage("b","build","빌드","ACTIVE",List.of(),"image","build.yaml",60,source?List.of(new BuildDefinition.Source("s","s","OCI","repo","url","main",true)):List.of(),List.of()));
   if(deliver)stages.add(new BuildDefinition.Stage("d","save","산출물 전달","ACTIVE",List.of("b"),"","",0,List.of(),List.of()));

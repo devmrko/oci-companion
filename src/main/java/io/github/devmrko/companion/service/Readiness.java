@@ -44,13 +44,19 @@ public final class Readiness {
  }
  public static Summary unknown(String message){return summarize(List.of(new Item("query","준비 상태","필수",true,State.UNKNOWN,message,"/guides#permissions","연결·권한 안내")));}
  private static State resultState(String state){return switch(state){case "SUCCEEDED"->State.PASS;case "FAILED"->State.FAIL;case "CANCELED"->State.WARN;default->State.UNKNOWN;};}
+ public static boolean fileHandoff(BuildHistory.Detail detail){
+  return detail.state().equals("SUCCEEDED")&&detail.storageState().equals("SUCCEEDED")&&detail.artifacts().stream().anyMatch(a->a.kind().equals("Artifact Registry"));
+ }
+ public static String deploymentLink(BuildHistory.Detail detail,String pipeline){
+  return fileHandoff(detail)?"/deployments/runs?sourcePipeline="+URLEncoder.encode(pipeline,StandardCharsets.UTF_8)+"&sourceRun="+URLEncoder.encode(detail.id(),StandardCharsets.UTF_8):"/deployments";
+ }
  public static Summary result(BuildHistory.Detail detail,String pipeline){
   boolean storage=detail.steps().stream().anyMatch(s->s.type().equals("DELIVER"));
   return summarize(List.of(
    new Item("build","빌드","필수",true,resultState(detail.buildState()),"OCI 빌드 단계 · "+detail.buildState(),"#build-logs","로그 보기"),
    new Item("tests","테스트·품질","선택",false,State.UNKNOWN,"보고서 조회 전","#build-report-form","보고서 보기"),
    new Item("storage","산출물 저장","조건부 필수",storage,storage?resultState(detail.storageState()):State.NA,storage?"OCI 전달 단계 · "+detail.storageState():"전달 단계 없음","#build-artifacts","산출물 보기"),
-   new Item("deploy","배포 준비","조건부 필수",false,State.UNKNOWN,"배포 대상에서 별도 점검",detail.state().equals("SUCCEEDED")&&detail.storageState().equals("SUCCEEDED")&&!detail.artifacts().isEmpty()?"/deployments/runs?sourcePipeline="+URLEncoder.encode(pipeline,StandardCharsets.UTF_8)+"&sourceRun="+URLEncoder.encode(detail.id(),StandardCharsets.UTF_8):"/deployments","배포 설정")
+   new Item("deploy","배포 준비","조건부 필수",false,State.UNKNOWN,"배포 대상에서 별도 점검",deploymentLink(detail,pipeline),"배포 설정")
   ));
  }
 }
