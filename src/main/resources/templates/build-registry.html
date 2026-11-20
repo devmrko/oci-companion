@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · Registry')}"></head><body>
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('산출물 저장소')}"></head><body>
 <header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content">
-<div th:replace="~{layout :: notice}"></div><h1>빌드</h1><nav th:replace="~{build-projects :: tabs}"></nav><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
-<section class="card"><div class="section-title"><h2>Registry</h2><a class="ui-button" th:href="@{/builds(tab='registry',kind=${kind},repository=${repository},pipeline=${pipeline})}">다시 조회</a></div>
+<div th:replace="~{layout :: notice}"></div><h1><span th:replace="~{ui-help :: term('registry')}"></span></h1>
+<section class="card"><div class="section-title"><h2 th:text="${kind == 'CONTAINER' ? '컨테이너 이미지' : '파일 저장소'}"></h2><a class="ui-button" th:href="@{/builds(tab='registry',kind=${kind},repository=${repository},pipeline=${pipeline})}">다시 조회</a></div>
 <form method="get" action="/builds" class="scope-bar"><input type="hidden" name="tab" value="registry"><input type="hidden" name="pipeline" th:value="${pipeline}">
 <label class="form-field">유형<select name="kind" class="ui-control"><option value="GENERIC" th:selected="${kind == 'GENERIC'}">파일 · JAR/ZIP</option><option value="CONTAINER" th:selected="${kind == 'CONTAINER'}">컨테이너 이미지</option></select></label><button class="ui-button">조회</button></form>
 <p class="small muted">현재 리전·구획의 OCI 저장소입니다. 기존 저장소는 별도 등록 없이 선택합니다.</p>
@@ -23,8 +23,8 @@
 <tr th:each="a : ${registryArtifacts.items()}"><td class="table-cell" th:text="${a.path()}"></td><td class="table-cell" th:text="${a.version()}"></td><td class="table-cell" th:text="${a.state()}"></td><td class="table-cell" th:text="${a.bytes()}"></td><td class="table-cell" th:text="${a.created()}"></td><td class="table-cell"><details><summary>OCID · SHA256/digest</summary><code th:text="${a.id()}"></code><br><code th:text="${a.digest()}"></code></details></td></tr>
 </tbody></table></div><a class="ui-button" th:if="${!registryArtifacts.next().isEmpty()}" th:href="@{/builds(tab='registry',kind=${kind},repository=${repository},pipeline=${pipeline},page=${registryArtifacts.next()})}">다음 100건</a></th:block></section>
 <section class="card" th:if="${registryTicket != null}"><details><summary>저장소 생성</summary><form th:action="@{/builds/registry}" method="post" class="build-field-grid">
-<input type="hidden" name="ticket" th:value="${registryTicket}"><label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255" th:placeholder="${kind == 'GENERIC' ? 'application-builds' : 'team/application'}"></label>
-<label class="form-field">설명 · 선택<textarea class="ui-control" name="description" maxlength="4000"></textarea></label>
+<input type="hidden" name="ticket" th:value="${registryTicket}"><label class="form-field"><span>이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="name" required maxlength="255" th:placeholder="${kind == 'GENERIC' ? 'application-builds' : 'team/application'}"></label>
+<label class="form-field"><span>설명 <span th:replace="~{ui-help :: required('선택')}"></span></span><textarea class="ui-control" name="description" maxlength="4000"></textarea></label>
 <label class="form-field" th:if="${kind == 'GENERIC'}">버전 덮어쓰기<select name="immutable" class="ui-control"><option value="true">금지</option><option value="false">허용</option></select></label>
 <div class="form-toolbar"><button class="ui-button">저장소 생성</button></div></form><p class="small muted">선택한 유형으로 현재 구획에 생성합니다. 컨테이너 저장소는 비공개로 생성합니다. 이미지 태그 덮어쓰기 제한은 현재 생성 API에서 지원하지 않습니다.</p></details></section>
 <details class="card"><summary>OCI에서 확인</summary><p>콘솔 → 개발자 서비스 → Containers &amp; Artifacts → Artifact Registry 또는 Container Registry → 저장소 선택</p><p>생성: 저장소 생성 · 수정/삭제: 저장소 상세의 작업 메뉴 · 산출물: 저장소 상세의 파일 또는 이미지 목록</p><pre class="code-block" th:text="${registryListCli}"></pre><pre class="code-block" th:text="${registryCreateCli}"></pre>

@@ -25,12 +25,12 @@
 <p class="notice" th:if="${subnetError != null}" th:text="${subnetError}"></p><datalist id="function-subnets" th:if="${functionSubnets != null}"><option th:each="s : ${functionSubnets}" th:value="${s.id()}" th:text="|${s.name()} · ${s.cidr()}|"></option></datalist>
 <form th:action="@{/builds/functions/template}" method="post" class="build-field-grid">
 <label class="form-field">빌드 종류<select class="ui-control" aria-label="빌드 종류"><option>Maven · JDK 21</option></select></label>
-<label class="form-field">Function 이름 · 필수<input class="ui-control" name="name" value="maven-builder" pattern="[a-z][a-z0-9-]{0,49}" required></label>
-<label class="form-field">애플리케이션 이름 · 필수<input class="ui-control" name="application" th:value="${selectedApplication != null ? selectedApplication.name() : 'build-functions'}" required maxlength="100"></label>
+<label class="form-field"><span>Function 이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="name" value="maven-builder" pattern="[a-z][a-z0-9-]{0,49}" required></label>
+<label class="form-field"><span>애플리케이션 이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="application" th:value="${selectedApplication != null ? selectedApplication.name() : 'build-functions'}" required maxlength="100"></label>
 <label class="form-field">아키텍처<select class="ui-control" name="architecture"><option value="ARM">ARM · linux/arm64</option><option value="X86">x86 · linux/amd64</option></select></label>
-<label class="form-field">Object Storage namespace · 필수<input class="ui-control" name="namespace" th:value="${storageOptions != null ? storageOptions.namespace() : ''}" required maxlength="100"></label>
+<label class="form-field"><span>Object Storage namespace <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="namespace" th:value="${storageOptions != null ? storageOptions.namespace() : ''}" required maxlength="100"></label>
 <label class="form-field">Container Registry 접두사<input class="ui-control" name="registryPrefix" value="builders" list="function-registry-prefixes" required maxlength="100"><span class="small muted">저장소 경로: 접두사/Function 이름</span></label>
-<label class="form-field">결과 버킷 이름 · 필수<input class="ui-control" name="bucket" list="function-buckets" required maxlength="100"><span class="small muted">기존 버킷 재사용 또는 생성할 이름</span></label>
+<label class="form-field"><span>결과 버킷 이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="bucket" list="function-buckets" required maxlength="100"><span class="small muted">기존 버킷 재사용 또는 생성할 이름</span></label>
 <label class="form-field">서브넷 OCID · 신규 애플리케이션용<input class="ui-control" name="subnet" list="function-subnets" placeholder="ocid1.subnet.…"><span class="small muted">생략하면 다운로드한 application.json에 입력</span></label>
 <div class="form-toolbar"><button class="ui-button primary">Fn Project ZIP 다운로드</button></div>
 </form><p class="small muted">func.yaml · Dockerfile · 실행 코드 · 요청 예제 · OCI/Fn CLI 구성 안내. 다운로드로 OCI 리소스가 생성되지는 않습니다.</p>
@@ -51,14 +51,14 @@
 <p>선택한 Function에 설정된 비공개 소스 버킷을 사용합니다. 테스트 후 wheel을 만들고 결과 버킷에 기록합니다.</p>
 <form th:action="@{/builds/functions/run}" method="post" class="build-field-grid" data-runtime="Python">
 <input type="hidden" name="ticket" th:value="${functionTicket}">
-<label class="form-field">소스 객체 이름 · 필수<input class="ui-control" name="sourceObject" placeholder="sources/project.tgz" maxlength="1024" required></label>
-<label class="form-field">객체 버전 ID · 필수<input class="ui-control" name="sourceVersion" maxlength="1024" required></label>
-<label class="form-field">번들 SHA-256 · 필수<input class="ui-control" name="sourceSha256" pattern="[0-9a-f]{64}" maxlength="64" required></label>
-<label class="form-field">커밋 SHA · 필수<input class="ui-control" name="commit" pattern="[0-9a-f]{40}" maxlength="40" required></label>
-<label class="form-field">필요 여유 공간(bytes) · 필수<input class="ui-control" name="requiredFreeBytes" inputmode="numeric" pattern="[1-9][0-9]{0,18}" required><span class="small muted">소스 압축·해제, 가상환경, 의존성, wheel 및 예비 공간을 포함한 예산입니다. 실제 공간이 부족하면 빌드를 중단합니다.</span></label>
+<label class="form-field"><span>소스 객체 이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="sourceObject" placeholder="sources/project.tgz" maxlength="1024" required></label>
+<label class="form-field"><span>객체 버전 ID <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="sourceVersion" maxlength="1024" required></label>
+<label class="form-field"><span>번들 SHA-256 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="sourceSha256" pattern="[0-9a-f]{64}" maxlength="64" required></label>
+<label class="form-field"><span>커밋 SHA <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="commit" pattern="[0-9a-f]{40}" maxlength="40" required></label>
+<label class="form-field"><span>필요 여유 공간(bytes) <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="requiredFreeBytes" inputmode="numeric" pattern="[1-9][0-9]{0,18}" required><span class="small muted">소스 압축·해제, 가상환경, 의존성, wheel 및 예비 공간을 포함한 예산입니다. 실제 공간이 부족하면 빌드를 중단합니다.</span></label>
 <label class="form-field">Goal<select class="ui-control" name="goal"><option value="verify">verify · 테스트·wheel</option><option value="package">package · 테스트·wheel</option><option value="test">test · 테스트</option></select></label>
 <label class="form-field">작업 경로<input class="ui-control" name="directory" value="project" maxlength="250" required><span class="small muted">pyproject.toml과 requirements-build.lock이 있는 번들 내부 폴더</span></label>
-<label class="form-field">산출물 패턴 · 선택<input class="ui-control" name="artifact" value="dist/*.whl" maxlength="250"></label>
+<label class="form-field"><span>산출물 패턴 <span th:replace="~{ui-help :: required('선택')}"></span></span><input class="ui-control" name="artifact" value="dist/*.whl" maxlength="250"></label>
 <div class="form-toolbar"><button class="ui-button primary" th:disabled="${builder.state() != 'ACTIVE'}">빌드 실행</button></div>
 </form><p class="small muted">접수는 빌드 성공을 의미하지 않습니다. 실행 이력에서 결과·로그·테스트 보고서를 확인하세요.</p></section>
 <section class="card" id="function-progress" th:if="${tab == 'history' and builder != null and builder.compatible() and !selectedRun.isEmpty()}" th:attr="data-url=@{/builds/functions/progress(region=${selection.region()},compartment=${selection.compartment()},application=${functionApplication},function=${function},run=${selectedRun})}">
