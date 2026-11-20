@@ -13,12 +13,23 @@ public final class OkeDeploymentManifest {
   if(!i.claim().isBlank()&&(!label(i.claim())||i.replicas()!=1||!i.mountPath().matches("/[A-Za-z0-9_./-]+")||i.mountPath().contains("..")||i.mountPath().equals("/")))throw Errors.DEPLOYMENT_INPUT.exception();
   if(i.claim().isBlank()&&!i.mountPath().isBlank())throw Errors.DEPLOYMENT_INPUT.exception();
   if(i.fsGroup()!=null&&(i.claim().isBlank()||i.fsGroup()<0||i.fsGroup()>2147483647L))throw Errors.DEPLOYMENT_INPUT.exception();
+  for(String ref:List.of(i.configMap(),i.secret(),i.serviceAccount()))if(!ref.isBlank()&&!label(ref))throw Errors.DEPLOYMENT_INPUT.exception();
+  for(String path:List.of(i.startupPath(),i.livenessPath()))if(!path.isBlank()&&(!path.startsWith("/")||path.length()>1024||path.chars().anyMatch(Character::isISOControl)))throw Errors.DEPLOYMENT_INPUT.exception();
+  if(i.terminationSeconds()<1||i.terminationSeconds()>600)throw Errors.DEPLOYMENT_INPUT.exception();
   var labels=Map.of("app.kubernetes.io/name",i.app());var container=new LinkedHashMap<String,Object>();container.put("name",i.app());container.put("image",image);container.put("ports",List.of(Map.of("name","http","containerPort",i.port())));
   var resources=Map.of("cpu",i.cpuMillis()+"m","memory",i.memoryMi()+"Mi");container.put("resources",Map.of("requests",new LinkedHashMap<>(resources),"limits",new LinkedHashMap<>(resources)));
   var names=new HashSet<String>();var env=new ArrayList<Map<String,String>>();
   for(var line:i.variables().lines().filter(x->!x.isBlank()).toList()){int pos=line.indexOf('=');if(pos<1)throw Errors.DEPLOYMENT_INPUT.exception();String key=line.substring(0,pos).strip();if(!key.matches("[A-Za-z_][A-Za-z0-9_]*")||!names.add(key)||names.size()>100)throw Errors.DEPLOYMENT_INPUT.exception();env.add(Map.of("name",key,"value",line.substring(pos+1)));}if(!env.isEmpty())container.put("env",env);
   if(!i.healthPath().isBlank())container.put("readinessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.healthPath()),"initialDelaySeconds",5,"periodSeconds",10));
+  var envFrom=new ArrayList<Map<String,Object>>();
+  if(!i.configMap().isBlank())envFrom.add(Map.of("configMapRef",Map.of("name",i.configMap(),"optional",false)));
+  if(!i.secret().isBlank())envFrom.add(Map.of("secretRef",Map.of("name",i.secret(),"optional",false)));
+  if(!envFrom.isEmpty())container.put("envFrom",envFrom);
+  if(!i.startupPath().isBlank())container.put("startupProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.startupPath()),"periodSeconds",10,"failureThreshold",30));
+  if(!i.livenessPath().isBlank())container.put("livenessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.livenessPath()),"periodSeconds",10,"failureThreshold",3));
   var pod=new LinkedHashMap<String,Object>();pod.put("containers",List.of(container));pod.put("nodeSelector",Map.of("kubernetes.io/arch",i.architecture()));
+  pod.put("terminationGracePeriodSeconds",i.terminationSeconds());
+  if(!i.serviceAccount().isBlank())pod.put("serviceAccountName",i.serviceAccount());
   if(!i.pullSecret().isBlank())pod.put("imagePullSecrets",List.of(Map.of("name",i.pullSecret())));
   if(!i.claim().isBlank()){container.put("volumeMounts",List.of(Map.of("name","data","mountPath",i.mountPath())));pod.put("volumes",List.of(Map.of("name","data","persistentVolumeClaim",Map.of("claimName",i.claim()))));}
   if(i.fsGroup()!=null)pod.put("securityContext",Map.of("fsGroup",i.fsGroup(),"fsGroupChangePolicy","OnRootMismatch"));
