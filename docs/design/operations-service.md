@@ -34,7 +34,7 @@ Foundation의 `UseCase<I,O>`는 인증된 입력·DTO 결과·서비스 경계 �
 
 ## OKE 운영 준비 진행 범위
 
-기존 `OkeDeploymentSetup` 인터페이스에 ConfigMap·Secret·ServiceAccount 이름 참조, startup/liveness 검사, 종료 대기를 추가했다. 표준 YAML이므로 앱 없이 사용할 수 있다. Secret 본문은 읽거나 저장하지 않는다. 현재는 이름 입력이며 리소스 존재·실행 권한·Workload Identity는 사전 검증하지 않는다. 화면에서 이 한계를 표시한다.
+기존 `OkeDeploymentSetup` 인터페이스에 ConfigMap·Secret·ServiceAccount 이름 참조, startup/liveness 검사, 종료 대기를 추가했다. 표준 YAML이므로 앱 없이 사용할 수 있다. Secret 본문은 읽거나 저장하지 않는다. 2026-11-21 후속 변경: `OkeRuntimeResources`로 같은 Namespace의 기존 리소스를 조회하고 `OkeRuntimePreparation`으로 존재·유형·Ingress backend/TLS 참조를 점검한다. UI는 목록에서 선택하며 미리보기와 저장에서 재조회한다. 실행 권한·Workload Identity·인증서 유효성·실제 HTTPS 응답은 검증 범위 밖이다.
 
 후속 순서:
 
@@ -45,3 +45,12 @@ Foundation의 `UseCase<I,O>`는 인증된 입력·DTO 결과·서비스 경계 �
 5. 에이전트 인증·도구·메모리·관측·평가 서비스 연결.
 
 각 단계는 기존 조회·생성 인터페이스를 재사용하고 서비스에 검사·계획·실행을 둔다. 기존 빌드·백업·환경 생성의 모든 컨트롤러를 옮긴 상태는 아니다. `DeploymentOperations`는 일반 배포 실행 경로에 적용됐으며 별도 복구·구성 생성 경로는 아직 기존 검증을 사용한다.
+
+### OKE 리소스 조회와 참조 점검
+
+- `OkeRuntimeResources`: OCI 배포 환경/클러스터 범위를 검증한 뒤 Kubernetes 목록을 조회한다. ConfigMap·Secret·ServiceAccount는 kubectl 출력 필드를 이름·유형으로 제한한다. Secret 값은 Java DTO나 파일에 담지 않는다.
+- `OkeRuntimePreparation`: PASS/FAIL/UNKNOWN/WARN, 조회 시각과 항목별 사유를 반환한다. 화면과 향후 자연어 도구가 같은 인터페이스를 사용한다.
+- 조회는 명시적 버튼으로 실행한다. Namespace/API 접속 경로 변경 시 이전 선택을 지운다. 부분 조회 실패는 빈 목록과 구분한다.
+- 선택한 참조가 없거나 조회 불가이면 저장을 차단한다. 저장 직전 다시 조회한다. 저장 후 리소스 변경까지 보장하지 않는다.
+- Ingress는 기존 설정의 backend와 생성 예정 ClusterIP Service 이름/포트를 비교한다. TLS는 호스트와 Secret 유형을 확인한다. DNS·인증서 내용·HTTPS 응답·컨트롤러 동작은 별도다.
+- 기존 LoadBalancer Service와 이름이 충돌하면 Ingress 연결 구성 저장을 차단한다. Ingress/LB/DNS/인증서는 생성하지 않는다. Gateway API는 후속 범위다.
