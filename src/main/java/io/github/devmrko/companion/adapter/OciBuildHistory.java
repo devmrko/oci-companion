@@ -72,6 +72,12 @@ public class OciBuildHistory implements BuildHistory {
     static Run summary(com.oracle.bmc.devops.model.BuildRunSummary r){return new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),time(r.getTimeCreated()),r.getBuildRunProgressSummary()==null?"":time(r.getBuildRunProgressSummary().getTimeStarted()),
                     r.getBuildRunProgressSummary()==null?"":time(r.getBuildRunProgressSummary().getTimeFinished()));}
     static String time(java.util.Date value){return value==null?"":value.toInstant().toString();}
+    static Optional<StoredArtifact> exportedImage(com.oracle.bmc.devops.model.BuildStageRunProgress build){
+        if(build.getStatus()!=com.oracle.bmc.devops.model.BuildPipelineStageRunProgress.Status.Succeeded||build.getExportedVariables()==null)return Optional.empty();
+        var values=build.getExportedVariables().getItems();
+        if(values==null||values.stream().filter(v->"BUILD_IMAGE_REFERENCE".equals(v.getName())).count()!=1)return Optional.empty();
+        return values.stream().filter(v->"BUILD_IMAGE_REFERENCE".equals(v.getName())).findFirst().flatMap(v->io.github.devmrko.companion.service.BuildImageIdentity.exported(build.getStageDisplayName(),v.getValue(),build.getBuildPipelineStageId()));
+    }
     public Detail detail(Connection c,String region,String compartment,String pipeline,String run) {
         try(var client=client(c,region)) {
             var r=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build()).getBuildRun();
@@ -89,6 +95,7 @@ public class OciBuildHistory implements BuildHistory {
                             else if(artifact instanceof com.oracle.bmc.devops.model.ContainerRegistryDeliveredArtifact a)
                                 artifacts.add(new StoredArtifact(a.getOutputArtifactName(),"Container Registry",a.getImageUri(),a.getDeliveredArtifactHash(),a.getDeployArtifactId()));
                         }
+                    if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress build)exportedImage(build).ifPresent(artifacts::add);
                     if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress build && build.getSteps()!=null)
                         for(var step:build.getSteps()) steps.add(new Step(step.getName(),step.getState()==null?"—":step.getState().getValue(),"COMMAND",stage.getBuildPipelineStageId(),time(step.getTimeStarted()),time(step.getTimeFinished())));
                 }

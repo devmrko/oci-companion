@@ -4,18 +4,26 @@ import io.github.devmrko.companion.port.BuildHistory;
 import java.util.*;
 import java.util.regex.Pattern;
 
-/** Uses only the selected run's delivered artifact record, never the current tag target. */
+/** Uses the selected run's delivered artifact or exported image record, never the current tag target. */
 public final class BuildImageIdentity {
  private BuildImageIdentity() {}
+ public static final String EXPORTED_KIND="Build image output";
  private static final Pattern DIGEST=Pattern.compile("sha256:[a-fA-F0-9]{64}");
  private static final Pattern ADDRESS=Pattern.compile("[a-z0-9.-]+/[a-z0-9]+/[a-z0-9]+(?:[._/-][a-z0-9]+)*");
  public record Image(String name,String reference,String note) { public boolean verified(){return !reference.isBlank();} }
  public static List<Image> inspect(BuildHistory.Detail detail){
-  boolean success="SUCCEEDED".equals(detail.state())&&"SUCCEEDED".equals(detail.buildState())&&"SUCCEEDED".equals(detail.storageState());
-  return detail.artifacts().stream().filter(a->"Container Registry".equals(a.kind())).map(a->{
-   String reference=success?reference(a.location(),a.version()):"";
-   return new Image(a.name(),reference,reference.isEmpty()?"실행 기록의 이미지 주소·digest 확인 불가":"OCI 전달 기록 · digest 고정");
+  boolean success="SUCCEEDED".equals(detail.state())&&"SUCCEEDED".equals(detail.buildState());
+  return detail.artifacts().stream().filter(a->"Container Registry".equals(a.kind())||EXPORTED_KIND.equals(a.kind())).map(a->{
+   String reference=success&&(EXPORTED_KIND.equals(a.kind())||"SUCCEEDED".equals(detail.storageState()))?reference(a.location(),a.version()):"";
+   return new Image(a.name(),reference,reference.isEmpty()?"실행 기록의 이미지 주소·digest 확인 불가":EXPORTED_KIND.equals(a.kind())?"OCI 빌드 출력 · digest 고정 · 저장소 별도 확인":"OCI 전달 기록 · digest 고정");
   }).toList();
+ }
+ public static java.util.Optional<BuildHistory.StoredArtifact> exported(String name,String uri,String stage){
+  if(uri==null||uri.length()>2048)return java.util.Optional.empty();
+  int at=uri.indexOf('@');if(at<0)return java.util.Optional.empty();
+  String digest=uri.substring(at+1),fixed=reference(uri,digest);
+  if(fixed.isEmpty())return java.util.Optional.empty();
+  return java.util.Optional.of(new BuildHistory.StoredArtifact(name,EXPORTED_KIND,fixed,digest.toLowerCase(Locale.ROOT),stage));
  }
  public static String reference(String uri,String hash){
   if(uri==null||hash==null||!DIGEST.matcher(hash).matches())return "";

@@ -42,7 +42,7 @@ public final class BuildChecks {
                     result.add(new Check("저장 · "+mapping.output(),missing||mismatch?"오류":"확인",missing?"산출물 참조 조회 실패":mismatch?"명세 출력 이름·유형 불일치":artifact.location(),missing||mismatch));
                 }
             }
-        }else result.add(new Check("저장 위치","없음","Registry 전달 단계 없음. 빌드·테스트만 실행할 수 있습니다.",false));
+        }else result.add(new Check("저장 위치","없음","OCI 전달 단계 없음. 명세의 사용자 업로드 명령은 별도입니다.",false));
         result.add(new Check("실행 권한·로그","미확인","사용자 권한과 파이프라인 권한은 별도입니다. 프로젝트 Logging 활성화와 서비스 권한을 OCI 콘솔에서 확인하세요.",false));
         return List.copyOf(result);
     }

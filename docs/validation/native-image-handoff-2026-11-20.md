@@ -26,3 +26,7 @@ DEFAULT / 서울 / 검증 구획의 최근 성공 실행 30건을 읽었다. 그
 Java 테스트 279개 통과. 같은 이미지, OCI 호스트 별칭, 다른 저장소·digest, 태그 전용 명세, 미등록 사이드카, 누락·충돌 기록, 실패 빌드, OKE 단계와 변경된 명세를 검사했다. 기존 파일 배포 테스트도 통과했다.
 
 근거: [OCI Java SDK ContainerRegistryDeliveredArtifact](https://docs.oracle.com/en-us/iaas/tools/java/latest/com/oracle/bmc/devops/model/ContainerRegistryDeliveredArtifact.Builder.html). 명세는 전달된 이미지의 hash와 URI 필드를 제공한다. 필드 정의가 실제 반환값의 존재를 보장하지는 않았다.
+
+## 후속 검증 · 2026-11-21
+
+네이티브 exportedVariables에 업로드 digest를 기록하는 별도 경로로 실제 빌드→OKE 배포가 성공했다. [검증 결과](exported-image-handoff-2026-11-21.md). 위 내용은 11월 20일 전달 API 필드의 관찰 결과이며, 해당 필드가 채워졌다는 뜻은 아니다.
