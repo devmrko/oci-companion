@@ -1,0 +1,5 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const label={textContent:''},note={textContent:''},item={dataset:{},querySelector:s=>s==='.check-state-label'?label:note};let listener;
+vm.runInNewContext(fs.readFileSync('src/main/resources/static/result-checks.js','utf8'),{document:{querySelector:()=>item,addEventListener:(_,fn)=>listener=fn}});
+const send=(state,data)=>listener({detail:{state,data}}),base={state:'AVAILABLE',tests:2,failures:0,errors:0,skipped:0,pmd:[]};
+send('READY',base);assert.equal(item.dataset.state,'PASS');send('READY',{...base,failures:1});assert.equal(item.dataset.state,'FAIL');send('READY',{...base,pmd:[{violations:1,errors:0}]});assert.equal(item.dataset.state,'WARN');send('READY',{...base,state:'MISSING',tests:0});assert.equal(item.dataset.state,'UNKNOWN');send('READY',base);send('UNKNOWN');assert.equal(item.dataset.state,'UNKNOWN');send('ERROR');assert.equal(item.dataset.state,'UNKNOWN');send('READY',{...base,skipped:2});assert.equal(item.dataset.state,'WARN');console.log('PASS report signal: pass/fail/warning/missing/selection change/error/all skipped');

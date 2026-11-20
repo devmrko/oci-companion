@@ -15,8 +15,8 @@
 <th:block th:if="${a.type() == 'GENERIC_FILE'}"><option th:each="r : ${setup.repositories()}" th:value="${r.id()}" th:text="${r.name()}" th:selected="${r.id() == a.repository()}"></option></th:block>
 <th:block th:if="${a.type() == 'DOCKER_IMAGE'}"><option th:each="r : ${containerRepositories}" th:value="${r.id()}" th:text="${r.name()}" th:selected="${r.id() == a.repository()}"></option></th:block>
 </select></label>
-<label class="form-field" th:if="${a.type() == 'GENERIC_FILE'}">파일 경로 · 필수<input class="ui-control" name="path" th:value="${a.path()}" required maxlength="1024"></label>
-<label class="form-field">버전·태그 · 필수<input class="ui-control" name="version" th:value="${a.version()}" required maxlength="255"></label>
+<label class="form-field" th:if="${a.type() == 'GENERIC_FILE'}"><span>파일 경로 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="path" th:value="${a.path()}" required maxlength="1024"></label>
+<label class="form-field"><span>버전·태그 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="version" th:value="${a.version()}" required maxlength="255"></label>
 <div class="form-toolbar"><button class="ui-button">저장 위치 적용</button></div></form>
 </th:block></div></th:block>
 <details class="build-advanced" th:if="${!setup.deliveries().isEmpty()}"><summary>적용 범위·버전</summary><p class="small muted">적용하면 OCI 파이프라인의 저장 위치를 변경합니다. 이후 실행에도 적용됩니다. 다른 파이프라인이 공유하는 참조는 변경하지 않습니다.</p>

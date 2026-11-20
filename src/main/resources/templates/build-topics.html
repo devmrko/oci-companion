@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 알림 주제')}"></head><body>
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('알림 채널')}"></head><body>
 <header th:replace="~{layout :: header}"></header>
-<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
-<nav th:replace="~{build-projects :: tabs}"></nav><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1><span th:replace="~{ui-help :: term('topic')}"></span></h1>
+
 <section class="card"><h2>알림 주제와 로그</h2>
 <dl class="build-facts">
 <div><dt>알림 주제</dt><dd>프로젝트의 빌드·배포 상태 알림을 전달하는 채널입니다.</dd></div>
@@ -10,7 +10,7 @@
 </dl>
 <p class="small muted">주제 생성 → 프로젝트에 연결 → 구독 등록. 이메일 구독은 수신자의 확인 후 활성화됩니다.</p>
 </section>
-<section class="card"><div class="section-title"><h2>알림 주제</h2><a class="ui-button" href="/builds?tab=topics">다시 조회</a></div>
+<section class="card"><div class="section-title"><h2><span th:replace="~{ui-help :: term('topic')}"></span></h2><a class="ui-button" href="/builds?tab=topics">다시 조회</a></div>
 <p th:if="${topicsLoaded and topicItems.isEmpty()}">현재 리전·구획에 알림 주제가 없습니다. 아래에서 생성하세요.</p>
 <p th:if="${!topicsLoaded}">목록을 조회하지 못했습니다. 연결·범위·Notifications 조회 권한을 확인하세요.</p>
 <div class="table-scroll" th:if="${!topicItems.isEmpty()}"><table class="data-table"><thead><tr><th class="table-heading">이름</th><th class="table-heading">상태</th><th class="table-heading">설명</th><th class="table-heading">연결</th></tr></thead><tbody>
@@ -20,8 +20,8 @@
 <section class="card" th:if="${adminTicket != null}"><h2>알림 주제 생성</h2>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">
 <input type="hidden" name="ticket" th:value="${adminTicket}">
-<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255" pattern="[A-Za-z0-9_\-]+" placeholder="build-notifications"><span class="small muted">영문·숫자·하이픈·밑줄. 테넌시에서 중복되지 않는 이름.</span></label>
-<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<label class="form-field"><span>이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="name" required maxlength="255" pattern="[A-Za-z0-9_\-]+" placeholder="build-notifications"><span class="small muted">영문·숫자·하이픈·밑줄. 테넌시에서 중복되지 않는 이름.</span></label>
+<label class="form-field"><span>설명 <span th:replace="~{ui-help :: required('선택')}"></span></span><input class="ui-control" name="description" maxlength="400"></label>
 <div class="form-toolbar"><button class="ui-button">알림 주제 생성</button></div>
 </form><p class="small muted">상단에서 선택한 리전·구획에 생성합니다. 구독은 자동 생성하지 않습니다.</p></section>
 <details class="card"><summary>OCI에서 확인</summary>

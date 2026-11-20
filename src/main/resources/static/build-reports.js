@@ -3,7 +3,8 @@
  const status=document.getElementById('build-report-status'),details=document.getElementById('build-report-details');
  let revision=0,active=null,chosen='';
  const selection=form=>new URLSearchParams(new FormData(form)).toString();
- function clear(){details.hidden=true;details.textContent='';document.getElementById('pmd-reports').replaceChildren();document.getElementById('report-files').replaceChildren();}
+ const signal=(state,data)=>document.dispatchEvent(new CustomEvent('companion-report',{detail:{state,data}}));
+ function clear(){signal('UNKNOWN');details.hidden=true;details.textContent='';document.getElementById('pmd-reports').replaceChildren();document.getElementById('report-files').replaceChildren();}
  function changed(form){if(active===form&&chosen!==selection(form)){revision++;chosen=selection(form);clear();status.textContent='선택이 변경되었습니다. 보고서를 다시 조회하세요.';status.dataset.state='CHANGED';}}
  for(const form of forms){
   form.addEventListener('input',()=>changed(form));form.addEventListener('change',()=>changed(form));
@@ -11,7 +12,7 @@
    event.preventDefault();if(form.dataset.reportBusy==='true')return;
    const button=form.querySelector('button:not([type=button])');form.dataset.reportBusy='true';button.disabled=true;
    active=form;chosen=selection(form);const request=++revision,snapshot=chosen;
-   clear();status.textContent='보고서 조회 중';status.dataset.state='LOADING';
+   clear();status.textContent='보고서 조회 중';status.dataset.state='LOADING';signal('LOADING');
    const current=()=>request===revision&&active===form&&snapshot===selection(form);
    try{
     const params=new URLSearchParams(snapshot);if(form.id==='object-report-form'){params.set('bucket',params.get('reportBucket'));params.set('prefix',params.get('reportPrefix'));}
@@ -20,8 +21,8 @@
     if(!current())return;
     status.textContent=data.state==='MISSING'?'JUnit 보고서 없음 · 테스트 통과 여부를 판단할 수 없습니다.':data.state==='EMPTY'?'보고서에 테스트가 없습니다.':`테스트 ${data.tests} · 실패 ${data.failures} · 오류 ${data.errors} · 건너뜀 ${data.skipped}`;
     window.CompanionPmdReports.render(data.pmd);window.CompanionReportFiles.render(data.attachments);
-    details.textContent=data.details.map(item=>`${item.suite} / ${item.test}\n${item.message}`).join('\n\n');details.hidden=!data.details.length;status.dataset.state='READY';
-   }catch{if(current()){clear();status.textContent='집계 실패 · 연결·보고서 형식·크기·읽기 권한을 확인하고 다시 조회하세요.';status.dataset.state='ERROR';}}
+    details.textContent=data.details.map(item=>`${item.suite} / ${item.test}\n${item.message}`).join('\n\n');details.hidden=!data.details.length;status.dataset.state='READY';signal('READY',data);
+   }catch{if(current()){clear();status.textContent='집계 실패 · 연결·보고서 형식·크기·읽기 권한을 확인하고 다시 조회하세요.';status.dataset.state='ERROR';signal('ERROR');}}
    finally{form.dataset.reportBusy='false';button.disabled=form.id==='object-report-form'&&!form.elements.object.value;}
   });
  }
@@ -34,7 +35,8 @@
  let revision=0;
  const selection=()=>JSON.stringify([form.elements.reportBucket.value,form.elements.reportPrefix.value]);
  let current=selection();
- function clear(){revision++;select.replaceChildren(new Option('보고서 목록을 조회하세요',''));view.disabled=true;status.textContent='';select.dispatchEvent(new Event('change',{bubbles:true}));}
+ const signal=(state,data)=>document.dispatchEvent(new CustomEvent('companion-report',{detail:{state,data}}));
+ function clear(){signal('UNKNOWN');revision++;select.replaceChildren(new Option('보고서 목록을 조회하세요',''));view.disabled=true;status.textContent='';select.dispatchEvent(new Event('change',{bubbles:true}));}
  function changed(){if(selection()!==current){current=selection();clear();}}
  form.addEventListener('input',changed);form.addEventListener('change',changed);
  select.addEventListener('change',()=>{view.disabled=form.dataset.reportBusy==='true'||!select.value;});

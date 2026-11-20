@@ -41,6 +41,7 @@ public class CatalogPages {
     }
     @ModelAttribute void navigation(Authentication auth,HttpServletRequest request,Model model) {
         if(auth!=null && auth.getPrincipal() instanceof Connection c && request.getMethod().equals("GET")) {
+            model.addAttribute("connection",c);
             try {
                 model.addAttribute("navSelection",selection(c,request.getSession()));
                 model.addAttribute("scopeMessage",request.getSession().getAttribute("scopeInvalid"));
@@ -147,7 +148,7 @@ public class CatalogPages {
         var s=selection(SecurityConfig.connection(auth),session);
         if (s.regions().stream().noneMatch(r->r.id().equals(region)) || s.compartments().stream().noneMatch(r->r.id().equals(compartment)) || !Set.of(0,60,300,900).contains(interval)) throw Errors.INVALID.exception();
         CompartmentScopes.targets(s.compartments(),compartment,mode);
-        String destination=Set.of("/builds/settings","/builds/configure","/agents/connections","/builds/automation","/builds/project-resources","/deployments/oke/configure","/backups/policies","/backups","/agents","/environments/containers","/environments/oke","/environments","/deployments","/deployments/runs","/deployments/configure","/sources","/builds","/guides","/builds/functions","/builds/tasks","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
+        String destination=Set.of("/readiness","/builds/settings","/builds/configure","/agents/connections","/builds/automation","/builds/project-resources","/deployments/oke/configure","/backups/policies","/backups","/agents","/environments/containers","/environments/oke","/environments","/deployments","/deployments/runs","/deployments/configure","/sources","/builds","/guides","/builds/functions","/builds/tasks","/builds?tab=registry&kind=GENERIC","/builds?tab=registry&kind=CONTAINER").contains(back)?back:"/";
         try { selections.write(SecurityConfig.connection(auth),region,compartment); }
         catch(IllegalStateException e) { flash.addFlashAttribute("message",e.getMessage());return "redirect:"+destination; }
         if(!s.region().equals(region) || !s.compartment().equals(compartment)) session.removeAttribute("scopeReports");
@@ -263,6 +264,7 @@ public class CatalogPages {
                             return "builds";
                         }
                         model.addAttribute("buildChecks",BuildChecks.inspect(definition,value,specs));
+                        model.addAttribute("preparation",Readiness.prepare(definition,value,specs,selected));
                         model.addAttribute("buildPurpose",BuildChecks.purpose(definition));
                     }
                     var settings=control.settings(c,s.region(),s.compartment(),selected);
@@ -299,7 +301,8 @@ public class CatalogPages {
                 String selectedRun=run.isEmpty() && !runs.isEmpty()?runs.getFirst().id():run;
                 if(!selectedRun.isEmpty()) {
                     if(runs.stream().noneMatch(r->r.id().equals(selectedRun))) throw Errors.MISSING.exception();
-                    model.addAttribute("detail",builds.detail(c,s.region(),s.compartment(),selected,selectedRun));
+                    var execution=builds.detail(c,s.region(),s.compartment(),selected,selectedRun);
+                    model.addAttribute("detail",execution);model.addAttribute("executionChecks",Readiness.result(execution));
                 }
             }
         } catch(BusinessException | IllegalStateException e) { model.addAttribute("message",e.getMessage()); }

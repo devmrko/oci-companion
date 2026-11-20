@@ -1016,3 +1016,36 @@ a:focus-visible, .ui-button:focus-visible {
 .execution-state[data-state="SUCCEEDED"] { color:#23623b; font-weight:600; }
 .execution-state[data-state="FAILED"] { color:#a52720; font-weight:600; }
 .execution-state[data-state="IN_PROGRESS"] { color:#176682; font-weight:600; }
+
+/* Navigation, glossary and evidence states share components across workflows. */
+.nav-section { border:0; margin:3px 0; padding:0; }
+.nav-section-title { display:flex; align-items:center; gap:8px; padding:10px 7px; font-weight:650; cursor:pointer; list-style:none; }
+.nav-section-title::-webkit-details-marker { display:none; }
+.nav-section-title::after { content:'›'; margin-left:auto; }
+.nav-section[open] > .nav-section-title::after { content:'⌄'; }
+.nav-children { margin-left:18px; border-left:1px solid var(--line); }
+.nav-children .side-item { padding:7px 10px; min-height:34px; }
+.sidebar-collapsed .nav-children { display:none; }
+.sidebar-collapsed .nav-section-title::after { display:none; }
+.term-label { display:inline-flex; gap:5px; align-items:center; }
+.term-help { display:inline-flex; align-items:center; justify-content:center; min-width:24px; min-height:24px; border:1px solid #a5b5bd; border-radius:50%; font-size:12px; font-weight:500; color:#216c8a; }
+.term-help:focus-visible, .nav-section-title:focus-visible { outline:2px solid #216c8a; outline-offset:2px; }
+.term-dialog { width:min(560px,calc(100% - 32px)); max-height:85vh; overflow:auto; border:1px solid var(--line); border-radius:6px; padding:24px; }
+.term-dialog::backdrop { background:rgb(0 0 0 / .35); }
+.dialog-actions { display:flex; justify-content:flex-end; }
+.term-dialog .code-block { white-space:pre-wrap; overflow-wrap:anywhere; }
+.requirement-badge { display:inline-block; font-size:11px; font-weight:500; border:1px solid #b8c6ce; border-radius:3px; padding:1px 5px; color:#4a5961; white-space:nowrap; }
+.requirement-badge[data-requirement="필수"] { background:#eaf1f4; color:#14536d; }
+.requirement-badge[data-requirement="조건부 필수"] { border-style:dashed; }
+.check-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr)); gap:12px; list-style:none; padding:0; margin:0; }
+.check-item { display:flex; flex-direction:column; gap:10px; border:1px solid var(--line); border-radius:4px; padding:16px; min-width:0; }
+.check-title { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px; }
+.check-state { display:flex; align-items:center; gap:7px; font-weight:600; }
+.status-dot { width:10px; height:10px; border-radius:50%; background:#7e8790; flex-shrink:0; }
+.check-item[data-state="PASS"] .status-dot { background:#2d7c49; }
+.check-item[data-state="WARN"] .status-dot { background:#b47a05; }
+.check-item[data-state="FAIL"] .status-dot { background:#c0382b; }
+.check-item[data-state="NA"] .status-dot { background:transparent; border:1px solid #7e8790; }
+.check-note { margin:0; font-size:12px; color:#625f5b; overflow-wrap:anywhere; }
+.check-action { margin-top:auto; }
+.status-legend { font-size:12px; }

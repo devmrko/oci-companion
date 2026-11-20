@@ -41,6 +41,11 @@ public class DeploymentRunPages {
                 }
             }
         }catch(BusinessException e){model.addAttribute("deploymentError",e.getMessage());}
+        if(!pipeline.isBlank()&&run.isBlank()){
+            @SuppressWarnings("unchecked") var imageList=(List<io.github.devmrko.companion.port.DeploymentImages.Check>)model.getAttribute("imageChecks");
+            @SuppressWarnings("unchecked") var architectureList=(List<io.github.devmrko.companion.port.DeploymentImages.Check>)model.getAttribute("architectureChecks");
+            model.addAttribute("deploymentPreparation",io.github.devmrko.companion.service.Readiness.deployment((DeploymentRuns.Plan)model.getAttribute("plan"),(BuildHandoff.Proof)model.getAttribute("buildProof"),!sourceRun.isBlank(),imageList,architectureList));
+        }
         return "deployment-runs";
     }
     @PostMapping("/deployments/runs") String start(Authentication auth,HttpSession session,@RequestParam String ticket){

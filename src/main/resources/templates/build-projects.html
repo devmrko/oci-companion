@@ -1,7 +1,7 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드 · 프로젝트')}"></head><body>
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('프로젝트')}"></head><body>
 <header th:replace="~{layout :: header}"></header>
-<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>빌드</h1>
-<div th:fragment="tabs">
+<main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div><h1><span th:replace="~{ui-help :: term('project')}"></span></h1>
+<div th:fragment="tabs" th:if="${tab != 'projects' and tab != 'topics' and tab != 'registry'}">
 <nav class="build-tabs" aria-label="빌드 메뉴">
 <a class="build-tab" th:classappend="${tab == 'tasks' or tab == 'execute'} ? 'is-active'" href="/builds/tasks">빌드 작업</a>
 <a class="build-tab" th:classappend="${tab == 'history'} ? 'is-active'" href="/builds/tasks?view=history">실행 이력</a>
@@ -9,9 +9,9 @@
 <a class="build-tab" th:classappend="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'} ? 'is-active'" href="/builds/tasks?view=environments">환경 관리</a>
 </nav>
 <nav class="form-toolbar build-management-links" aria-label="OCI 리소스 관리" th:if="${tab != 'tasks' and tab != 'execute' and tab != 'history' and tab != 'automation'}">
-<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">DevOps 프로젝트</a><a href="/builds/project-resources">코드 저장소·로그</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">Registry</a><a href="/builds?tab=topics">알림 주제</a>
-</nav></div><div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>
-<section class="card"><div class="section-title"><h2>프로젝트</h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
+<a href="/builds/configure">빌드 구성</a><a href="/builds/functions">Functions</a><a href="/builds?tab=projects">프로젝트</a><a href="/builds/project-resources">코드 저장소·로그</a><a href="/builds?tab=pipelines">파이프라인</a><a href="/builds?tab=registry">산출물 저장소</a><a href="/builds?tab=topics">알림 채널</a>
+</nav></div>
+<section class="card"><div class="section-title"><h2><span th:replace="~{ui-help :: term('project')}"></span></h2><a class="ui-button" href="/builds?tab=projects">다시 조회</a></div>
 <p class="small muted">저장소·파이프라인·로그 설정을 묶는 OCI DevOps의 필수 관리 단위입니다.</p>
 <p th:if="${projectsLoaded and projectItems.isEmpty()}">현재 리전·구획에 프로젝트가 없습니다.</p>
 <p th:unless="${projectsLoaded}">프로젝트 목록을 조회하지 못했습니다. 연결·범위·DevOps 조회 권한을 확인하세요.</p>
@@ -21,9 +21,9 @@
 <section class="card" th:if="${adminTicket != null}"><h2>프로젝트 추가</h2>
 <form th:action="@{/builds/create}" method="post" class="build-field-grid">
 <input type="hidden" name="ticket" th:value="${adminTicket}">
-<label class="form-field">이름 · 필수<input class="ui-control" name="name" required maxlength="255"><span class="small muted">생성 후 변경할 수 없습니다.</span></label>
-<label class="form-field">알림 주제 · 필수<select class="ui-control" name="topic" required><option value="">선택</option><option th:each="t : ${topics}" th:value="${t.id()}" th:text="${t.name()}" th:selected="${t.id() == selectedTopic}"></option></select><span class="small muted">빌드·배포 상태 알림을 구독자에게 전달합니다. 로그 저장과는 별개입니다.</span><a href="/builds?tab=topics">알림 주제 조회·생성</a></label>
-<label class="form-field">설명 · 선택<input class="ui-control" name="description" maxlength="400"></label>
+<label class="form-field"><span>이름 <span th:replace="~{ui-help :: required('필수')}"></span></span><input class="ui-control" name="name" required maxlength="255"><span class="small muted">생성 후 변경할 수 없습니다.</span></label>
+<label class="form-field"><span>알림 주제 <span th:replace="~{ui-help :: required('필수')}"></span></span><select class="ui-control" name="topic" required><option value="">선택</option><option th:each="t : ${topics}" th:value="${t.id()}" th:text="${t.name()}" th:selected="${t.id() == selectedTopic}"></option></select><span class="small muted">빌드·배포 상태 알림을 구독자에게 전달합니다. 로그 저장과는 별개입니다.</span><a href="/builds?tab=topics">알림 주제 조회·생성</a></label>
+<label class="form-field"><span>설명 <span th:replace="~{ui-help :: required('선택')}"></span></span><input class="ui-control" name="description" maxlength="400"></label>
 <div class="form-toolbar"><button class="ui-button" th:disabled="${topics.isEmpty()}">프로젝트 생성</button></div>
 </form><p class="notice" th:if="${topicError != null}" th:text="${topicError}"></p>
 <p class="small muted" th:if="${topics.isEmpty() and topicError == null}">선택 가능한 알림 주제가 없습니다. 알림 주제 탭에서 생성하세요.</p>

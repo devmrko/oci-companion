@@ -1,5 +1,5 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OCI 사용 안내')}"></head><body><header th:replace="~{layout :: header}"></header><main class="page-content app-content"><div th:replace="~{layout :: notice}"></div><h1>OCI 사용 안내</h1>
-<section class="card section-stack" id="start"><h2>처음 사용</h2><p>상단에서 리전·구획을 선택하세요. 기존 리소스가 있으면 필요한 단계부터 시작합니다.</p>
+<section th:replace="~{ui-help :: glossary}"></section><section class="card section-stack" id="start"><h2>처음 사용</h2><p>상단에서 리전·구획을 선택하세요. 기존 리소스가 있으면 필요한 단계부터 시작합니다.</p>
 <ol class="setup-steps">
 <li><strong>소스</strong><span>OCI 저장소를 선택하거나 외부 Git 주소를 등록합니다.</span><a class="ui-button" href="/sources">소스 등록</a></li>
 <li><strong>프로젝트·로그</strong><span>DevOps 프로젝트를 선택·생성하고 빌드 로그를 활성화합니다.</span><div class="form-toolbar"><a class="ui-button" href="/builds?tab=projects">프로젝트</a><a href="/builds/project-resources">저장소·로그 준비</a></div></li>
