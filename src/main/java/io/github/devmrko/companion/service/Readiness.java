@@ -33,7 +33,7 @@ public final class Readiness {
  public static Summary deployment(DeploymentRuns.Plan plan,BuildHandoff.Proof proof,boolean selectedBuild,List<DeploymentImages.Check> images,List<DeploymentImages.Check> architectures){
   var out=new ArrayList<Item>();
   out.add(new Item("target","배포 대상·명세","필수",true,plan==null?State.UNKNOWN:State.PASS,plan==null?"대상 조회·명세 확인 필요":"대상 상태·지원 명세 확인","#deployment-preflight","점검 상세"));
-  out.add(new Item("artifact","빌드·배포 파일 일치","조건부 필수",selectedBuild,proof!=null?State.PASS:selectedBuild?State.UNKNOWN:State.NA,proof!=null?"SHA-256·크기 일치":selectedBuild?"선택 빌드의 파일 확인 필요":"파이프라인의 기존 배포본 사용","#deployment-preflight","점검 상세"));
+  out.add(new Item("artifact","빌드·배포본 일치","조건부 필수",selectedBuild,proof!=null?State.PASS:selectedBuild?State.UNKNOWN:State.NA,proof!=null?proof.summary():selectedBuild?"선택 빌드의 배포본 확인 필요":"파이프라인의 기존 배포본 사용","#deployment-preflight","점검 상세"));
   var all=new ArrayList<DeploymentImages.Check>();if(images!=null)all.addAll(images);if(architectures!=null)all.addAll(architectures);
   boolean needsImages=plan==null||"OKE".equals(plan.targetType());
   State state=!needsImages?State.NA:all.stream().anyMatch(i->i.state()==DeploymentImages.State.BLOCKED)?State.FAIL:all.isEmpty()||images==null||architectures==null||all.stream().anyMatch(i->i.state()==DeploymentImages.State.UNKNOWN)?State.UNKNOWN:State.PASS;
@@ -48,7 +48,7 @@ public final class Readiness {
   return detail.state().equals("SUCCEEDED")&&detail.storageState().equals("SUCCEEDED")&&detail.artifacts().stream().anyMatch(a->a.kind().equals("Artifact Registry"));
  }
  public static String deploymentLink(BuildHistory.Detail detail,String pipeline){
-  return fileHandoff(detail)?"/deployments/runs?sourcePipeline="+URLEncoder.encode(pipeline,StandardCharsets.UTF_8)+"&sourceRun="+URLEncoder.encode(detail.id(),StandardCharsets.UTF_8):"/deployments";
+  return (fileHandoff(detail)||BuildImageIdentity.inspect(detail).stream().anyMatch(BuildImageIdentity.Image::verified))?"/deployments/runs?sourcePipeline="+URLEncoder.encode(pipeline,StandardCharsets.UTF_8)+"&sourceRun="+URLEncoder.encode(detail.id(),StandardCharsets.UTF_8):"/deployments";
  }
  public static Summary result(BuildHistory.Detail detail,String pipeline){
   boolean storage=detail.steps().stream().anyMatch(s->s.type().equals("DELIVER"));

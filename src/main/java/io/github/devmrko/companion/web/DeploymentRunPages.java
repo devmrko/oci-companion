@@ -24,6 +24,7 @@ public class DeploymentRunPages {
         if(request.getSession().getAttribute("scopeInvalid")!=null)return "deployment-runs";
         try{
             if(sourcePipeline.isBlank()!=sourceRun.isBlank())throw Errors.HANDOFF.exception();
+            if(!sourceRun.isBlank()&&run.isBlank())model.addAttribute("sourceImages",handoff.images(c,scope.region(),scope.compartment(),sourcePipeline,sourceRun));
             model.addAttribute("pipelines",runs.pipelines(c,scope.region(),scope.compartment()));
             if(!pipeline.isBlank())model.addAttribute("history",runs.history(c,scope.region(),scope.compartment(),pipeline,historyPage));
             if(!run.isBlank()){model.addAttribute("run",runs.run(c,scope.region(),scope.compartment(),pipeline,run));model.addAttribute("deploymentLogs",logs.read(c,scope.region(),scope.compartment(),pipeline,run,logPage,logUntil));}
