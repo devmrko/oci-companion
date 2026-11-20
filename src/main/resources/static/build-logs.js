@@ -1,6 +1,7 @@
 (() => {
  const root=document.querySelector('#build-logs'); if(!root)return;
  const status=document.querySelector('#log-status'),output=document.querySelector('#log-output'),count=document.querySelector('#log-visible-count');
+ let pendingStage=new URLSearchParams(location.search).get('logStage')||'';
  const interval=document.querySelector('#log-interval'),stage=document.querySelector('#log-stage'),search=document.querySelector('#log-search');
  const older=document.querySelector('#log-older'),refresh=document.querySelector('#log-refresh');
  let lines=[],next='',until='',timer,busy=false,lastSuccess='',failed=false;
@@ -16,8 +17,8 @@
    const data=await response.json();
    if(!['READY','EMPTY'].includes(data.state)){failure(data.note||'로그 조회 실패 · 연결과 Logging 설정을 확인하세요.',data.state||'ERROR');return;}
    lines=previous?[...data.lines,...lines]:data.lines;next=data.next;until=data.until;failed=false;root.dataset.logState=data.state;
-   const chosen=stage.value;stage.replaceChildren(new Option('전체',''));
-   [...new Set(lines.map(l=>l.stage))].filter(Boolean).forEach(s=>stage.add(new Option(s,s)));stage.value=[...stage.options].some(o=>o.value===chosen)?chosen:'';
+   const chosen=stage.value||pendingStage;pendingStage='';stage.replaceChildren(new Option('전체',''));
+   [...new Set(lines.map(l=>l.stage))].filter(Boolean).forEach(s=>stage.add(new Option(s,s)));if(chosen&&![...stage.options].some(o=>o.value===chosen))stage.add(new Option(chosen+' (조회 로그 없음)',chosen));stage.value=chosen;
    lastSuccess=new Date().toLocaleTimeString();status.textContent=data.note+' · '+lines.length+'건 · 마지막 성공 '+lastSuccess;render();
   }catch(e){failure('로그 조회 실패 · 연결·로그인·조회 범위를 확인하고 다시 조회하세요.','ERROR');}
   finally{busy=false;refresh.disabled=false;older.disabled=failed||!next;schedule();}

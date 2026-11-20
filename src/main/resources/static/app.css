@@ -1005,3 +1005,14 @@ a:focus-visible, .ui-button:focus-visible {
 /* Connection setup fields share responsive sizing and alignment. */
 .connection-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:16px; align-items:end; }
 .connection-fields .form-field { min-width:0; }
+
+.insight-metrics dd { font-size:1.35rem; font-weight:600; }
+.insight-columns { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr)); gap:20px; min-width:0; }
+.insight-columns > * { min-width:0; overflow-wrap:anywhere; }
+
+.insight-metrics { grid-template-columns:repeat(auto-fit,minmax(min(120px,100%),1fr)); }
+
+.insight-table th, .insight-table td { padding:10px 12px; border-bottom:1px solid #dedbd7; text-align:left; vertical-align:top; }
+.execution-state[data-state="SUCCEEDED"] { color:#23623b; font-weight:600; }
+.execution-state[data-state="FAILED"] { color:#a52720; font-weight:600; }
+.execution-state[data-state="IN_PROGRESS"] { color:#176682; font-weight:600; }

@@ -41,7 +41,7 @@ public class OciBuildHistory implements BuildHistory {
             if(!compartment.equals(p.getCompartmentId())) throw Errors.SCOPE.exception();
             var result=new ArrayList<Run>();
             for(var r:client.getPaginators().listBuildRunsRecordIterator(ListBuildRunsRequest.builder().buildPipelineId(pipeline).build()))
-                result.add(new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),r.getTimeCreated().toInstant().toString()));
+                result.add(summary(r));
             result.sort(Comparator.comparing(Run::createdAt).reversed());return result;
         } catch(Exception e) { throw Errors.CLOUD.exception(); }
     }
@@ -53,15 +53,35 @@ public class OciBuildHistory implements BuildHistory {
             try(var in=response.getInputStream()){return io.github.devmrko.companion.service.TestReports.read(in);}
         }catch(Exception e){throw Errors.CLOUD.exception();}
     }
+    public Map<String,String> executionContext(Connection c,String region,String compartment,String pipeline,String run){
+        try(var client=client(c,region)){
+            var r=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build()).getBuildRun();
+            if(!compartment.equals(r.getCompartmentId())||!pipeline.equals(r.getBuildPipelineId()))throw Errors.SCOPE.exception();
+            var result=new TreeMap<String,String>();
+            if(r.getBuildRunProgress()!=null&&r.getBuildRunProgress().getBuildPipelineStageRunProgress()!=null)
+                for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values())
+                    if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress b){
+                        String prefix=b.getStageDisplayName()+" · "+b.getBuildPipelineStageId();
+                        result.put(prefix+" · 실행 Shape",Objects.toString(b.getActualBuildRunnerShape(),"기록 없음"));
+                        result.put(prefix+" · 실행 이미지",b.getImage()==null?"기록 없음":b.getImage().getValue());
+                        result.put(prefix+" · 명세 경로",Objects.toString(b.getBuildSpecFile(),"기록 없음"));
+                    }
+            return result;
+        }catch(Exception e){throw Errors.CLOUD.exception();}
+    }
+    static Run summary(com.oracle.bmc.devops.model.BuildRunSummary r){return new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),time(r.getTimeCreated()),r.getBuildRunProgressSummary()==null?"":time(r.getBuildRunProgressSummary().getTimeStarted()),
+                    r.getBuildRunProgressSummary()==null?"":time(r.getBuildRunProgressSummary().getTimeFinished()));}
+    static String time(java.util.Date value){return value==null?"":value.toInstant().toString();}
     public Detail detail(Connection c,String region,String compartment,String pipeline,String run) {
         try(var client=client(c,region)) {
             var r=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build()).getBuildRun();
             if(!compartment.equals(r.getCompartmentId()) || !pipeline.equals(r.getBuildPipelineId())) throw Errors.SCOPE.exception();
             var steps=new ArrayList<Step>();var artifacts=new ArrayList<StoredArtifact>();
             if(r.getBuildRunProgress()!=null && r.getBuildRunProgress().getBuildPipelineStageRunProgress()!=null)
-                for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values()) {
+                for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values().stream().sorted(Comparator.comparing((com.oracle.bmc.devops.model.BuildPipelineStageRunProgress x)->x.getTimeStarted(),Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(x->Objects.toString(x.getBuildPipelineStageId(),""))).toList()) {
                     steps.add(new Step(stage.getStageDisplayName(),stage.getStatus()==null?"—":stage.getStatus().getValue(),
-                        stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress?"BUILD":stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress?"DELIVER":"OTHER"));
+                        stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress?"BUILD":stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress?"DELIVER":"OTHER",
+                        stage.getBuildPipelineStageId(),time(stage.getTimeStarted()),time(stage.getTimeFinished())));
                     if(stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress delivery && delivery.getDeliveredArtifacts()!=null)
                         for(var artifact:delivery.getDeliveredArtifacts().getItems()) {
                             if(artifact instanceof com.oracle.bmc.devops.model.GenericDeliveredArtifact a)
@@ -70,7 +90,7 @@ public class OciBuildHistory implements BuildHistory {
                                 artifacts.add(new StoredArtifact(a.getOutputArtifactName(),"Container Registry",a.getImageUri(),a.getDeliveredArtifactHash(),a.getDeployArtifactId()));
                         }
                     if(stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress build && build.getSteps()!=null)
-                        for(var step:build.getSteps()) steps.add(new Step(step.getName(),step.getState()==null?"—":step.getState().getValue()));
+                        for(var step:build.getSteps()) steps.add(new Step(step.getName(),step.getState()==null?"—":step.getState().getValue(),"COMMAND",stage.getBuildPipelineStageId(),time(step.getTimeStarted()),time(step.getTimeFinished())));
                 }
             var source=r.getBuildRunSource();String origin="기록 없음";
             if(source instanceof com.oracle.bmc.devops.model.ManualBuildRunSource)origin="수동 / API";

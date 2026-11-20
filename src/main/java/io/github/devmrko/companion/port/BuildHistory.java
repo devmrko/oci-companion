@@ -9,8 +9,14 @@ public interface BuildHistory {
         public Pipeline(String id,String name,String state,String projectId,String projectName) { this(id,name,state,projectId,projectName,""); }
         public Pipeline(String id,String name,String state) { this(id,name,state,"",""); }
     }
-    record Run(String id,String name,String state,String createdAt) {}
-    record Step(String name,String state,String type) { public Step(String name,String state) { this(name,state,""); } }
+    record Run(String id,String name,String state,String createdAt,String startedAt,String finishedAt) {
+        public Run(String id,String name,String state,String createdAt){this(id,name,state,createdAt,"","");}
+    }
+    record Step(String name,String state,String type,String stageId,String startedAt,String finishedAt) {
+        public Step(String name,String state,String type){this(name,state,type,"","","");}
+        public Step(String name,String state){this(name,state,"");}
+        public String duration(){return io.github.devmrko.companion.service.BuildInsights.duration(startedAt,finishedAt);}
+    }
     record StoredArtifact(String name,String kind,String location,String version,String id) {}
     record Detail(String id,String name,String state,String message,List<Step> steps,List<StoredArtifact> artifacts,String origin,String repository,String branch,String commit) {
         public Detail(String id,String name,String state,String message,List<Step> steps,List<StoredArtifact> artifacts) { this(id,name,state,message,steps,artifacts,"기록 없음","","",""); }
@@ -25,6 +31,7 @@ public interface BuildHistory {
                 .orElse(states.stream().filter(s->!s.equals("SUCCEEDED")).findFirst().orElse("UNKNOWN"));
         }
     }
+    default java.util.Map<String,String> executionContext(Connection c,String region,String compartment,String pipeline,String run){return java.util.Map.of();}
     List<Pipeline> pipelines(Connection connection,String region,String compartment);
     List<Run> runs(Connection connection,String region,String compartment,String pipeline);
     io.github.devmrko.companion.service.TestReports.Summary reports(Connection connection,String region,String compartment,String pipeline,String run,String artifact);
