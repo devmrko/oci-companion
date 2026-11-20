@@ -1051,3 +1051,5 @@ a:focus-visible, .ui-button:focus-visible {
 .status-legend { font-size:12px; }
 
 .build-context { margin-block: .75rem 1rem; }
+
+.task-selection-summary.is-static { position:static; }
