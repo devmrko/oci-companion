@@ -7,4 +7,10 @@ Allow any-user to read subnets in compartment id ${scope.compartment()} where al
 <p class="small muted">서브넷 조회는 클러스터 API·노드·배포 환경에서 필요할 수 있습니다. 지원되지 않는 target.subnet.id 조건은 사용하지 않습니다. 산출물·알림 주제는 해당 리소스 구획의 읽기·사용 권한을 별도로 설정하세요.</p>
 <ul><li>사설 OCIR 이미지: 대상 Namespace의 imagePullSecret과 명세 참조를 준비하세요.</li><li>이미지 아키텍처와 노드의 x86·ARM이 일치해야 합니다.</li><li>명세 적용 성공 후에도 Pod 상태·readiness·이벤트를 확인하세요. 실행 중 취소는 즉시 종료를 보장하지 않습니다.</li></ul>
 <a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm" target="_blank" rel="noopener noreferrer">DevOps IAM ↗</a> · <a href="https://docs.oracle.com/en-us/iaas/Content/Identity/policyreference/contengpolicyreference.htm" target="_blank" rel="noopener noreferrer">OKE 권한 ↗</a>
+</details><details th:fragment="failure" class="card section-stack" id="deployment-failure-help">
+<summary>실패 원인·권한 확인 ?</summary>
+<p>실패 단계와 로그를 먼저 확인하세요. 조회 성공은 파이프라인 실행 권한을 보장하지 않습니다.</p>
+<dl class="build-facts"><div><dt>VM 식별·조회</dt><dd>대상 존재·구획, 배포 파이프라인의 Compute 읽기 권한</dd></div><div><dt>VM 명령 실행</dt><dd>파이프라인의 명령 생성 권한, VM의 명령 수행 권한, Run Command 에이전트</dd></div><div><dt>배포본 다운로드</dt><dd>산출물 경로·버전, 실행 주체의 저장소 읽기 권한, 네트워크</dd></div><div><dt>설치·시작·상태 확인</dt><dd>실행 계정, 런타임, 경로·포트, 명령 종료 코드</dd></div><div><dt>OKE 명세 적용</dt><dd>클러스터 상태·접근 권한, Namespace, Kubernetes 권한</dd></div></dl>
+<p>OCI 콘솔 → ID 및 보안 → 정책. 관리자가 실패한 작업의 실행 주체·대상 구획을 확인해 필요한 권한만 적용하세요. 변경 후 대상 확인 → 새 실행.</p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/devops/using/devops_iampolicies.htm" target="_blank" rel="noopener noreferrer">OCI 실행 권한 명세 ↗</a>
 </details></body></html>
