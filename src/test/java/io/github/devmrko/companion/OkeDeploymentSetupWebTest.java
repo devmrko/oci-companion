@@ -17,6 +17,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 @SpringBootTest(properties="companion.data-dir=${java.io.tmpdir}/companion-oke-setup-test") @ActiveProfiles("demo") @AutoConfigureMockMvc
 class OkeDeploymentSetupWebTest {
+ @MockitoBean OkeEndpointChecks endpointChecks;
  @Autowired MockMvc mvc;@MockitoBean OkeDeploymentSetup setup;@MockitoBean DeploymentEnvironments environments;@MockitoBean Registry registry;
  @Test void formValuesReachPreviewAndScopedSingleUseCreate()throws Exception{
   var s=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
@@ -30,4 +31,15 @@ class OkeDeploymentSetupWebTest {
   mvc.perform(post("/deployments/oke/configure/create").session(s).with(csrf()).param("ticket",create)).andExpect(status().isOk()).andExpect(content().string(containsString("배포 실행·이력")));
   mvc.perform(post("/deployments/oke/configure/create").session(s).with(csrf()).param("ticket",create)).andExpect(status().isConflict());verify(setup,times(1)).create(any(),anyString(),anyString(),any(),anyString());
  }
+ @Test void endpointProbeRequiresCsrfAndCurrentScope()throws Exception{
+  var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+  when(environments.environments(any(),anyString(),anyString())).thenReturn(List.of());when(registry.list(any(),anyString(),anyString(),anyString())).thenReturn(List.of());
+  var view=mvc.perform(get("/deployments/oke/configure").session(session)).andExpect(status().isOk()).andReturn();
+  var scope=(io.github.devmrko.companion.web.CatalogPages.Selection)view.getModelAndView().getModel().get("navSelection");
+  mvc.perform(post("/deployments/oke/endpoint-check").session(session)).andExpect(status().isForbidden());
+  mvc.perform(post("/deployments/oke/endpoint-check").session(session).with(csrf()).param("region","wrong").param("compartment",scope.compartment()).param("environment","env").param("endpoint","PUBLIC_ENDPOINT").param("namespace","ns").param("ingress","web").param("host","example.com").param("path","/")).andExpect(status().isConflict());verifyNoInteractions(endpointChecks);
+  when(endpointChecks.inspect(any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString(),anyString())).thenReturn(new OkeEndpointChecks.Report(java.time.Instant.now(),"https://example.com/",List.of(new OkeEndpointChecks.Check("TLS","PASS","valid"))));
+  mvc.perform(post("/deployments/oke/endpoint-check").session(session).with(csrf()).param("region",scope.region()).param("compartment",scope.compartment()).param("environment","env").param("endpoint","PUBLIC_ENDPOINT").param("namespace","ns").param("ingress","web").param("host","example.com").param("path","/")).andExpect(status().isOk()).andExpect(jsonPath("$.checks[0].state").value("PASS"));
+ }
+
 }

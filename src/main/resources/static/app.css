@@ -1053,3 +1053,8 @@ a:focus-visible, .ui-button:focus-visible {
 .build-context { margin-block: .75rem 1rem; }
 
 .task-selection-summary.is-static { position:static; }
+
+.endpoint-check-state { display:inline-block; padding:2px 7px; border-radius:3px; white-space:nowrap; background:#e8edf0; color:#34454f; }
+.endpoint-check-state[data-state="PASS"] { background:#e1f1e8; color:#185b35; }
+.endpoint-check-state[data-state="WARN"] { background:#fff0cd; color:#775309; }
+.endpoint-check-state[data-state="FAIL"] { background:#fbe4e4; color:#8b2424; }
