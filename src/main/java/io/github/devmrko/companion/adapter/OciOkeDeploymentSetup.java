@@ -12,8 +12,8 @@ import java.util.*;
 import org.springframework.stereotype.Component;
 @Component
 public class OciOkeDeploymentSetup implements OkeDeploymentSetup {
- private final OciBuildHistory clients;private final OciDeploymentSetup registry;
- public OciOkeDeploymentSetup(OciBuildHistory clients,OciDeploymentSetup registry){this.clients=clients;this.registry=registry;}
+ private final OkeRuntimePreparation runtime;private final OciBuildHistory clients;private final OciDeploymentSetup registry;
+ public OciOkeDeploymentSetup(OciBuildHistory clients,OciDeploymentSetup registry,OkeRuntimePreparation runtime){this.runtime=runtime;this.clients=clients;this.registry=registry;}
  public Preview preview(Connection c,String r,String comp,Input i){
   try(var d=clients.client(c,r);var a=registry.artifacts(c,r)){
    var response=d.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(i.environment()).build());
@@ -23,11 +23,11 @@ public class OciOkeDeploymentSetup implements OkeDeploymentSetup {
    var repo=a.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(i.repository()).build()).getContainerRepository();if(!comp.equals(repo.getCompartmentId())||!"AVAILABLE".equals(repo.getLifecycleState().getValue()))throw Errors.SCOPE.exception();
    String url=com.oracle.bmc.Region.fromRegionId(r).getRegionCode()+".ocir.io/"+repo.getNamespace()+"/"+repo.getDisplayName()+"@"+image.getDigest();String yaml=OkeDeploymentManifest.render(i,url);
    String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((i.toString()+yaml+e.toString()+Objects.toString(response.getEtag(),"")+Objects.toString(ir.getEtag(),"")).getBytes(StandardCharsets.UTF_8)));
-   return new Preview(i,e.getProjectId(),e.getDisplayName(),url,yaml,hash);
+   return new Preview(i,e.getProjectId(),e.getDisplayName(),url,yaml,hash,runtime.inspect(c,r,comp,i));
   }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
  }
  public DeploymentSetup.Result create(Connection c,String r,String comp,Preview expected,String token){
-  var p=preview(c,r,comp,expected.input());if(!expected.fingerprint().equals(p.fingerprint()))throw Errors.BUILD_CHANGED.exception();String pipeline="",manifest="",stage="";
+  var p=preview(c,r,comp,expected.input());if(p.runtime()!=null&&!p.runtime().allowed())throw Errors.DEPLOYMENT_RUNTIME.exception();if(!expected.fingerprint().equals(p.fingerprint()))throw Errors.BUILD_CHANGED.exception();String pipeline="",manifest="",stage="";
   try(var d=clients.client(c,r)){
    var i=p.input();pipeline=d.createDeployPipeline(CreateDeployPipelineRequest.builder().opcRetryToken(OciDeploymentSetup.token(token,"pipeline")).createDeployPipelineDetails(CreateDeployPipelineDetails.builder().projectId(p.project()).displayName(i.name()).description(i.description()).build()).build()).getDeployPipeline().getId();
    manifest=d.createDeployArtifact(CreateDeployArtifactRequest.builder().opcRetryToken(OciDeploymentSetup.token(token,"manifest")).createDeployArtifactDetails(CreateDeployArtifactDetails.builder().projectId(p.project()).displayName(i.name()+"-manifest").deployArtifactType(DeployArtifact.DeployArtifactType.KubernetesManifest).argumentSubstitutionMode(DeployArtifact.ArgumentSubstitutionMode.None).deployArtifactSource(InlineDeployArtifactSource.builder().base64EncodedContent(p.yaml().getBytes(StandardCharsets.UTF_8)).build()).build()).build()).getDeployArtifact().getId();
