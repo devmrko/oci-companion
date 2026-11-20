@@ -13,8 +13,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 @Controller @Profile("!legacy")
 public class OkeDeploymentSetupPages {
- private final OkeRuntimeResources resources;private final CatalogPages catalog;private final DeploymentEnvironments environments;private final Registry registry;private final OkeDeploymentSetup setup;
- public OkeDeploymentSetupPages(CatalogPages catalog,DeploymentEnvironments environments,Registry registry,OkeDeploymentSetup setup,OkeRuntimeResources resources){this.resources=resources;this.catalog=catalog;this.environments=environments;this.registry=registry;this.setup=setup;}
+ private final OkeEndpointChecks endpointChecks;private final OkeRuntimeResources resources;private final CatalogPages catalog;private final DeploymentEnvironments environments;private final Registry registry;private final OkeDeploymentSetup setup;
+ public OkeDeploymentSetupPages(CatalogPages catalog,DeploymentEnvironments environments,Registry registry,OkeDeploymentSetup setup,OkeRuntimeResources resources,OkeEndpointChecks endpointChecks){this.endpointChecks=endpointChecks;this.resources=resources;this.catalog=catalog;this.environments=environments;this.registry=registry;this.setup=setup;}
  record Ticket(Connection c,String region,String compartment,Instant expires,OkeDeploymentSetup.Preview preview) {}
  @SuppressWarnings("unchecked") private Map<String,Ticket> tickets(HttpSession s){var m=(Map<String,Ticket>)s.getAttribute("okeSetupTickets");if(m==null){m=new LinkedHashMap<>();s.setAttribute("okeSetupTickets",m);}return m;}
  private String issue(HttpSession s,Connection c,CatalogPages.Selection scope,OkeDeploymentSetup.Preview preview){synchronized(s){var m=tickets(s);m.entrySet().removeIf(e->e.getValue().expires().isBefore(Instant.now()));if(m.size()>=16)m.remove(m.keySet().iterator().next());String key=UUID.randomUUID().toString();m.put(key,new Ticket(c,scope.region(),scope.compartment(),Instant.now().plusSeconds(600),preview));return key;}}
@@ -28,6 +28,10 @@ public class OkeDeploymentSetupPages {
  @GetMapping("/deployments/oke/resources") @ResponseBody OkeRuntimeResources.Snapshot resources(Authentication a,HttpSession session,@RequestParam String region,@RequestParam String compartment,@RequestParam String environment,@RequestParam String endpoint,@RequestParam String namespace){
   var c=SecurityConfig.connection(a);var s=catalog.selection(c,session);if(session.getAttribute("scopeInvalid")!=null||!s.region().equals(region)||!s.compartment().equals(compartment))throw Errors.SCOPE.exception();
   return resources.read(c,region,compartment,environment,endpoint,namespace);
+ }
+ @PostMapping("/deployments/oke/endpoint-check") @ResponseBody OkeEndpointChecks.Report endpointCheck(Authentication a,HttpSession session,@RequestParam String region,@RequestParam String compartment,@RequestParam String environment,@RequestParam String endpoint,@RequestParam String namespace,@RequestParam String ingress,@RequestParam String host,@RequestParam String path){
+  var c=SecurityConfig.connection(a);var s=catalog.selection(c,session);if(session.getAttribute("scopeInvalid")!=null||!s.region().equals(region)||!s.compartment().equals(compartment))throw Errors.SCOPE.exception();
+  return endpointChecks.inspect(c,region,compartment,environment,endpoint,namespace,ingress,host,path);
  }
  @GetMapping("/deployments/oke/configure") String page(Authentication a,HttpServletRequest r,Model m,@RequestParam(defaultValue="") String environment,@RequestParam(defaultValue="") String repository,@RequestParam(defaultValue="") String page){base(a,r,m);choices(a,r,m,initial(environment,repository),page);return "oke-deployment-setup";}
  @PostMapping("/deployments/oke/configure/preview") String preview(Authentication a,HttpServletRequest r,Model m,@RequestParam String ticket,@ModelAttribute("input") OkeDeploymentSetup.Input i){var t=checked(a,r.getSession(),ticket,true);if(t.preview()!=null)throw Errors.BUILD_CHANGED.exception();base(a,r,m);try{var p=setup.preview(t.c(),t.region(),t.compartment(),i);m.addAttribute("preview",p);m.addAttribute("createTicket",issue(r.getSession(),t.c(),catalog.selection(t.c(),r.getSession()),p));}catch(BusinessException e){m.addAttribute("setupError",e.getMessage());}choices(a,r,m,i,"");return "oke-deployment-setup";}

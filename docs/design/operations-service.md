@@ -54,3 +54,11 @@ Foundation의 `UseCase<I,O>`는 인증된 입력·DTO 결과·서비스 경계 �
 - 선택한 참조가 없거나 조회 불가이면 저장을 차단한다. 저장 직전 다시 조회한다. 저장 후 리소스 변경까지 보장하지 않는다.
 - Ingress는 기존 설정의 backend와 생성 예정 ClusterIP Service 이름/포트를 비교한다. TLS는 호스트와 Secret 유형을 확인한다. DNS·인증서 내용·HTTPS 응답·컨트롤러 동작은 별도다.
 - 기존 LoadBalancer Service와 이름이 충돌하면 Ingress 연결 구성 저장을 차단한다. Ingress/LB/DNS/인증서는 생성하지 않는다. Gateway API는 후속 범위다.
+
+### 실제 공개 HTTPS 점검 (2026-11-21)
+
+`OkeEndpointChecks`는 현재 인증 주체·리전·구획으로 Ingress를 재조회하고 등록된 정확한 호스트/경로만 점검한다. 화면과 향후 자연어 도구가 같은 인터페이스를 사용한다. 결과에는 조회 시각, 대상, DNS·Ingress 주소·TLS·HTTP별 상태와 근거가 포함된다. 참조 점검이나 구성 저장과는 별도 수동 동작이다.
+
+기존 `MonitoringTransport`는 로컬 에이전트용이다. `spring-foundation`의 `FoundationHttpClients`도 검토했으며 신뢰된 고정 origin의 HTTP 서비스 프록시용이다. 이번 Ingress 점검의 DNS IP 고정·인증서 정보 조회는 제공하지 않아 JDK `SSLSocket`으로 OKE 어댑터 안에 구현했다. 공통 HTTP 프록시를 중복 구현하거나 Foundation 의존성을 추가하지 않았다.
+
+근거: [JDK SSLParameters](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/javax/net/ssl/SSLParameters.html), [JSSE](https://docs.oracle.com/en/java/javase/21/security/java-secure-socket-extension-jsse-reference-guide.html). 실제 검증과 제한은 `docs/validation/oke-endpoint-checks-2026-11-21.md`에 기록했다.
