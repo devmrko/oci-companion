@@ -24,6 +24,14 @@ class OkeDeploymentManifestTest {
   for(long group:new long[]{-1,2147483648L})assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","data","/data",true,group),image));
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","","",true,1000L),image));
  }
+ @Test void runtimeReferencesAndProbesUseNativeKubernetesFields(){
+  var i=new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/ready","","pull-secret","","",true,null,"app-config","app-secret","app-account","/startup","/live",60);
+  String yaml=OkeDeploymentManifest.render(i,"icn.ocir.io/ns/image@sha256:"+"a".repeat(64));
+  assertTrue(yaml.contains("configMapRef:"));assertTrue(yaml.contains("secretRef:"));assertTrue(yaml.contains("optional: false"));assertTrue(yaml.contains("serviceAccountName: app-account"));
+  assertTrue(yaml.contains("startupProbe:"));assertTrue(yaml.contains("livenessProbe:"));assertTrue(yaml.contains("terminationGracePeriodSeconds: 60"));
+  assertEquals(1,OkeManifests.inspect(List.of(OkeManifestsTest.artifact(yaml)),"comp","project","companion-demo").size());
+  assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"","","","","",true,null,"","","","/health\nInjected","",30),"icn.ocir.io/ns/image@sha256:"+"a".repeat(64)));
+ }
  @Test void invalidNamespaceDuplicateVariablesAndUnpinnedImageFail(){
   String image="icn.ocir.io/ns/image@sha256:"+"a".repeat(64);
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("kube-system","","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","A=1\nA=2","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","","","",1),"image:latest"));
