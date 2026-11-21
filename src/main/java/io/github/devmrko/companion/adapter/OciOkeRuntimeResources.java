@@ -69,7 +69,7 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
   if(spec.has("defaultBackend"))routes.add(route("","/",spec.path("defaultBackend")));
   for(var rule:spec.path("rules"))for(var path:rule.path("http").path("paths"))routes.add(route(rule.path("host").asText(""),path.path("path").asText("/"),path.path("backend")));
   for(var value:spec.path("tls")){var hosts=new ArrayList<String>();for(var host:value.path("hosts"))hosts.add(host.asText());tls.add(new Tls(List.copyOf(hosts),value.path("secretName").asText("")));}
-  return new Ingress(item.path("metadata").path("name").asText(),spec.path("ingressClassName").asText(""),List.copyOf(routes),List.copyOf(tls),addresses(item));
+  return new Ingress(item.path("metadata").path("name").asText(),spec.path("ingressClassName").asText(item.path("metadata").path("annotations").path("kubernetes.io/ingress.class").asText("")),List.copyOf(routes),List.copyOf(tls),addresses(item));
  }
  private static Route route(String host,String path,JsonNode backend){var service=backend.path("service");var port=service.path("port");return new Route(host,path,service.path("name").asText(""),port.has("number")?port.path("number").asText():port.path("name").asText(""));}
  private static List<String> addresses(JsonNode item){var out=new ArrayList<String>();for(var a:item.path("status").path("loadBalancer").path("ingress")){String s=a.path("ip").asText(a.path("hostname").asText(""));if(!s.isBlank())out.add(s);}return List.copyOf(out);}
