@@ -1,0 +1,11 @@
+# Official stock HBase and demo images require linux/amd64.
+hbase:
+  nodeSelector:
+    kubernetes.io/arch: amd64
+quickstart:
+  nodeSelector:
+    kubernetes.io/arch: amd64
+global:
+  imageRegistry: docker.io
+  image:
+    registry: docker.io
