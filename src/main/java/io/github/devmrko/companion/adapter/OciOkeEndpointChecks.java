@@ -54,7 +54,7 @@ public class OciOkeEndpointChecks implements OkeEndpointChecks {
      tls.setSoTimeout(4000);var params=tls.getSSLParameters();params.setEndpointIdentificationAlgorithm("HTTPS");params.setServerNames(List.of(new SNIHostName(host)));params.setApplicationProtocols(new String[]{"http/1.1"});tls.setSSLParameters(params);tls.startHandshake();
      var cert=(X509Certificate)tls.getSession().getPeerCertificates()[0];cert.checkValidity();long days=Duration.between(Instant.now(),cert.getNotAfter().toInstant()).toDays();
      checks.add(new Check("TLS",days<30?"WARN":"PASS","신뢰 체인·호스트명 확인 · 만료 "+cert.getNotAfter().toInstant()+" · "+days+"일 남음"));
-     try{tls.getOutputStream().write(("HEAD "+path+" HTTP/1.1\r\nHost: "+host+"\r\nUser-Agent: OCI-Companion-Check\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));tls.getOutputStream().flush();int status=status(tls.getInputStream());checks.add(new Check("HTTP",status>=200&&status<300?"PASS":"WARN","HEAD "+status+(status>=300&&status<400?" · 리다이렉트 미추적":status==401||status==403?" · 인증·접근 정책 확인":status==405?" · HEAD 미지원, 앱 응답 별도 확인":"")+" · 본문 미수집"));}
+     try{tls.getOutputStream().write(("HEAD "+path+" HTTP/1.1\r\nHost: "+host+"\r\nUser-Agent: OCI-Companion-Check\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));tls.getOutputStream().flush();int status=status(tls.getInputStream());checks.add(new Check("HTTP",status>=200&&status<300?"PASS":"WARN","HEAD "+status+(status>=300&&status<400?" · 리다이렉트 미추적":status==401||status==403?" · 인증·접근 정책 확인":status==405||status==501?" · HEAD 미지원, GET 응답은 브라우저에서 확인":"")+" · 본문 미수집"));}
      catch(Exception e){checks.add(new Check("HTTP","UNKNOWN","TLS 연결 후 HTTP 상태 확인 실패·시간 초과"));}
     }
    }finally{deadline.cancel(false);}
