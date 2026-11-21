@@ -1,0 +1,28 @@
+apiVersion: v1alpha1
+kind: Installation
+metadata:
+  name: oci-companion-signoz
+spec:
+  deployment:
+    flavor: compose
+    mode: docker
+  signoz:
+    spec:
+      image: signoz/signoz:v0.151.0
+  ingester:
+    spec:
+      image: signoz/signoz-otel-collector:v0.144.18
+  patches:
+    - target: deployment/compose.yaml
+      operations:
+        - op: replace
+          path: /services/ingester/ports
+          value: ["127.0.0.1:24317:4317", "127.0.0.1:24318:4318"]
+        - op: replace
+          path: /services/oci-companion-signoz-signoz-0/ports
+          value: ["127.0.0.1:18080:8080"]
+    - target: deployment/ingester/opamp.yaml
+      operations:
+        - op: replace
+          path: /server_endpoint
+          value: ws://oci-companion-signoz-signoz-0:4320/v1/opamp
