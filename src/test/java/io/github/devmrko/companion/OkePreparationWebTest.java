@@ -17,6 +17,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 @SpringBootTest(properties="companion.data-dir=${java.io.tmpdir}/companion-oke-preparation-test") @ActiveProfiles("demo") @AutoConfigureMockMvc
 class OkePreparationWebTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkeWorkloadAccess workloadAccess;
  @Autowired MockMvc mvc; @MockitoBean OkePreparation preparation; @MockitoBean BuildAdministration projects;
  @Test void privateNetworkFormRendersAndCreateTicketCannotBeReused() throws Exception {
   var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
