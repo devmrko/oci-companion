@@ -1,0 +1,8 @@
+# Local validation only. Production requires separate storage, authentication and TLS.
+services:
+  observability:
+    image: grafana/otel-lgtm@sha256:1b852b77d7bcadb7699bfe7c78a51d059dff85168de674728cf7abf4474645e5
+    ports:
+      - "127.0.0.1:13000:3000"
+      - "127.0.0.1:14318:4318"
+    # No Companion dependency. Data is ephemeral when the container is removed.
