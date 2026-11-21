@@ -1,6 +1,7 @@
 package io.github.devmrko.companion.service;
 import io.github.devmrko.companion.error.*;
 public enum Errors implements ErrorDescriptor {
+    WORKLOAD_ACCESS_INPUT(ErrorCategory.VALIDATION, "Enhanced 클러스터와 현재 Namespace의 ServiceAccount·구획의 버킷을 선택하세요."),
     DEPLOYMENT_RUNTIME(ErrorCategory.CONFLICT, "앱 설정·Ingress 참조를 확인하지 못했습니다. 리소스·권한을 확인하고 명세를 다시 조회하세요."),
     CONTAINER_NETWORK(ErrorCategory.VALIDATION, "공용 IP 없이 외부 Registry에 접근하려면 NAT 경로가 필요합니다. OCIR은 NAT 또는 서비스 게이트웨이를 사용할 수 있습니다. 연결 가능한 서브넷을 선택하세요. 사용자 정의 경로는 OCI 콘솔에서 구성하세요."),
     CAPACITY_INPUT(ErrorCategory.VALIDATION, "OCI 허용 범위와 변경값을 확인하세요. 볼륨은 현재보다 큰 용량(최대 32,768GB)만 가능합니다."),
