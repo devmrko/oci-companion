@@ -22,8 +22,8 @@ public class AgentConnectionPages {
   }catch(IllegalArgumentException e){model.addAttribute("connectionError",e.getMessage());}
   return "agent-connections";
  }
- @PostMapping("/agents/connections") String add(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam String name,@RequestParam String environment,@RequestParam String address,@RequestParam String credential){
-  try {var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(c.demo()||session.getAttribute("scopeInvalid")!=null||!region.equals(s.region())||!compartment.equals(s.compartment()))throw new IllegalArgumentException("리전·구획이 바뀌었습니다. 다시 확인하세요.");var id=registry.register(c,region,compartment,name,environment,address,credential);flash.addFlashAttribute("message","앱 연결을 등록했습니다.");return "redirect:/agents/connections?selected="+id;}
+ @PostMapping("/agents/connections") String add(Authentication auth,HttpSession session,RedirectAttributes flash,@RequestParam String region,@RequestParam String compartment,@RequestParam String name,@RequestParam String environment,@RequestParam String address,@RequestParam String credential,@RequestParam(defaultValue="monitoring-http-v1") String adapter){
+  try {var c=SecurityConfig.connection(auth);var s=catalog.selection(c,session);if(c.demo()||session.getAttribute("scopeInvalid")!=null||!region.equals(s.region())||!compartment.equals(s.compartment()))throw new IllegalArgumentException("리전·구획이 바뀌었습니다. 다시 확인하세요.");var id=registry.register(c,region,compartment,name,environment,address,credential,adapter);flash.addFlashAttribute("message","앱 연결을 등록했습니다.");return "redirect:/agents/connections?selected="+id;}
   catch(IllegalArgumentException e){flash.addFlashAttribute("message",e.getMessage());return "redirect:/agents/connections";}
  }
 

@@ -1058,3 +1058,6 @@ a:focus-visible, .ui-button:focus-visible {
 .endpoint-check-state[data-state="PASS"] { background:#e1f1e8; color:#185b35; }
 .endpoint-check-state[data-state="WARN"] { background:#fff0cd; color:#775309; }
 .endpoint-check-state[data-state="FAIL"] { background:#fbe4e4; color:#8b2424; }
+
+/* Bounded runtime diagnostic output; shared by diagnostic viewers. */
+.diagnostic-output { max-height: 60vh; overflow: auto; white-space: pre; }

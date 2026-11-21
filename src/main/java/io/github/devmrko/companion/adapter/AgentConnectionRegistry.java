@@ -31,10 +31,14 @@ public class AgentConnectionRegistry {
  public String token(Connection c,String r,String comp,Registration x)throws Exception{var ref=credentials(c,r,comp).stream().filter(t->t.id().equals(x.credentialRef())).findFirst().orElseThrow();var path=Path.of(ref.tokenFile());if(Files.size(path)>8192||Files.isSymbolicLink(path))throw new IllegalArgumentException();String token=Files.readString(path).strip();if(token.isBlank()||token.chars().anyMatch(Character::isISOControl))throw new IllegalArgumentException();return token;}
  private void write(List<Registration> items)throws Exception{Files.createDirectories(file.toAbsolutePath().getParent());if(Files.isSymbolicLink(file))throw new IllegalArgumentException();var tmp=Files.createTempFile(file.toAbsolutePath().getParent(),"agent-connections-",".tmp",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));try{Files.writeString(tmp,mapper.writeValueAsString(items));Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}finally{Files.deleteIfExists(tmp);}}
  public synchronized String register(Connection c,String r,String comp,String name,String environment,String address,String credential){
+  return register(c,r,comp,name,environment,address,credential,"monitoring-http-v1");
+ }
+ public synchronized String register(Connection c,String r,String comp,String name,String environment,String address,String credential,String adapter){
+  if(!Set.of("monitoring-http-v1","spring-actuator-v1").contains(adapter))throw new IllegalArgumentException("지원되는 연결 유형을 선택하세요.");
   if(name==null||name.isBlank()||name.length()>100||environment==null||environment.isBlank()||environment.length()>80)throw new IllegalArgumentException("이름과 환경을 확인하세요.");
   MonitoringTransport.checkedBase(address);
   if(credentials(c,r,comp).stream().noneMatch(x->x.id().equals(credential)))throw new IllegalArgumentException("현재 범위의 인증 참조를 선택하세요.");
-  try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));if(items.size()>=100)throw new IllegalArgumentException();String id=UUID.randomUUID().toString();items.add(new Registration(id,name,environment,"monitoring-http-v1",address,credential,c.profile(),c.tenancy(),c.user(),r,comp));write(items);return id;}catch(Exception e){throw new IllegalArgumentException("연결 등록을 저장하지 못했습니다.");}
+  try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));if(items.size()>=100)throw new IllegalArgumentException();String id=UUID.randomUUID().toString();items.add(new Registration(id,name,environment,adapter,address,credential,c.profile(),c.tenancy(),c.user(),r,comp));write(items);return id;}catch(Exception e){throw new IllegalArgumentException("연결 등록을 저장하지 못했습니다.");}
  }
  public synchronized String registerOke(Connection c,String r,String comp,String id,String name,String environment,Dependency cluster){
   if(c.demo()||name==null||name.isBlank()||name.length()>100||environment==null||environment.isBlank()||environment.length()>80||!"OKE".equals(cluster.type()))throw new IllegalArgumentException("이름·환경·클러스터를 확인하세요.");
