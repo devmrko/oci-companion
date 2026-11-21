@@ -25,13 +25,14 @@ public class OciOkeWorkloadAccess implements OkeWorkloadAccess {
  }
  public Plan prepare(Connection c,String r,String comp,Input i){return prepare(c,r,comp,i,"companion-access-"+UUID.randomUUID().toString());}
  private Plan prepare(Connection c,String r,String comp,Input i,String job){
-  label(i.namespace());label(i.serviceAccount());if(!i.bucket().matches("[A-Za-z0-9_-]{1,256}")||!job.matches("companion-access-[a-f0-9-]{36}"))throw Errors.WORKLOAD_ACCESS_INPUT.exception();
+  label(i.namespace());account(i.serviceAccount());if(!i.bucket().matches("[A-Za-z0-9_.-]{1,256}")||!job.matches("companion-access-[a-f0-9-]{36}"))throw Errors.WORKLOAD_ACCESS_INPUT.exception();
   var o=options(c,r,comp,i.environment(),i.endpoint(),i.namespace());if(!o.clusterType().equals("ENHANCED_CLUSTER")||!o.accounts().contains(i.serviceAccount())||!o.buckets().contains(i.bucket()))throw Errors.WORKLOAD_ACCESS_INPUT.exception();
   String owner=owner(c,r,comp);return new Plan(i,o.cluster(),policy(comp,o.cluster(),i),manifest(i,o.objectNamespace(),r,job,owner),job,owner);
  }
  static void label(String s){if(s==null||!s.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"))throw Errors.WORKLOAD_ACCESS_INPUT.exception();}
+ static void account(String s){if(s==null||s.length()>253)throw Errors.WORKLOAD_ACCESS_INPUT.exception();for(String part:s.split("\\.",-1))label(part);}
  static String policy(String comp,String cluster,Input i){
-  label(i.namespace());label(i.serviceAccount());if(!comp.matches("ocid1\\.compartment\\.[a-zA-Z0-9.-]+")||!cluster.matches("ocid1\\.cluster\\.[a-zA-Z0-9.-]+")||!i.bucket().matches("[A-Za-z0-9_-]{1,256}"))throw Errors.WORKLOAD_ACCESS_INPUT.exception();
+  label(i.namespace());account(i.serviceAccount());if(!comp.matches("ocid1\\.compartment\\.[a-zA-Z0-9.-]+")||!cluster.matches("ocid1\\.cluster\\.[a-zA-Z0-9.-]+")||!i.bucket().matches("[A-Za-z0-9_.-]{1,256}"))throw Errors.WORKLOAD_ACCESS_INPUT.exception();
   return "Allow any-user to inspect objects in compartment id "+comp+" where all {request.principal.type='workload', request.principal.cluster_id='"+cluster+"', request.principal.namespace='"+i.namespace()+"', request.principal.service_account='"+i.serviceAccount()+"', target.bucket.name='"+i.bucket()+"'}";
  }
  String manifest(Input i,String ns,String region,String job,String owner){
