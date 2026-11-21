@@ -9,7 +9,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Component
 public class AgentConnectionRegistry {
- public record Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment,List<Dependency> dependencies) {
+ public record Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment,List<Dependency> dependencies,io.github.devmrko.companion.port.ObservabilitySetup.Settings observability) {
+  public Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment,List<Dependency> dependencies){this(id,name,environment,adapter,baseUrl,credentialRef,profile,tenancy,user,region,compartment,dependencies,null);}
   public Registration { dependencies=dependencies==null?List.of():List.copyOf(dependencies); }
   public Registration(String id,String name,String environment,String adapter,String baseUrl,String credentialRef,String profile,String tenancy,String user,String region,String compartment){this(id,name,environment,adapter,baseUrl,credentialRef,profile,tenancy,user,region,compartment,List.of());}
  }
@@ -45,8 +46,8 @@ public class AgentConnectionRegistry {
   try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));
    if(!id.isBlank()){if(!"oke-workload-v1".equals(get(c,r,comp,id).adapter()))throw new IllegalArgumentException();}
    else {if(all.size()>=100)throw new IllegalArgumentException();id=UUID.randomUUID().toString();}
-   final String selected=id;all.removeIf(x->x.id().equals(selected));
-   all.add(new Registration(id,name,environment,"oke-workload-v1","","",c.profile(),c.tenancy(),c.user(),r,comp,List.of(cluster)));write(all);return id;
+   final String selected=id;var observation=all.stream().filter(x->x.id().equals(selected)).map(Registration::observability).filter(Objects::nonNull).findFirst().orElse(null);all.removeIf(x->x.id().equals(selected));
+   all.add(new Registration(id,name,environment,"oke-workload-v1","","",c.profile(),c.tenancy(),c.user(),r,comp,List.of(cluster),observation));write(all);return id;
   }catch(Exception e){throw new IllegalArgumentException("OKE 연결 등록을 저장하지 못했습니다.");}
  }
  public synchronized void remove(Connection c,String r,String comp,String id){get(c,r,comp,id);try{var items=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));items.removeIf(x->x.id().equals(id));write(items);}catch(Exception e){throw new IllegalArgumentException("연결 해제를 저장하지 못했습니다.");}}
@@ -54,7 +55,12 @@ public class AgentConnectionRegistry {
   var current=get(c,r,comp,id);var refs=new ArrayList<>(current.dependencies());
   if(remove)refs.removeIf(x->x.ocid().equals(dependency.ocid()));
   else {if(refs.size()>=8||refs.stream().anyMatch(x->x.ocid().equals(dependency.ocid())))throw new IllegalArgumentException("의존 리소스는 중복 없이 최대 8개입니다.");refs.add(dependency);}
-  try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));all.replaceAll(x->x.id().equals(id)?new Registration(x.id(),x.name(),x.environment(),x.adapter(),x.baseUrl(),x.credentialRef(),x.profile(),x.tenancy(),x.user(),x.region(),x.compartment(),refs):x);write(all);}catch(Exception e){throw new IllegalArgumentException("의존 리소스를 저장하지 못했습니다.");}
+  try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));all.replaceAll(x->x.id().equals(id)?new Registration(x.id(),x.name(),x.environment(),x.adapter(),x.baseUrl(),x.credentialRef(),x.profile(),x.tenancy(),x.user(),x.region(),x.compartment(),refs,x.observability()):x);write(all);}catch(Exception e){throw new IllegalArgumentException("의존 리소스를 저장하지 못했습니다.");}
+ }
+
+ public synchronized void observability(Connection c,String r,String comp,String id,io.github.devmrko.companion.port.ObservabilitySetup.Settings settings){
+  get(c,r,comp,id);
+  try{var all=new ArrayList<>(Arrays.asList(read(file,Registration[].class)));all.replaceAll(x->x.id().equals(id)?new Registration(x.id(),x.name(),x.environment(),x.adapter(),x.baseUrl(),x.credentialRef(),x.profile(),x.tenancy(),x.user(),x.region(),x.compartment(),x.dependencies(),settings):x);write(all);}catch(Exception e){throw new IllegalArgumentException("관측 설정을 저장하지 못했습니다.");}
  }
 
 }
