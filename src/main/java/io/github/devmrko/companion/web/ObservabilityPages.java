@@ -36,13 +36,17 @@ public class ObservabilityPages {
  @GetMapping("/agents/connections/observability") String page(Authentication a,HttpServletRequest request,Model m,@RequestParam String selected,@RequestParam(defaultValue="") String provider){
   catalog.navigation(a,request,m);var s=scope(a,request.getSession());var c=SecurityConfig.connection(a);var app=registry.get(c,s.region(),s.compartment(),selected);var saved=setup.get(c,s.region(),s.compartment(),selected);
   String product=provider.isBlank()?(saved==null?"grafana":saved.provider()):provider;var choice=setup.providers().stream().filter(p->p.id().equals(product)).findFirst().orElseThrow(()->new IllegalArgumentException("제품을 선택하세요."));
-  m.addAttribute("selection",s);m.addAttribute("selected",app.id());m.addAttribute("app",app);m.addAttribute("providers",setup.providers());m.addAttribute("provider",choice);m.addAttribute("saved",saved);m.addAttribute("scopeBack","/agents/connections");
-  if(saved!=null)m.addAttribute("instrumentation",setup.instrumentation(saved));
+  m.addAttribute("selection",s);m.addAttribute("selected",app.id());m.addAttribute("app",app);m.addAttribute("providers",setup.providers());m.addAttribute("provider",choice);m.addAttribute("configuredProvider",saved==null?"":saved.provider());
+  var current=saved!=null&&saved.provider().equals(product)?saved:null;
+  m.addAttribute("saved",current);
+  if(!m.containsAttribute("form"))m.addAttribute("form",current);m.addAttribute("scopeBack","/agents/connections");
+  if(current!=null)m.addAttribute("instrumentation",setup.instrumentation(current));
   return "observability-setup";
  }
  @PostMapping("/agents/connections/observability") String save(Authentication a,HttpSession session,RedirectAttributes flash,@RequestParam String selected,@RequestParam String region,@RequestParam String compartment,@RequestParam String provider,@RequestParam String dashboard,@RequestParam String endpoint,@RequestParam String service,@RequestParam String runtime,@RequestParam(defaultValue="") String agentId){
   var s=scope(a,session);if(!s.region().equals(region)||!s.compartment().equals(compartment))throw new IllegalArgumentException("리전·구획이 바뀌었습니다. 다시 확인하세요.");
-  try{setup.save(SecurityConfig.connection(a),region,compartment,selected,new ObservabilitySetup.Settings(provider,dashboard.strip(),endpoint.strip(),service.strip(),runtime,agentId.strip()));flash.addFlashAttribute("message","연결 설정 저장 · 실제 수집은 분석 도구에서 확인하세요.");}catch(IllegalArgumentException e){flash.addFlashAttribute("message",e.getMessage());}
-  return "redirect:/agents/connections/observability?selected="+java.net.URLEncoder.encode(selected,java.nio.charset.StandardCharsets.UTF_8);
+  var input=new ObservabilitySetup.Settings(provider,dashboard.strip(),endpoint.strip(),service.strip(),runtime,agentId.strip());
+  try{setup.save(SecurityConfig.connection(a),region,compartment,selected,input);flash.addFlashAttribute("message","연결 설정 저장 · 실제 수집은 분석 도구에서 확인하세요.");}catch(IllegalArgumentException e){flash.addFlashAttribute("message",e.getMessage());flash.addFlashAttribute("form",input);}
+  return "redirect:/agents/connections/observability?selected="+java.net.URLEncoder.encode(selected,java.nio.charset.StandardCharsets.UTF_8)+"&provider="+java.net.URLEncoder.encode(provider,java.nio.charset.StandardCharsets.UTF_8);
  }
 }
