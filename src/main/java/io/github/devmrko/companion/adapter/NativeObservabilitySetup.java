@@ -17,7 +17,7 @@ public class NativeObservabilitySetup implements ObservabilitySetup {
   new Provider("pinpoint","Pinpoint","https://github.com/pinpoint-apm/pinpoint-kubernetes","https://github.com/pinpoint-apm/pinpoint-kubernetes/blob/master/docs/AGENTS.md","공식 Helm 차트 4.0.1 평가 구성: x86 노드·약 8.3GiB 메모리 요청·영구 볼륨 필요. OKE 설치를 확인했습니다. Java 실시간 진단은 Pinpoint 에이전트를 사용하세요."));}
  public Settings get(Connection c,String r,String comp,String app){return registry.get(c,r,comp,app).observability();}
  public java.util.Map<String,String> installationFiles(String provider){
-  var files=switch(provider){case "signoz"->List.of("casting.yaml","install.sh","README.md");case "pinpoint"->List.of("prepare.sh","values-placement.yaml","registry-renderer.sh","README.md");default->throw new IllegalArgumentException("SigNoz 또는 Pinpoint를 선택하세요.");};
+  var files=switch(provider){case "signoz"->List.of("casting.yaml","install.sh","README.md");case "pinpoint"->List.of("prepare.sh","values-placement.yaml","registry-renderer.sh","README.md","OPERATIONS.md");default->throw new IllegalArgumentException("SigNoz 또는 Pinpoint를 선택하세요.");};
   var result=new java.util.LinkedHashMap<String,String>();
   try{for(String name:files)try(var input=new org.springframework.core.io.ClassPathResource("observability/"+provider+"/"+name).getInputStream()){result.put(name,new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));}}
   catch(java.io.IOException e){throw new IllegalArgumentException("설치 구성을 읽지 못했습니다.");}

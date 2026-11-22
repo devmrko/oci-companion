@@ -26,3 +26,5 @@ OTLP 추적: 기본 HTTP 포트 9997, 경로 /v1/traces. Companion에는 http://
 계측: https://github.com/pinpoint-apm/pinpoint-kubernetes/blob/master/docs/AGENTS.md
 
 Pinpoint 4의 필수 서비스 그룹은 `DEFAULT`로 생성합니다. 다른 그룹은 Pinpoint Web에 먼저 등록한 뒤 `-Dpinpoint.serviceName`을 변경하세요. 앱 이름은 `applicationName`, 인스턴스 이름은 `agentName`입니다. 4.x의 agentId는 자동 생성됩니다.
+
+운영 구성과 수집 확인 절차는 `OPERATIONS.md`를 확인하세요.
