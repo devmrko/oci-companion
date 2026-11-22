@@ -18,6 +18,10 @@ import jakarta.servlet.http.*;
 public class Application {
  public static void main(String[] args){SpringApplication.run(Application.class,args);}
  @GetMapping("/hello") String hello(){return "hello";}
+ @GetMapping("/diagnostics/slow") org.springframework.http.ResponseEntity<String> slow()throws InterruptedException{
+  if(!Boolean.parseBoolean(System.getenv("DIAGNOSTICS_SLOW_ENABLED")))return org.springframework.http.ResponseEntity.notFound().build();
+  Thread.sleep(30_000);return org.springframework.http.ResponseEntity.ok("completed");
+ }
  @Bean SecurityFilterChain security(HttpSecurity http)throws Exception{
   String token=System.getenv("DIAGNOSTICS_TOKEN");if(token==null||token.length()<32)throw new IllegalStateException("DIAGNOSTICS_TOKEN must contain at least 32 characters");
   byte[] expected=("Bearer "+token).getBytes(StandardCharsets.UTF_8);

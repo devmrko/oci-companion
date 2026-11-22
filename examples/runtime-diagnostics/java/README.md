@@ -33,3 +33,5 @@ Companion 관리자가 동일 토큰의 파일 참조를 프로파일·리전·�
 
 토큰 파일은 소유자만 읽도록 설정한다. 파일 내용은 `Bearer ` 접두사 없는 토큰이다.
 `companion.agent-credentials` 설정으로 인증 목록 파일 경로를 바꿀 수 있다.
+
+Pinpoint 활성 요청 덤프 검증: `DIAGNOSTICS_SLOW_ENABLED=true`로 실행한 뒤 인증된 `GET /diagnostics/slow`를 호출합니다. 30초 대기하며 기본값은 비활성입니다. 검증 후 환경변수를 제거하세요.
