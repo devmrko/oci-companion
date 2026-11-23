@@ -3,10 +3,17 @@ import io.github.devmrko.companion.domain.Models.Connection;
 import java.util.List;
 public interface DeploymentRuns {
     record Pipeline(String id,String name,String state) {}
+    record Job(String name,String serviceAccount,int deadlineSeconds,int retries,int ttlSeconds,List<String> secrets) {}
     record Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,
-                String targetType,String cluster,String namespace,List<String> images,java.util.Map<String,List<String>> imageArchitectures) {
+                String targetType,String cluster,String namespace,List<String> images,java.util.Map<String,List<String>> imageArchitectures,List<Job> jobs) {
+        public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,String targetType,String cluster,String namespace,List<String> images,java.util.Map<String,List<String>> imageArchitectures){
+            this(pipeline,name,environment,instances,fingerprint,targetType,cluster,namespace,images,imageArchitectures,List.of());
+        }
+        public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,String targetType,String cluster,String namespace,List<String> images,List<Job> jobs){
+            this(pipeline,name,environment,instances,fingerprint,targetType,cluster,namespace,images,java.util.Map.of(),jobs);
+        }
         public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint,String targetType,String cluster,String namespace,List<String> images){
-            this(pipeline,name,environment,instances,fingerprint,targetType,cluster,namespace,images,java.util.Map.of());
+            this(pipeline,name,environment,instances,fingerprint,targetType,cluster,namespace,images,java.util.Map.of(),List.of());
         }
         public Plan(String pipeline,String name,String environment,List<String> instances,String fingerprint){
             this(pipeline,name,environment,instances,fingerprint,"VM","","",List.of());
