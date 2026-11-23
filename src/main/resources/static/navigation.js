@@ -41,6 +41,7 @@ function navigationKey(){
  if(route.startsWith('/agents'))return 'monitoring';
  if(route.startsWith('/backups'))return 'backups';
  if(route.startsWith('/guides'))return 'guides';
+ if(route.startsWith('/settings/profiles'))return 'profiles';
  return '';
 }
 const activeKey=navigationKey();
