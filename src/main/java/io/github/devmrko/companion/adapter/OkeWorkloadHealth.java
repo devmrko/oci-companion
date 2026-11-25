@@ -44,6 +44,8 @@ public class OkeWorkloadHealth {
     }
     private final Path config;
     private OkeConnectionStore managed;
+    private OkeApiAccess access;private OkeTokenCache tokens;
+    @org.springframework.beans.factory.annotation.Autowired void access(OkeApiAccess access,OkeTokenCache tokens){this.access=access;this.tokens=tokens;}
     private final String kubectl;
     private final AgentConnectionRegistry registry;
     private final OciAgentDependencies cloud;
@@ -119,7 +121,10 @@ public class OkeWorkloadHealth {
     }
     byte[] command(Target t,List<String> command,int limit)throws Exception {
         if(!Path.of(kubectl).isAbsolute())throw new IllegalArgumentException();
-        var args=new ArrayList<>(List.of(kubectl,"--kubeconfig",t.kubeconfig(),"--namespace",t.namespace(),"--request-timeout=5s"));
+        if(access!=null)t=access.apply(t);
+        Path temporary=tokens==null?null:tokens.temporaryConfig(t);
+        try {
+        var args=new ArrayList<>(List.of(kubectl,"--kubeconfig",temporary==null?t.kubeconfig():temporary.toString(),"--namespace",t.namespace(),"--request-timeout=30s"));
         if(t.server()!=null&&!t.server().isBlank())args.add("--server="+t.server());
         if(t.tlsServerName()!=null&&!t.tlsServerName().isBlank())args.add("--tls-server-name="+t.tlsServerName());
         args.addAll(command);
@@ -127,13 +132,14 @@ public class OkeWorkloadHealth {
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
             var output=executor.submit(()->{try(var in=process.getInputStream()){return in.readNBytes(limit+1);}});
             try {
-                var bytes=output.get(8,TimeUnit.SECONDS);
+                var bytes=output.get(45,TimeUnit.SECONDS);
                 if(bytes.length>limit||!process.waitFor(1,TimeUnit.SECONDS)||process.exitValue()!=0)throw new IllegalArgumentException();
                 return bytes;
             } finally {
                 process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();output.cancel(true);
             }
         }
+        }finally{if(temporary!=null)Files.deleteIfExists(temporary);}
     }
     private static boolean owned(JsonNode node,String kind,Set<String> owners) {
         for(var ref:node.path("metadata").path("ownerReferences"))
