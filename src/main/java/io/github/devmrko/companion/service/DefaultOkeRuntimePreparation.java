@@ -9,13 +9,14 @@ public class DefaultOkeRuntimePreparation implements OkeRuntimePreparation {
  private final OkeRuntimeResources resources;
  public DefaultOkeRuntimePreparation(OkeRuntimeResources resources){this.resources=resources;}
  public Report inspect(Connection c,String region,String compartment,OkeDeploymentSetup.Input i){
-  if(List.of(i.configMap(),i.secret(),i.serviceAccount(),i.pullSecret(),i.ingress()).stream().allMatch(String::isBlank)&&!i.requireTls())return new Report(Instant.now(),List.of());
+  if(List.of(i.configMap(),i.secret(),i.serviceAccount(),i.pullSecret(),i.ingress()).stream().allMatch(String::isBlank)&&!i.requireTls()&&i.fileVolumes().isBlank())return new Report(Instant.now(),List.of());
   try{return evaluate(resources.read(c,region,compartment,i.environment(),i.endpoint(),i.namespace()),i);}
   catch(io.github.devmrko.companion.error.BusinessException e){return new Report(Instant.now(),List.of(new Check("connection",State.UNKNOWN,"참조 조회 실패 · OCI 환경·클러스터·Kubernetes list 권한·API 접속 경로 확인")));}
  }
  static Report evaluate(OkeRuntimeResources.Snapshot snapshot,OkeDeploymentSetup.Input i){
   var checks=new ArrayList<Check>();
   reference(checks,snapshot,"configmaps",i.configMap(),Set.of());
+  for(var volume:DeploymentVolumes.parse(i.fileVolumes()))reference(checks,snapshot,volume.kind().equals("secret")?"secrets":"configmaps",volume.name(),Set.of());
   reference(checks,snapshot,"secrets",i.secret(),Set.of("Opaque"));
   reference(checks,snapshot,"serviceaccounts",i.serviceAccount(),Set.of());
   reference(checks,snapshot,"secrets",i.pullSecret(),Set.of("kubernetes.io/dockerconfigjson","kubernetes.io/dockercfg"));

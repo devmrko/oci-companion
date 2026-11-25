@@ -36,4 +36,9 @@ class OkeDeploymentManifestTest {
   String image="icn.ocir.io/ns/image@sha256:"+"a".repeat(64);
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("kube-system","","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","A=1\nA=2","","",1),image));assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(input("companion-demo","","","",1),"image:latest"));
  }
+ @Test void defaultNamespaceWorkloadPassesDeploymentInspectionWithoutNamespaceMutation(){
+  String yaml=OkeDeploymentManifest.render(input("default","","","",2),"icn.ocir.io/ns/image@sha256:"+"a".repeat(64));
+  assertFalse(yaml.contains("kind: Namespace"));assertEquals(1,OkeManifests.inspect(List.of(OkeManifestsTest.artifact(yaml)),"comp","project","default").size());
+  assertThrows(RuntimeException.class,()->OkeManifests.inspect(List.of(OkeManifestsTest.artifact("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: default\n---\n"+yaml)),"comp","project","default"));
+ }
 }

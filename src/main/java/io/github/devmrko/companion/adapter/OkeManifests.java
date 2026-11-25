@@ -13,7 +13,7 @@ final class OkeManifests {
     record Inspection(List<String> images,Map<String,List<String>> architectures,List<Job> jobs) {}
     static List<String> inspect(List<DeployArtifact> artifacts,String compartment,String project,String namespace){return inspectDetails(artifacts,compartment,project,namespace).images();}
     static Inspection inspectDetails(List<DeployArtifact> artifacts,String compartment,String project,String namespace){
-        if(namespace==null||!namespace.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")||Set.of("default","kube-system","kube-public","kube-node-lease").contains(namespace))throw Errors.INVALID.exception();
+        if(namespace==null||!namespace.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")||Set.of("kube-system","kube-public","kube-node-lease").contains(namespace))throw Errors.INVALID.exception();
         var jobs=new ArrayList<Job>();var requirements=new LinkedHashMap<String,Set<String>>();var images=new LinkedHashSet<String>();var names=new HashSet<String>();int count=0;int bytes=0;
         for(var artifact:artifacts){
             if(!compartment.equals(artifact.getCompartmentId())||!project.equals(artifact.getProjectId()))throw Errors.SCOPE.exception();
@@ -28,7 +28,7 @@ final class OkeManifests {
                     String api=kind.equals("Deployment")?"apps/v1":kind.equals("Job")?"batch/v1":"v1";
                     if(!api.equals(doc.get("apiVersion"))||!Set.of("Namespace","ServiceAccount","PersistentVolumeClaim","Deployment","Service","Job").contains(kind)||!names.add(kind+"/"+name))throw Errors.INVALID.exception();
                     if(kind.equals("Namespace")){
-                        if(!namespace.equals(name)||meta.containsKey("namespace"))throw Errors.SCOPE.exception();
+                        if("default".equals(name)||!namespace.equals(name)||meta.containsKey("namespace"))throw Errors.SCOPE.exception();
                     } else if(!namespace.equals(meta.get("namespace")))throw Errors.SCOPE.exception();
                     if(kind.equals("Job"))jobs.add(job(name,map(doc.get("spec"))));
                     if(kind.equals("Deployment")||kind.equals("Job")){

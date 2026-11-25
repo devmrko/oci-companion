@@ -21,4 +21,9 @@ class OkeRuntimePreparationTest {
  @Test void tlsRequiresAnIngress(){assertFalse(DefaultOkeRuntimePreparation.evaluate(snapshot(true,"8080","kubernetes.io/tls","ClusterIP"),input("","",true)).allowed());}
  @Test void wildcardMatchesOnlyOneLabel(){assertTrue(DefaultOkeRuntimePreparation.covers("*.example.com","hello.example.com"));assertFalse(DefaultOkeRuntimePreparation.covers("*.example.com","a.b.example.com"));assertFalse(DefaultOkeRuntimePreparation.covers("*.example.com","example.com"));assertFalse(DefaultOkeRuntimePreparation.covers("*",""));}
  @Test void noOptionalReferencesDoesNotQueryCluster(){var resources=mock(OkeRuntimeResources.class);assertTrue(new DefaultOkeRuntimePreparation(resources).inspect(null,"region","compartment",input("","",false)).allowed());verifyNoInteractions(resources);}
+ @Test void missingSecretFileVolumeBlocksDeployment(){
+  var mapper=com.fasterxml.jackson.databind.json.JsonMapper.builder().build();var values=mapper.convertValue(input("","",false),Map.class);values.put("fileVolumes","secret wallet /opt/wallet true");
+  var i=mapper.convertValue(values,OkeDeploymentSetup.Input.class);var report=DefaultOkeRuntimePreparation.evaluate(snapshot(true,"8080","Opaque","ClusterIP"),i);
+  assertFalse(report.allowed());assertTrue(report.checks().stream().anyMatch(check->check.key().equals("secrets/wallet")&&check.state()==OkeRuntimePreparation.State.FAIL));
+ }
 }
