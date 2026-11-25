@@ -64,6 +64,23 @@ Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다
 
 남은 검증은 별도 ARM Function에 이미지 빌더를 준비하고 실제 이미지 생성·push까지 수행하는 것입니다. 현재 Function 경로를 VM보다 우선하도록 바꾸지 않았습니다. 기능 검증 범위를 구분한 안내를 추가했으며, 기존 문서에 남아 있던 전체 Function OCID도 제거했습니다.
 
+### B1 추가 확인: 관리형 CUSTOM 러너와 Cloud Shell
+
+`JOUNGMINKOKOR_API` / 춘천 리전에서 새 `sustena-verify-arm-capability` 빌드 파이프라인을 만들고 관리형 단계 생성 API를 두 번 호출했습니다. 빌드 실행은 하지 않았으며 생성된 단계와 파이프라인은 모두 삭제했습니다.
+
+| 요청 | 실제 API 결과 |
+|---|---|
+| `CUSTOM`, OCPU 2, 8GiB, `shapeName=VM.Standard.A1.Flex`, `OL8_AARCH64_STANDARD_10` | HTTP 400 `InvalidParameter`, 원문 `Invalid Image: OL8_AARCH64_STANDARD_10` |
+| 같은 CUSTOM 설정, `OL8_X86_64_STANDARD_10` | 생성 접수. 반환된 설정은 CUSTOM·OCPU 2·8GiB뿐이며 이미지도 x86 그대로. `shapeName`은 응답에 없음 |
+
+[공식 CUSTOM 모델](https://docs.oracle.com/en-us/iaas/tools/typescript/latest/modules/_devops_lib_model_custom_build_runner_shape_config_.custombuildrunnershapeconfig.html)의 속성도 `buildRunnerType`, `ocpus`, `memoryInGBs`이며 셰이프 이름 필드는 없습니다. 따라서 위 요청 접수는 A1.Flex ARM 러너 선택 성공이 아닙니다. 시험한 ARM 이미지 이름은 거부됐지만 모든 미공개 이미지 이름을 시험한 것은 아닙니다. 근거는 로컬 `.tools/verification/arm-capability-results.json`입니다.
+
+Cloud Shell은 [공식 문서](https://docs.oracle.com/en-us/iaas/Content/API/Concepts/cloudshellintro.htm)에서 유료 계정의 ARM 선택, Podman·Buildah·Fn 제공을 명시합니다. ARM이 제공되는 리전에서는 대화형 컨테이너 빌드 후보가 됩니다. 다만 외부 SSH 접속이 없고 장시간 비대화형 작업에는 Compute를 권장하므로 현재 Companion 서버의 자동 원격 빌더와 같은 연결 방식으로 대체할 수는 없습니다.
+
+실제 로컬 OCI CLI 시도는 `oci cloud-shell --help` → `Error: No such command 'cloud-shell'.` (종료 2)였습니다. 브라우저로 춘천 OCI 콘솔을 열자 `Cloud Account Name` 로그인 화면이 표시됐습니다(`35-cloudshell-console-access.png`). 현재 브라우저에는 OCI 콘솔 인증 세션이 없어서 ARM 선택·`uname -m`·Podman 빌드 실행은 하지 못했습니다. **Cloud Shell이 불가능하다는 결론이 아니라 실제 세션 검증이 남은 상태**입니다. 기존 IAM은 변경하지 않았습니다.
+
+후속 실검증은 인증된 콘솔에서 Actions → Architecture → ARM 선택 후 `uname -m`, `podman build --platform linux/arm64`, OCIR push를 확인하는 것입니다. 지금은 성공을 확인한 VM 경로를 유지하고 Cloud Shell은 대화형 대안으로 안내합니다.
+
 ## 초기 검증 결론
 
 - Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.
