@@ -31,6 +31,16 @@ public class OciNodePortAccess implements NodePortAccess {
   if(source==null||!source.matches("[0-9]{1,3}(\\.[0-9]{1,3}){3}/32")||port<30000||port>32767)throw Errors.INVALID.exception();
   for(String octet:source.substring(0,source.length()-3).split("\\."))if(Integer.parseInt(octet)>255||(octet.length()>1&&octet.startsWith("0")))throw Errors.INVALID.exception();
  }
+ public List<NodePortAccess.Rule> references(Connection c,String region,String compartment,String cluster,String list,int port){
+  if(port<30000||port>32767||lists(c,region,compartment,cluster).stream().noneMatch(x->x.id().equals(list)))throw Errors.SCOPE.exception();
+  try(var network=clients.network(c,region)){
+   var rules=network.getSecurityList(GetSecurityListRequest.builder().securityListId(list).build()).getSecurityList().getIngressSecurityRules();
+   var result=new ArrayList<NodePortAccess.Rule>();
+   for(var rule:rules){var tcp=rule.getTcpOptions();var range=tcp==null?null:tcp.getDestinationPortRange();int min=range==null?1:range.getMin(),max=range==null?65535:range.getMax();
+    if(("6".equals(rule.getProtocol())||"all".equals(rule.getProtocol()))&&port>=min&&port<=max)result.add(new NodePortAccess.Rule(rule.getSource(),rule.getProtocol(),min,max,Objects.toString(rule.getDescription(),"")));
+   }return List.copyOf(result);
+  }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){throw new IllegalStateException(OciPipelineIam.error(e));}
+ }
  static String marker(String source,int port){return "OCI Companion NodePort "+source+" "+port;}
  static boolean owned(IngressSecurityRule rule,String source,int port){
   var tcp=rule.getTcpOptions();var range=tcp==null?null:tcp.getDestinationPortRange();

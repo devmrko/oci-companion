@@ -28,6 +28,11 @@ class OkeManifestsTest {
         var input=mapper.convertValue(fields,io.github.devmrko.companion.port.OkeDeploymentSetup.Input.class);String yaml=OkeDeploymentManifest.render(input,IMAGE);
         assertFalse(yaml.contains("&id"));assertEquals(List.of(IMAGE),inspect(yaml));
     }
+    @Test void serviceReplacementCannotRetargetAnotherDeployment(){
+        assertDoesNotThrow(()->OkeManifests.replacementTarget(artifact(YAML),"comp","project","testing","app"));
+        assertThrows(RuntimeException.class,()->OkeManifests.replacementTarget(artifact(YAML),"comp","project","testing","other"));
+        assertThrows(RuntimeException.class,()->OkeManifests.replacementTarget(artifact(YAML+"---\n"+YAML.replace("name: app","name: other")),"comp","project","testing","app"));
+    }
     @Test void fixedImageAndExplicitNamespaceAreDisplayed(){assertEquals(List.of(IMAGE),inspect(YAML));}
     @Test void mutableImagesAndMissingNamespacesAreRejected(){
         assertThrows(RuntimeException.class,()->inspect(YAML.replace(IMAGE,"app:latest")));

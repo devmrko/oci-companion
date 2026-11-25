@@ -15,4 +15,5 @@ public interface OkeDeploymentSetup {
  }
  Preview preview(Connection c,String region,String compartment,Input input);
  DeploymentSetup.Result create(Connection c,String region,String compartment,Preview preview,String token);
+ default void update(Connection c,String region,String compartment,String pipeline,String fingerprint,Preview preview){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_INPUT.exception();}
 }

@@ -45,4 +45,21 @@ public class OciOkeDeploymentSetup implements OkeDeploymentSetup {
    return new DeploymentSetup.Result(pipeline,"",manifest,stage,"");
   }catch(Exception e){return new DeploymentSetup.Result(pipeline,"",manifest,stage,"일부 생성 또는 응답 확인 실패 · 생성된 ID를 OCI에서 확인하세요. 자동 재생성하지 않습니다.");}
  }
+ public void update(Connection c,String r,String comp,String pipeline,String fingerprint,Preview expected){
+  var p=preview(c,r,comp,expected.input());if(p.runtime()!=null&&!p.runtime().allowed())throw Errors.DEPLOYMENT_RUNTIME.exception();if(!p.fingerprint().equals(expected.fingerprint()))throw Errors.BUILD_CHANGED.exception();
+  try(var d=clients.client(c,r)){
+   var current=d.getDeployPipeline(GetDeployPipelineRequest.builder().deployPipelineId(pipeline).build()).getDeployPipeline();
+   if(!comp.equals(current.getCompartmentId())||!p.project().equals(current.getProjectId()))throw Errors.SCOPE.exception();
+   var stages=new ArrayList<DeployStageSummary>();for(var s:d.getPaginators().listDeployStagesRecordIterator(ListDeployStagesRequest.builder().deployPipelineId(pipeline).build()))stages.add(s);
+   if(stages.size()!=1)throw Errors.DEPLOYMENT_INPUT.exception();
+   var stage=d.getDeployStage(GetDeployStageRequest.builder().deployStageId(stages.getFirst().getId()).build()).getDeployStage();
+   if(!(stage instanceof OkeDeployStage oke)||!pipeline.equals(stage.getDeployPipelineId())||!comp.equals(stage.getCompartmentId())||!p.project().equals(stage.getProjectId())||!p.input().environment().equals(oke.getOkeClusterDeployEnvironmentId())||!p.input().namespace().equals(oke.getNamespace())||oke.getKubernetesManifestDeployArtifactIds()==null||oke.getKubernetesManifestDeployArtifactIds().size()!=1)throw Errors.SCOPE.exception();
+   String id=oke.getKubernetesManifestDeployArtifactIds().getFirst();var response=d.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build());var artifact=response.getDeployArtifact();
+   if(!comp.equals(artifact.getCompartmentId())||!p.project().equals(artifact.getProjectId())||artifact.getDeployArtifactType()!=DeployArtifact.DeployArtifactType.KubernetesManifest||!(artifact.getDeployArtifactSource() instanceof InlineDeployArtifactSource)||artifact.getArgumentSubstitutionMode()!=DeployArtifact.ArgumentSubstitutionMode.None||response.getEtag()==null||response.getEtag().isBlank())throw Errors.SCOPE.exception();
+   var environment=d.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(p.input().environment()).build()).getDeployEnvironment();
+   if(!(environment instanceof OkeClusterDeployEnvironment env)||!fingerprint.equals(OciDeploymentRuns.fingerprint(current,oke,env,List.of(artifact))))throw Errors.BUILD_CHANGED.exception();
+   OkeManifests.replacementTarget(artifact,comp,p.project(),p.input().namespace(),p.input().app());
+   d.updateDeployArtifact(UpdateDeployArtifactRequest.builder().deployArtifactId(id).ifMatch(response.getEtag()).updateDeployArtifactDetails(UpdateDeployArtifactDetails.builder().deployArtifactSource(InlineDeployArtifactSource.builder().base64EncodedContent(p.yaml().getBytes(StandardCharsets.UTF_8)).build()).build()).build());
+  }catch(BusinessException e){throw e;}catch(Exception e){throw new IllegalStateException(OciPipelineIam.error(e)+" · 원본 파이프라인을 확인한 뒤 다시 미리보기하세요.");}
+ }
 }

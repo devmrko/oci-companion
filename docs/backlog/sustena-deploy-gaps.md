@@ -90,6 +90,19 @@ Cloud Shell은 [공식 문서](https://docs.oracle.com/en-us/iaas/Content/API/Co
 - `./mvnw verify` **383개 통과**. 호스트 선택·오류 비밀값 미노출·버퍼 초기화와 기존 빌드 순서/실패 정리 테스트가 포함됩니다.
 - 검증 저장소는 다음 운영 서비스 흐름 검증에 재사용한 뒤 삭제합니다. 운영 서비스 이미지는 이 단계에서 변경하지 않았습니다.
 
+## B3: 등록 서비스에서 커밋 → 빌드 → 배포
+
+운영 `sustena-c`를 첫 서비스로 등록했습니다. 소스·브랜치, ARM 빌더, 이미지 저장소, OKE 환경·조회 연결, 배포 구성, 기존 NodePort 31083과 해당 보안 목록 규칙을 참조로 저장합니다. 이 등록은 운영 이미지나 보안 규칙을 바꾸지 않습니다.
+
+별도 `sustena-verify-service`에서 화면으로 a829ff9 커밋 선택 → 등록 Secret 인증으로 ARM 빌드·push → 생성 digest의 배포 미리보기 → 기존 파이프라인 명세 갱신·배포 → 앱 상태 조회를 완료했습니다. 빌드와 OCI 배포 모두 `SUCCEEDED`, 두 ARM 노드의 Pod는 **2/2 Ready**였습니다. digest는 B2와 같은 `sha256:5b528b6231a98fb3d832d36ffdd0a793d7051a123d2f0d36559ae93fade73176`이며 테스트 명령은 Python AST 구문 검사입니다. 전체 앱 테스트를 실행한 것은 아닙니다.
+
+- 배포 미리보기는 현재 Deployment 설정을 보존하며 Service·Namespace 객체를 포함하지 않습니다. 파이프라인 변경 감지와 산출물 etag 검사, 공통 배포 사전 검사, 세션·범위에 묶인 일회용 확인을 거칩니다. 응답이 불확실하면 자동 재실행하지 않습니다.
+- 첫 등록 시 초기 배포가 아직 접수되지 않아 Deployment 조회가 실패했습니다. OCI 이력이 0건임을 확인한 뒤 초기 배포를 실행했고, 완료 후 등록이 성공했습니다. 대기 중 Deployment가 없을 때의 안내와 화면을 벗어난 실행 결과 복귀는 B4에서 보강합니다.
+- 운영 Deployment·Service의 전체 spec과 ConfigMap 데이터는 사전 백업과 동일하며 운영 Ready 2를 재확인했습니다.
+- 스크린샷: `38-production-service-registered.png`, `41-verification-service-registered.png`, `42-service-build-result.png`, `43-service-deploy-preview.png`, `44-service-deploy-result.png`, `45-service-ready.png`.
+- `./mvnw verify`: **390개 통과**, 실패·오류·건너뜀 0. 검증용 B2/B3 리소스는 B4 확인 후 정리합니다.
+
+
 ## 초기 검증 결론
 
 - Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.

@@ -64,14 +64,14 @@ public class OciDeploymentRuns implements DeploymentRuns {
         var artifacts=new ArrayList<DeployArtifact>();
         for(var id:stage.getKubernetesManifestDeployArtifactIds())artifacts.add(client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build()).getDeployArtifact());
         var checked=OkeManifests.inspectDetails(artifacts,compartment,pipeline.getProjectId(),stage.getNamespace());
-        var hash=MessageDigest.getInstance("SHA-256");
-        hash.update((pipeline.toString()+stage.toString()+env.toString()).getBytes(StandardCharsets.UTF_8));
-        for(var artifact:artifacts){
-            hash.update(artifact.toString().getBytes(StandardCharsets.UTF_8));
-            hash.update(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent());
-        }
-        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),HexFormat.of().formatHex(hash.digest()),"OKE",env.getClusterId(),stage.getNamespace(),checked.images(),checked.architectures(),checked.jobs());
+        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),fingerprint(pipeline,stage,env,artifacts),"OKE",env.getClusterId(),stage.getNamespace(),checked.images(),checked.architectures(),checked.jobs());
     }
+    static String fingerprint(DeployPipeline pipeline,OkeDeployStage stage,OkeClusterDeployEnvironment env,List<DeployArtifact> artifacts)throws Exception {
+        var hash=MessageDigest.getInstance("SHA-256");hash.update((pipeline.toString()+stage.toString()+env.toString()).getBytes(StandardCharsets.UTF_8));
+        for(var artifact:artifacts){hash.update(artifact.toString().getBytes(StandardCharsets.UTF_8));hash.update(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent());}
+        return HexFormat.of().formatHex(hash.digest());
+    }
+
     com.oracle.bmc.containerengine.ContainerEngineClient clusters(Connection c,String region) throws java.io.IOException {
         var client=com.oracle.bmc.containerengine.ContainerEngineClient.builder().configuration(com.oracle.bmc.ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(clients.authentication(c));
         client.setRegion(region);return client;

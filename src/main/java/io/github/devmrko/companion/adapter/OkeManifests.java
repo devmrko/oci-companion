@@ -10,6 +10,19 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** Bounded target inspection, not a replacement for Kubernetes admission policies. */
 final class OkeManifests {
+    static void replacementTarget(DeployArtifact artifact,String compartment,String project,String namespace,String app){
+        inspect(List.of(artifact),compartment,project,namespace);
+        var options=new LoaderOptions();options.setAllowDuplicateKeys(false);options.setMaxAliasesForCollections(0);options.setCodePointLimit(524288);options.setNestingDepthLimit(30);
+        int deployments=0;
+        try{
+            for(var raw:new Yaml(new SafeConstructor(options)).loadAll(new String(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent(),StandardCharsets.UTF_8))){
+                var doc=map(raw);String kind=text(doc,"kind");
+                if(!Set.of("Deployment","Service","Namespace").contains(kind))throw Errors.SCOPE.exception();
+                if(kind.equals("Deployment")){deployments++;if(!app.equals(text(map(doc.get("metadata")),"name")))throw Errors.SCOPE.exception();}
+            }
+            if(deployments!=1)throw Errors.SCOPE.exception();
+        }catch(Exception e){throw Errors.SCOPE.exception();}
+    }
     record Inspection(List<String> images,Map<String,List<String>> architectures,List<Job> jobs) {}
     static List<String> inspect(List<DeployArtifact> artifacts,String compartment,String project,String namespace){return inspectDetails(artifacts,compartment,project,namespace).images();}
     static Inspection inspectDetails(List<DeployArtifact> artifacts,String compartment,String project,String namespace){
