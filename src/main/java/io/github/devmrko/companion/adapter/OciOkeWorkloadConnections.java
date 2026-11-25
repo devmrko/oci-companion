@@ -59,7 +59,7 @@ public class OciOkeWorkloadConnections implements OkeWorkloadConnections {
   if(!(info.get("server") instanceof String server)||!(info.get("certificate-authority-data") instanceof String ca))throw new IllegalArgumentException();
   var uri=URI.create(server);if(!"https".equals(uri.getScheme())||uri.getHost()==null||uri.getUserInfo()!=null||uri.getQuery()!=null||uri.getFragment()!=null||!(uri.getPath().isEmpty()||uri.getPath().equals("/")))throw new IllegalArgumentException();
   if(ca.length()>131072||Base64.getDecoder().decode(ca).length==0)throw new IllegalArgumentException();
-  var args=List.of("ce","cluster","generate-token","--cluster-id",cluster,"--region",r,"--profile",c.profile(),"--config-file",config,"--auth","api_key");
+  var args=List.of("ce","cluster","generate-token","--cluster-id",cluster,"--region",r,"--profile",c.profile(),"--config-file",config,"--auth",OciProfiles.cliAuth(config,c.profile()));
   var exec=Map.of("apiVersion","client.authentication.k8s.io/v1beta1","command",oci,"args",args,"interactiveMode","Never");
   return JsonMapper.builder().build().writeValueAsString(Map.of("apiVersion","v1","kind","Config","clusters",List.of(Map.of("name","cluster","cluster",Map.of("server",server,"certificate-authority-data",ca))),"users",List.of(Map.of("name","profile","user",Map.of("exec",exec))),"contexts",List.of(Map.of("name","selected","context",Map.of("cluster","cluster","user","profile"))),"current-context","selected"));
  }

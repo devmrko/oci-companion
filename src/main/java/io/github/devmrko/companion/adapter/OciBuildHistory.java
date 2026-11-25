@@ -1,7 +1,7 @@
 package io.github.devmrko.companion.adapter;
 
 import com.oracle.bmc.ClientConfiguration;
-import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
+import com.oracle.bmc.auth.AuthenticationDetailsProvider;
 import com.oracle.bmc.devops.DevopsClient;
 import com.oracle.bmc.devops.requests.*;
 import com.oracle.bmc.retrier.RetryConfiguration;
@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 public class OciBuildHistory implements BuildHistory {
     private final String path;
     public OciBuildHistory(@Value("${companion.oci-config}") String path) { this.path=path; }
-    ConfigFileAuthenticationDetailsProvider authentication(Connection c) throws java.io.IOException {
-        var auth=new ConfigFileAuthenticationDetailsProvider(path,c.profile());
+    AuthenticationDetailsProvider authentication(Connection c) throws java.io.IOException {
+        var auth=OciProfiles.load(path,c.profile());
         if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user())) throw Errors.SCOPE.exception();
         return auth;
     }

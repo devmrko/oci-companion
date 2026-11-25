@@ -1,7 +1,7 @@
 package io.github.devmrko.companion.adapter;
 
 import com.oracle.bmc.ClientConfiguration;
-import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
+import com.oracle.bmc.auth.AuthenticationDetailsProvider;
 import com.oracle.bmc.devops.DevopsClient;
 import com.oracle.bmc.devops.model.CreateBuildRunDetails;
 import com.oracle.bmc.devops.model.CreateDeployPipelineDeploymentDetails;
@@ -41,22 +41,22 @@ public class OciCloud implements CloudConnection, PipelineGateway {
             return List.copyOf(names);
         } catch (IOException e) { return List.of(); }
     }
-    private ConfigFileAuthenticationDetailsProvider provider(String profile) throws IOException {
+    private AuthenticationDetailsProvider provider(String profile) throws IOException {
         if (!profiles().contains(profile)) throw Errors.CONFIG.exception();
-        return new ConfigFileAuthenticationDetailsProvider(configPath,profile);
+        return OciProfiles.load(configPath,profile);
     }
     public Connection connect(String profile) {
         try {
             var auth=provider(profile);
             try (var identity=IdentityClient.builder().configuration(CONFIG).build(auth)) {
                 var tenancy=identity.getTenancy(GetTenancyRequest.builder().tenancyId(auth.getTenantId()).build()).getTenancy();
-                return new Connection(profile,auth.getTenantId(),auth.getUserId(),auth.getRegion().getRegionId(),tenancy.getName(),false);
+                return new Connection(profile,auth.getTenantId(),auth.getUserId(),((com.oracle.bmc.auth.RegionProvider)auth).getRegion().getRegionId(),tenancy.getName(),false);
             }
         } catch (Exception e) { throw Errors.CONFIG.exception(); }
     }
     private DevopsClient client(Connection c) throws IOException {
         var auth=provider(c.profile());
-        if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user()) || !auth.getRegion().getRegionId().equals(c.region())) throw Errors.SCOPE.exception();
+        if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user()) || !((com.oracle.bmc.auth.RegionProvider)auth).getRegion().getRegionId().equals(c.region())) throw Errors.SCOPE.exception();
         return DevopsClient.builder().configuration(CONFIG).build(auth);
     }
     public List<Pipeline> pipelines(Connection c,String compartment) {
