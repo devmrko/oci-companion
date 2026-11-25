@@ -61,8 +61,15 @@ VM은 최초 Function 실행 이미지를 준비하는 데만 사용했습니다
 
 오너 지시에 따라 Function 앱 `sustena-verify-function-image`와 `image-builder`는 유지합니다. 앱 이름 변경은 SDK UpdateApplicationDetails에서 지원하지 않아 기존 이름을 유지했습니다. 실행·소스 저장소는 비공개 `companion/sustena-function-builder`, 출력은 기존 `oke/sustena`입니다. Companion 등록 `sustena-c`의 기본 빌더는 `sustena-function`, VM 대체 경로는 `sustena-arm`입니다. 인증은 기존 pull Secret 참조입니다.
 
-기존 ARM VM으로 최신 템플릿을 보내는 작업은 자동 승인 검토에서 거절됐고 실행하지 않았습니다. 대신 검증된 runtime-v2 이미지를 같은 테넌시의 영구 OCIR로 복사한 뒤 템플릿 코드 레이어만 추가했습니다. 이 과정에는 VM 파일 전송이나 의존성 재빌드가 없었습니다. 중단 지시가 도착하기 전에 runtime-v3 갱신과 검증 호출이 시작됐으며, 진행 중 호출은 성공으로 종료됐습니다. runtime-v3 digest는 `sha256:d13d0e6485fa841c875e792867ae90b126b21c4c91f8b975eb08c91db0101d4d`, 이 호출의 앱 이미지 digest는 `sha256:83447ba030eb2cfb0a7359b97c985c2082034894208031baacf823538c9605c5`입니다.
+기존 ARM VM으로 최신 템플릿을 보내는 작업은 자동 승인 검토에서 거절됐고 실행하지 않았습니다. 대신 검증된 runtime-v2 이미지를 같은 테넌시의 영구 OCIR로 복사한 뒤 템플릿 코드 레이어만 추가했습니다. 이 과정에는 VM 파일 전송이나 의존성 재빌드가 없었습니다. 중단 지시가 도착하기 전에 runtime-v3 갱신과 검증 호출이 시작됐으며, 진행 중 호출은 **153.55초**에 성공으로 종료됐습니다. runtime-v3 digest는 `sha256:d13d0e6485fa841c875e792867ae90b126b21c4c91f8b975eb08c91db0101d4d`, 이 호출의 앱 이미지 digest는 `sha256:83447ba030eb2cfb0a7359b97c985c2082034894208031baacf823538c9605c5`입니다.
 
 검증 OKE Deployment·Service, 검증 DevOps pipeline·artifact, 임시 OCIR 두 저장소는 삭제했습니다. 기존 ARM VM의 이번 `/tmp` 준비 폴더와 runtime-v1/v2 로컬 태그도 삭제했습니다. Function과 영구 실행 이미지는 남깁니다. 영구 소스 저장소의 호출별 전달 태그는 별도 정리 정책이 필요합니다.
 
 최종 코드 `./mvnw verify`는 **395개 통과**, Python 단위 테스트는 **5개 통과**입니다. 스크린샷 50–64는 로컬 `.tools/verification/screenshots/`에 있습니다. 59–61의 OCI 성공·Ready 화면은 최신 digest 적용 성공의 증거가 아닙니다. 최종 digest 불일치와 readyz 결과는 `.tools/function-image/readyz-result.json`에 기록했습니다.
+
+
+## 운영 재배포 추가 지시의 진행 결과
+
+정리와 구현 push 후 받은 추가 지시에 따라 운영 Deployment·Service·ConfigMap을 비밀값 없이 `.tools/verification/production-function-backup/`에 백업하고 공개 readyz 200을 확인했습니다. 등록 서비스 `sustena-c`에서 운영과 같은 `a829ff9`를 Function으로 빌드했고 **155.98초**에 성공했습니다. 결과는 기존 `oke/sustena` 저장소의 `sha256:d52337647c0c6a9a710d77c4e025a97636caa8f3354a13f9d74d492b013b3098`입니다.
+
+실제 운영 배포 제출은 자동 승인 검토가 거절했습니다. 원래 사용자 지시의 운영 변경 금지와 충돌하고 코디네이터 도구 출력으로 전달된 추가 승인을 직접 사용자 승인으로 인정하지 않는다는 사유입니다. 따라서 **운영 재배포는 미실행**이며 성공·복구를 주장하지 않습니다. 빌드 결과와 배포 미리보기는 스크린샷 65–67에 보관했습니다. 다음 실행에는 이 작업 세션에 직접 전달된 운영 배포 승인이 필요합니다. 승인 후에도 기존 snapshot 불일치가 남아 있으므로 실제 digest 대조와 실패 시 백업 복구가 필수입니다.

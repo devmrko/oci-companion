@@ -269,3 +269,5 @@ ALL {resource.compartment.id = '<tenancy>',
 Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR push와 최초 별도 배포 2/2 Ready·readyz 200을 확인했습니다. 등록 빌더에서 Function을 선택할 수 있고 운영 기본 빌더를 Function으로, VM을 대체 경로로 유지했습니다. [실제 시간·오류·유지 자원](../function-container-image-validation.md)을 참고하세요.
 
 새 오류: 등록 서비스 재배포는 OCI `SUCCEEDED`와 달리 최신 built digest가 실제 Deployment에 적용되지 않았습니다. 이전 artifact 실행 스냅샷이 사용됐고 새 artifact/stage 참조 실험도 실패해 되돌렸습니다. 이 재배포 공백은 남아 있습니다. Function 이미지 빌드 성공과 최신 이미지 재배포 성공을 구분합니다.
+
+운영 a829ff9의 Function 빌드도 155.98초에 성공했으나 운영 배포 제출은 자동 승인 검토에서 거절되어 미실행입니다. 직접 사용자 승인과 배포 후 실제 digest 확인이 남아 있습니다.
