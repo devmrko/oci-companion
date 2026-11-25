@@ -37,4 +37,7 @@ class OkeRuntimeInputsTest {
   var store=new OkeDeploymentInputs(new JsonBuildSpecDraftStore(directory.toString()));store.save(c,"region","comp",i);
   var reloaded=new OkeDeploymentInputs(new JsonBuildSpecDraftStore(directory.toString()));assertEquals(i,reloaded.read(c,"region","comp","env").orElseThrow());assertTrue(reloaded.read(c,"region","other","env").isEmpty());assertTrue(reloaded.read(new Connection("profile","tenant","other","region","label",false),"region","comp","env").isEmpty());assertTrue(reloaded.read(c,"region","comp","other-env").isEmpty());
  }
+ @Test void nodePortUsesSeparateServiceNameAndRequestedPort(){
+  String yaml=OkeDeploymentManifest.render(input(Map.of("serviceType","NodePort","nodePort",31084,"serviceName","sustena-verify-nodeport")),IMAGE);var docs=new ArrayList<Map>();new Yaml().loadAll(yaml).forEach(x->docs.add((Map)x));var service=docs.stream().filter(d->"Service".equals(d.get("kind"))).findFirst().orElseThrow();assertEquals("sustena-verify-nodeport",((Map)service.get("metadata")).get("name"));assertEquals("NodePort",((Map)service.get("spec")).get("type"));assertTrue(yaml.contains("nodePort: 31084"));
+ }
 }

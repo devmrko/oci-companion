@@ -26,4 +26,12 @@ class OkeRuntimePreparationTest {
   var i=mapper.convertValue(values,OkeDeploymentSetup.Input.class);var report=DefaultOkeRuntimePreparation.evaluate(snapshot(true,"8080","Opaque","ClusterIP"),i);
   assertFalse(report.allowed());assertTrue(report.checks().stream().anyMatch(check->check.key().equals("secrets/wallet")&&check.state()==OkeRuntimePreparation.State.FAIL));
  }
+ @Test void nodePortChecksAllNamespacesAndAllowsSameServiceRedeployment(){
+  var mapper=com.fasterxml.jackson.databind.json.JsonMapper.builder().build();var values=mapper.convertValue(input("","",false),Map.class);values.put("serviceType","NodePort");values.put("nodePort",31084);values.put("serviceName","public");var input=mapper.convertValue(values,OkeDeploymentSetup.Input.class);
+  var resources=mock(OkeRuntimeResources.class);when(resources.read(any(),any(),any(),any(),any(),any())).thenReturn(snapshot(true,"8080","Opaque","ClusterIP"));
+  when(resources.nodePorts(any(),any(),any(),any(),any(),any())).thenReturn(new OkeRuntimeResources.NodePorts(true,List.of(new OkeRuntimeResources.AllocatedPort("other","existing",31084))));
+  var preparation=new DefaultOkeRuntimePreparation(resources);assertFalse(preparation.inspect(null,"r","comp",input).allowed());
+  when(resources.nodePorts(any(),any(),any(),any(),any(),any())).thenReturn(new OkeRuntimeResources.NodePorts(true,List.of(new OkeRuntimeResources.AllocatedPort("ns","public",31084))));assertTrue(preparation.inspect(null,"r","comp",input).allowed());
+  when(resources.nodePorts(any(),any(),any(),any(),any(),any())).thenReturn(new OkeRuntimeResources.NodePorts(false,List.of()));assertFalse(preparation.inspect(null,"r","comp",input).allowed());
+ }
 }
