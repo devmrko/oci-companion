@@ -36,4 +36,13 @@ class OciPipelineIamTest {
         var changed=new PipelineIam.Check(true,false,"new-group",true,"rule",List.of(),List.of(),"");doReturn(changed).when(adapter).inspect(c,"r","comp","pipeline");
         assertThrows(RuntimeException.class,()->adapter.create(c,"r","comp","pipeline",check,"12345678-1234-1234-1234-123456789012"));
     }
+    @Test void listSummariesLoadMissingRuleAndStatementsBeforeEvaluating()throws Exception {
+        var adapter=spy(new OciPipelineIam(mock(OciBuildHistory.class)));var client=mock(IdentityClient.class,RETURNS_DEEP_STUBS);
+        doNothing().when(adapter).scope(any(),any(),any(),any());doReturn(client).when(adapter).identity(c);
+        when(client.getPaginators().listDynamicGroupsRecordIterator(any())).thenReturn(List.of(DynamicGroup.builder().id("g").name("builders").lifecycleState(DynamicGroup.LifecycleState.Active).build()));
+        when(client.getDynamicGroup(any())).thenReturn(GetDynamicGroupResponse.builder().dynamicGroup(DynamicGroup.builder().matchingRule("resource.id = 'pipeline'").build()).build());
+        when(client.getPaginators().listPoliciesRecordIterator(any())).thenReturn(List.of(Policy.builder().id("policy").lifecycleState(Policy.LifecycleState.Active).build()));
+        when(client.getPolicy(any())).thenReturn(GetPolicyResponse.builder().policy(Policy.builder().statements(List.of("Allow dynamic-group builders to manage all-resources in tenancy")).build()).build());
+        assertTrue(adapter.inspect(c,"r","tenant","pipeline").ready());verify(client).getDynamicGroup(any());verify(client).getPolicy(any());
+    }
 }

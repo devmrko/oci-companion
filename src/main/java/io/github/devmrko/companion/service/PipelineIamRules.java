@@ -14,7 +14,7 @@ public final class PipelineIamRules {
         return "ALL {resource.compartment.id = '"+compartment+"', ANY {resource.type = 'devopsbuildpipeline', resource.type = 'devopsdeploypipeline'}}";
     }
     public static boolean matches(String rule, String pipeline, String compartment) {
-        String value=rule.strip();
+        if(rule==null)return false;String value=rule.strip();
         var combined=Pattern.compile("(?is)^(ALL|ANY)\\s*\\{(.*)}$").matcher(value);
         if(combined.matches()) {
             var parts=new ArrayList<String>(); int depth=0,start=0;

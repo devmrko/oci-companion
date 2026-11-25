@@ -38,13 +38,23 @@ public class OciPipelineIam implements PipelineIam {
             try(var client=identity(c)) {
                 var groups=new ArrayList<PipelineIamRules.Group>();
                 for(var group:client.getPaginators().listDynamicGroupsRecordIterator(ListDynamicGroupsRequest.builder().compartmentId(c.tenancy()).build()))
-                    if(group.getLifecycleState()==DynamicGroup.LifecycleState.Active)groups.add(new PipelineIamRules.Group(group.getId(),group.getName(),group.getMatchingRule()));
+                    if(group.getLifecycleState()==DynamicGroup.LifecycleState.Active){
+                        String matching=group.getMatchingRule();
+                        if(matching==null)matching=client.getDynamicGroup(GetDynamicGroupRequest.builder().dynamicGroupId(group.getId()).build()).getDynamicGroup().getMatchingRule();
+                        if(matching==null)throw new IllegalStateException("동적 그룹 규칙을 조회하지 못했습니다.");
+                        groups.add(new PipelineIamRules.Group(group.getId(),group.getName(),matching));
+                    }
                 var statements=new ArrayList<String>();var ancestors=new HashSet<String>();var visited=new HashSet<String>();String current=compartment;
                 while(true) {
                     if(!visited.add(current))throw new IllegalStateException("구획 계층을 확인하지 못했습니다.");
                     ancestors.add(current);
                     for(var policy:client.getPaginators().listPoliciesRecordIterator(ListPoliciesRequest.builder().compartmentId(current).build()))
-                        if(policy.getLifecycleState()==Policy.LifecycleState.Active)statements.addAll(policy.getStatements());
+                        if(policy.getLifecycleState()==Policy.LifecycleState.Active){
+                            var grants=policy.getStatements();
+                            if(grants==null)grants=client.getPolicy(GetPolicyRequest.builder().policyId(policy.getId()).build()).getPolicy().getStatements();
+                            if(grants==null)throw new IllegalStateException("정책 문장을 조회하지 못했습니다.");
+                            statements.addAll(grants);
+                        }
                     if(current.equals(c.tenancy()))break;
                     var parent=client.getCompartment(GetCompartmentRequest.builder().compartmentId(current).build()).getCompartment();
                     ancestors.add(parent.getName());current=parent.getCompartmentId();
