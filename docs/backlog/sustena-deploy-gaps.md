@@ -36,9 +36,9 @@ Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다
 - ARM 러너 점검은 현재 SDK의 지원 이미지 목록에 근거합니다. OCI 전체 서비스의 ARM 러너 제공 여부를 증명하지 않습니다. 원격 빌드의 테스트 단계는 Python AST 검사이며 Sustena 전체 단위 테스트 실행은 아닙니다.
 - NodePort 생성·규칙 추가/제거·Pod Ready는 확인했지만 외부 HTTP 요청 성공은 별도 검증하지 않았습니다.
 - 소스 push의 실제 검증은 OCI 저장소 간 새 브랜치 전달입니다. 초기 브랜치 충돌 방지는 회귀 테스트로 확인했습니다.
-- 운영 `sustena-c` 재배포는 아래 후속 검증에서 완료했습니다. 반복 사용을 위한 OCIR 인증 자동화와 운영 서비스 등록은 후속 작업입니다.
+- 운영 `sustena-c` 재배포는 아래 후속 검증에서 완료했습니다. OCIR 인증 자동화와 운영 서비스 등록은 아래 B2·B3에서 완료했습니다.
 
-최신 `./mvnw verify`: **378개 테스트 통과**. 로그는 `/tmp/ridley-verify-1.log`, 스크린샷은 이 작업 트리의 `.tools/verification/screenshots/`에 있으며 Git에는 포함하지 않습니다. 전체 OCID·비밀값·API 키 지문을 문서에 남기지 않습니다.
+초기 보강 검증의 `./mvnw verify`: **378개 테스트 통과**. 로그는 `/tmp/ridley-verify-1.log`, 스크린샷은 이 작업 트리의 `.tools/verification/screenshots/`에 있으며 Git에는 포함하지 않습니다. 전체 OCID·비밀값·API 키 지문을 문서에 남기지 않습니다.
 
 ## 운영 재배포 (후속 오너 승인, 2026-11-25)
 
@@ -100,8 +100,28 @@ Cloud Shell은 [공식 문서](https://docs.oracle.com/en-us/iaas/Content/API/Co
 - 첫 등록 시 초기 배포가 아직 접수되지 않아 Deployment 조회가 실패했습니다. OCI 이력이 0건임을 확인한 뒤 초기 배포를 실행했고, 완료 후 등록이 성공했습니다. 대기 중 Deployment가 없을 때의 안내와 화면을 벗어난 실행 결과 복귀는 B4에서 보강합니다.
 - 운영 Deployment·Service의 전체 spec과 ConfigMap 데이터는 사전 백업과 동일하며 운영 Ready 2를 재확인했습니다.
 - 스크린샷: `38-production-service-registered.png`, `41-verification-service-registered.png`, `42-service-build-result.png`, `43-service-deploy-preview.png`, `44-service-deploy-result.png`, `45-service-ready.png`.
-- `./mvnw verify`: **390개 통과**, 실패·오류·건너뜀 0. 검증용 B2/B3 리소스는 B4 확인 후 정리합니다.
+- `./mvnw verify`: **390개 통과**, 실패·오류·건너뜀 0. 검증용 B2/B3 리소스 정리 결과는 아래 B4에 기록했습니다.
 
+
+## B4: 실제 사용 흐름 보완과 최종 정리
+
+실행 화면을 벗어난 뒤에도 서비스를 선택해 최근 실행으로 돌아갈 수 있습니다. 최근 시작·조회한 실행 20개를 사용자·리전·구획별로 저장하며, 링크를 열면 기존 빌드·배포 실행기의 현재 상태를 다시 조회합니다.
+
+이번 실제 사용에서 확인해 고친 항목:
+
+- 서비스에 보관한 배포 구성을 **이 서비스 구성으로 편집**으로 복원합니다. 같은 OKE 환경에 여러 앱을 구성한 뒤에도 다른 앱의 마지막 입력을 잘못 이어 쓰지 않도록 했습니다. 실제 `sustena-c` 구성을 복원했고 클라우드 변경은 없었습니다.
+- ARM 빌더 목록에 호스트와 인증 방식·Secret 이름 참조를 보여 주며 운영 서비스로 돌아갈 수 있게 했습니다. 인증값은 표시하지 않습니다.
+- 초기 Deployment가 있어야 서비스 등록이 가능하다는 안내와, 실패 시 배포 이력·사설 API·빌더 인증·OCI 연결로 이동하는 경로를 추가했습니다. 오류 화면에 공통 스타일을 적용했습니다.
+- OCI Git 사용자명에 도메인을 포함하는 예시를 소스 push 입력에 추가했습니다.
+- 서비스 등록 해제를 추가했습니다. 로컬 등록만 해제하며 클라우드 자원과 기존 실행은 삭제·취소하지 않습니다. 테스트는 해제 후 배포 계획 거부, 이력 보존, 구성 복원 시 클라우드 변경 없음, 재시작 후 이력·사용자 범위 분리를 확인합니다.
+
+전체 `./mvnw verify` **392개 통과**, 실패·오류·건너뜀 0. 실제 서버 재시작 후 저장된 서비스·빌더를 사용했고 실행 복귀, 인증 참조 표시, 운영 구성 복원, 검증 서비스 등록 해제를 화면으로 확인했습니다. 스크린샷은 `46-service-history.png`, `47-builder-auth-reference.png`, `48-production-configuration-restored.png`, `49-production-service-retained.png`입니다.
+
+최종 정리: B2/B3의 `sustena-verify-service` Deployment·ClusterIP Service·Pod, 같은 이름의 DevOps 파이프라인·단계·명세, `sustena-verify-auth` OCIR 저장소와 VM 이미지 태그 두 개를 삭제했습니다. 이름으로 재조회한 검증용 OCI·Kubernetes 리소스는 **0개**입니다. 검증 서비스 등록과 두 검증 OKE 조회 연결도 해제했습니다. 운영 Ready는 Sustena 2·Knowledge MCP 2·Finance MCP 1이며, 운영 Deployment·Service·ConfigMap 비교 결과 변경 없음입니다. B 단계에서는 IAM·보안 규칙을 생성하거나 수정하지 않았습니다.
+
+운영 `sustena-c` 등록, `sustena-arm` 빌더의 기존 Secret 참조, `sustena-c-companion` 파이프라인·명세는 유지합니다. 로컬 설정은 이 작업 트리의 `.tools/verification/data`에 있으므로 이어 사용할 때 같은 `--companion.data-dir`을 지정해야 합니다. 비밀값을 포함할 수 있는 런타임 파일과 백업은 Git에서 제외합니다. 검증용 서버와 브라우저는 작업 종료 때 중지합니다.
+
+남은 한계는 B1에 기록한 실제 Cloud Shell ARM 이미지 빌드·Functions 내부 이미지 생성 미검증, IAM이 없는 환경의 생성·전파 과정 미검증, NodePort 검증용 포트의 외부 HTTP 미검증, 이번 ARM 빌드 테스트가 AST 검사에 한정된다는 점입니다. 현재 성공을 확인한 자동 빌드 경로는 ARM VM입니다.
 
 ## 초기 검증 결론
 

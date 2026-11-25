@@ -22,6 +22,23 @@ public class OperatingServices {
  private String key(DeploymentOperations.Context c){if(c.connection().demo())throw Errors.SCOPE.exception();return String.join("\n","operating-services-v1",c.connection().profile(),c.connection().tenancy(),c.connection().user(),c.region(),c.compartment());}
  private void save(String key,Object value){store.save(key,new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(value),Instant.now().toString()));}
  public List<Entry> list(DeploymentOperations.Context c){return store.read(key(c)).map(d->List.of(json.readValue(d.content(),Entry[].class))).orElse(List.of());}
+ public List<Release> recent(DeploymentOperations.Context c,String name){
+  get(c,name);
+  return store.read(key(c)+"\nrecent\n"+name).map(d->List.of(json.readValue(d.content(),String[].class))).orElse(List.of()).stream().map(id->release(c,id)).toList();
+ }
+ private synchronized void remember(DeploymentOperations.Context c,Release release){
+  String name=release.service().registration().name();
+  if(list(c).stream().noneMatch(e->e.registration().name().equals(name)))return;
+  var ids=new ArrayList<>(recent(c,name).stream().map(Release::id).toList());
+  ids.remove(release.id());ids.add(0,release.id());save(key(c)+"\nrecent\n"+name,ids.stream().limit(20).toList());
+ }
+ public OkeDeploymentSetup.Input restoreConfiguration(DeploymentOperations.Context c,String name){
+  var input=get(c,name).deployment();inputs.save(c.connection(),c.region(),c.compartment(),input);return input;
+ }
+ public synchronized void remove(DeploymentOperations.Context c,String name){
+  get(c,name);save(key(c),list(c).stream().filter(e->!e.registration().name().equals(name)).toList());
+  store.delete(key(c)+"\nrecent\n"+name);
+ }
  public Entry get(DeploymentOperations.Context c,String name){return list(c).stream().filter(e->e.registration().name().equals(name)).findFirst().orElseThrow(Errors.MISSING::exception);}
  private Source source(DeploymentOperations.Context c,String id){return catalog.sources(c.connection(),c.region(),c.compartment()).stream().filter(s->s.id().equals(id)&&s.provider().equals("OCI")).findFirst().orElseThrow(Errors.SCOPE::exception);}
  public List<SourceVersions.Ref> commits(DeploymentOperations.Context c,Entry e){return versions.commits(c.connection(),c.region(),c.compartment(),source(c,e.registration().source()),e.registration().branch());}
@@ -47,10 +64,10 @@ public class OperatingServices {
  public BuildPlan prepareBuild(DeploymentOperations.Context c,String name,String commit){if(commit==null||!commit.matches("[a-f0-9]{40}"))throw Errors.INVALID.exception();var e=get(c,name);var r=e.registration();var src=source(c,r.source());var plan=builds.preview(c.connection(),c.region(),c.compartment(),new ArmBuilds.Input(r.builder(),src.resourceId(),commit,e.deployment().repository(),name+"-"+commit.substring(0,Math.min(12,commit.length()))+"-"+UUID.randomUUID().toString().substring(0,8),r.dockerfile(),r.testCommand()));return new BuildPlan(e,commit,plan);}
  public synchronized Release build(DeploymentOperations.Context c,BuildPlan plan){
   if(!get(c,plan.service().registration().name()).equals(plan.service()))throw Errors.BUILD_CHANGED.exception();
-  String run=builds.start(c.connection(),c.region(),c.compartment(),plan.build(),"",new char[0]);var release=new Release(UUID.randomUUID().toString(),plan.service(),plan.commit(),run,"","BUILDING","");save(key(c)+"\n"+release.id(),release);return release;
+  String run=builds.start(c.connection(),c.region(),c.compartment(),plan.build(),"",new char[0]);var release=new Release(UUID.randomUUID().toString(),plan.service(),plan.commit(),run,"","BUILDING","");save(key(c)+"\n"+release.id(),release);remember(c,release);return release;
  }
  public Release release(DeploymentOperations.Context c,String id){if(id==null||!id.matches("[a-f0-9-]{36}"))throw Errors.INVALID.exception();return store.read(key(c)+"\n"+id).map(d->json.readValue(d.content(),Release.class)).orElseThrow(Errors.MISSING::exception);}
- public Status status(DeploymentOperations.Context c,String id){var r=release(c,id);return new Status(r,builds.read(c.connection(),c.region(),c.compartment(),r.buildRun()),r.deploymentRun().isBlank()?null:deployments.status(c,r.service().registration().pipeline(),r.deploymentRun()));}
+ public Status status(DeploymentOperations.Context c,String id){var r=release(c,id);remember(c,r);return new Status(r,builds.read(c.connection(),c.region(),c.compartment(),r.buildRun()),r.deploymentRun().isBlank()?null:deployments.status(c,r.service().registration().pipeline(),r.deploymentRun()));}
  public DeployPlan prepareDeploy(DeploymentOperations.Context c,String id){
   var status=status(c,id);var r=status.release();if(!r.deploymentRun().isBlank()||!r.state().equals("BUILDING")||!status.build().state().equals("SUCCEEDED")||!get(c,r.service().registration().name()).equals(r.service()))throw Errors.BUILD_CHANGED.exception();
   var image=status.build();if(!image.repository().equals(r.service().deployment().repository())||!image.digest().matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();

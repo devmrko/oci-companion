@@ -54,4 +54,22 @@ class OperatingServicesTest {
   when(resources.nodePorts(any(),any(),any(),any(),any(),any())).thenReturn(new OkeRuntimeResources.NodePorts(true,List.of(new OkeRuntimeResources.AllocatedPort("apps","different",31083))));
   assertThrows(RuntimeException.class,()->service.register(context,new OperatingServices.Registration("other","source","main","arm","env","pipeline","Dockerfile","test-command","",31083)));assertEquals(1,service.list(context).size());
  }
+ @Test void recentRunsSurviveServiceRestartAndRemainOwnerScoped(){
+  var run=service.build(context,service.prepareBuild(context,"app",commit));
+  var restarted=new OperatingServices(store,inputs,setup,connections,environments,catalog,versions,builds,registry,access,resources,operations);
+  assertEquals(List.of(run),restarted.recent(context,"app"));
+  restarted.status(context,run.id());assertEquals(1,restarted.recent(context,"app").size());
+  var other=new DeploymentOperations.Context(new Connection("profile","tenant","other","r","label",false),"r","comp","session");
+  assertThrows(RuntimeException.class,()->restarted.release(other,run.id()));
+  assertThrows(RuntimeException.class,()->restarted.recent(other,"app"));
+ }
+ @Test void restoringAndRemovingRegistrationNeverMutatesCloudResources(){
+  var entry=service.get(context,"app");var run=service.build(context,service.prepareBuild(context,"app",commit));
+  assertEquals(entry.deployment(),service.restoreConfiguration(context,"app"));
+  verify(inputs).save(eq(context.connection()),eq("r"),eq("comp"),eq(entry.deployment()));
+  service.remove(context,"app");assertTrue(service.list(context).isEmpty());assertEquals(run,service.release(context,run.id()));
+  assertThrows(RuntimeException.class,()->service.prepareDeploy(context,run.id()));
+  verify(setup,never()).update(any(),any(),any(),any(),any(),any());verify(operations,never()).execute(any(),any());
+ }
+
 }
