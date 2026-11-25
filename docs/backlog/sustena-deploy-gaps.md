@@ -36,9 +36,22 @@ Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다
 - ARM 러너 점검은 현재 SDK의 지원 이미지 목록에 근거합니다. OCI 전체 서비스의 ARM 러너 제공 여부를 증명하지 않습니다. 원격 빌드의 테스트 단계는 Python AST 검사이며 Sustena 전체 단위 테스트 실행은 아닙니다.
 - NodePort 생성·규칙 추가/제거·Pod Ready는 확인했지만 외부 HTTP 요청 성공은 별도 검증하지 않았습니다.
 - 소스 push의 실제 검증은 OCI 저장소 간 새 브랜치 전달입니다. 초기 브랜치 충돌 방지는 회귀 테스트로 확인했습니다.
-- 운영 `sustena-c` 재배포, 반복 사용을 위한 OCIR 인증 자동화와 운영 서비스 등록은 후속 작업입니다.
+- 운영 `sustena-c` 재배포는 아래 후속 검증에서 완료했습니다. 반복 사용을 위한 OCIR 인증 자동화와 운영 서비스 등록은 후속 작업입니다.
 
 최신 `./mvnw verify`: **378개 테스트 통과**. 로그는 `/tmp/ridley-verify-1.log`, 스크린샷은 이 작업 트리의 `.tools/verification/screenshots/`에 있으며 Git에는 포함하지 않습니다. 전체 OCID·비밀값·API 키 지문을 문서에 남기지 않습니다.
+
+## 운영 재배포 (후속 오너 승인, 2026-11-25)
+
+운영 `sustena-c`를 Companion으로 재배포하여 OCI 실행 `SUCCEEDED`, Ready **2/2**, `https://sustena.store/readyz` **200**을 확인했습니다. 운영 이미지는 기존 `a829ff9`의 digest `sha256:d822e917de25d58511296d430e1038a4f5da0c6c0847b1ef66947f97741d4cfb`를 유지했습니다. CLI 패치나 복원은 실행하지 않았습니다.
+
+- 사전 백업: `.tools/verification/production-backup/`의 Deployment·Service·ConfigMap YAML. Secret은 조회하거나 백업하지 않았으며 인라인 비밀 환경변수·민감한 ConfigMap 키가 있으면 중단하도록 검사했습니다. 백업은 Git에서 제외하고 파일 권한 0600으로 보관합니다.
+- 현재 폼에 없는 `runAsUser`, seccomp, 지갑 파일 모드, emptyDir 크기 제한까지 유지하도록 **기존 Deployment 유지 · 이미지만 변경** 경로를 추가했습니다. 현재 단일 컨테이너 Deployment를 읽어 이미지 참조만 바꾸며 Service·Namespace 객체는 만들지 않습니다. 미리보기 이후 리소스 버전이 바뀌면 저장을 중단합니다. 인라인 환경변수를 포함한 Deployment는 이 경로에서 거부합니다.
+- 저장 전 생성 명세와 백업의 전체 `spec`이 동일함을 확인했습니다. 실행 후에도 Deployment `spec`, `sustena-c-nodeport` Service `spec`, `sustena-config` ConfigMap 데이터가 동일했습니다. NodePort 31083·nginx·보안 규칙·Secret은 변경하지 않았습니다.
+- 운영 재배포에 사용하는 새 DevOps 파이프라인 `sustena-c-companion`과 명세는 유지합니다. 운영 조회 연결 `sustena-c`도 등록했습니다. 검증 리소스가 아닌 후속 운영 서비스 등록 대상입니다.
+- 스크린샷: `29-production-readyz-before.png`, `30-production-preview.png`, `31-production-started.png`, `32-production-deployment-result.png`, `33-production-ready.png`, `34-production-readyz-after.png` (앞 절과 같은 폴더).
+- 전체 `./mvnw verify`: **380개 통과**, 0 실패·오류·건너뜀. 기능 커밋 `cc4a2ee`.
+
+후속 B 단계에서는 ARM 빌드 대안 조사, OCIR 인증 재사용, 운영 서비스에서 이어지는 빌드·배포 흐름을 진행합니다.
 
 ## 초기 검증 결론
 
