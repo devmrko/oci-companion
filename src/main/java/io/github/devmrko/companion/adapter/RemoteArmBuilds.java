@@ -104,7 +104,13 @@ bash -o pipefail -c %s
 stage build
 podman build "${auth[@]}" --platform linux/arm64 --file "$dockerfile" --tag %s .
 stage push
-podman push "${auth[@]}" --digestfile "$work/digest" %s
+if ! podman push "${auth[@]}" --digestfile "$work/digest" %s 2>"$work/push-error"; then
+ printf 'COMPANION_PUSH_ERROR=' >&3
+ head -c 512 "$work/push-error" | base64 | tr -d '\\n' >&3
+ printf '\\n' >&3
+ cat "$work/push-error" >>"$work/build.log"
+ exit 125
+fi
 digest=$(cat "$work/digest")
 [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
 printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
@@ -119,6 +125,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    String script=script(plan,work,username,password);Arrays.fill(password,'\0');
    command(builder,"bash -s",new ByteArrayInputStream(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)),1800,line->{
     if(line.startsWith("COMPANION_PHASE=")){String step=line.substring(16);if(Set.of("architecture","source","test","build","push").contains(step))phase(identity,step);}
+    if(line.startsWith("COMPANION_PUSH_ERROR="))try{remoteError.set(PipelineIamRules.safe(new String(Base64.getDecoder().decode(line.substring(21)),java.nio.charset.StandardCharsets.UTF_8)));}catch(IllegalArgumentException ignored){}
     if(line.equals("COMPANION_ERROR=registry-auth"))remoteError.set("레지스트리 인증·push 권한 오류입니다. 실행 미리보기에서 OCIR 사용자와 Auth token을 지정하세요.");
     if(line.equals("COMPANION_ERROR=disk-space"))remoteError.set("원격 VM의 디스크 공간이 부족합니다.");
     if(line.equals("COMPANION_ERROR=tls"))remoteError.set("원격 VM의 레지스트리 TLS 인증서 연결을 확인하세요.");

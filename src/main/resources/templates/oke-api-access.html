@@ -1,9 +1,9 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OKE API 접속 설정')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content">
 <h1>OKE API 접속 설정</h1><p>상태·로그 조회와 배포 참조 확인에 같은 설정을 사용합니다.</p><p th:if="${message}" th:text="${message}"></p>
-<form method="get" th:action="@{/environments/oke/access}"><label>클러스터<select name="cluster"><option value="">선택하세요</option><option th:each="item : ${clusters}" th:value="${item.id()}" th:text="${item.name()}" th:selected="${item.id()==cluster}"></option></select></label><button>선택</button></form>
+<form method="get" th:action="@{/environments/oke/access}"><label>클러스터<select class="ui-control" name="cluster"><option value="">선택하세요</option><option th:each="item : ${clusters}" th:value="${item.id()}" th:text="${item.name()}" th:selected="${item.id()==cluster}"></option></select></label><button class="ui-button">선택</button></form>
 <form th:if="${settings != null}" method="post" th:action="@{/environments/oke/access}" th:object="${settings}" class="card section-stack"><input type="hidden" name="ticket" th:value="${ticket}">
 <label>API 접속 주소 (HTTPS)<input class="ui-control" th:field="*{server}" placeholder="https://127.0.0.1:6443"></label><label>TLS 서버 이름<input class="ui-control" th:field="*{tlsServerName}" placeholder="API 인증서의 이름 또는 IP"></label><p>직접 터널을 쓰면 로컬 주소를 입력하세요. 비워두면 OCI에서 받은 주소를 사용합니다. TLS 인증서 검증은 유지합니다.</p>
 <details><summary>Companion이 SSH 터널 관리</summary><p>위 API 접속 주소에는 점프 호스트에서 접근할 사설 API 주소를 입력하세요. 첫 조회에서 터널을 열고 설정 변경·앱 종료 시 닫습니다.</p>
 <label>점프 호스트<input class="ui-control" th:field="*{jumpHost}"></label><label>SSH 사용자<input class="ui-control" th:field="*{jumpUser}"></label><label>SSH 개인 키의 절대 경로<input class="ui-control" th:field="*{keyPath}"></label><p>키 내용은 입력하지 마세요. 앱 실행 계정의 known_hosts에 등록된 호스트만 연결합니다.</p></details>
-<button name="action" value="save">접속 설정 저장</button><button name="action" value="disconnect">열린 터널 닫기</button></form>
+<button class="ui-button" name="action" value="save">접속 설정 저장</button><button class="ui-button" name="action" value="disconnect">열린 터널 닫기</button></form>
 <a th:href="@{/agents/connections/oke}">OKE 조회 연결</a> · <a th:href="@{/deployments/oke/configure}">배포 구성</a></main></body></html>
