@@ -76,6 +76,14 @@ public class OperatingServices {
   if(run.state().equals("SUCCEEDED")&&(target.isEmpty()||!digest.matches("sha256:[a-f0-9]{64}")))return new DeploymentRuns.Run(run.id(),run.name(),"UNVERIFIED","빌드 digest와 실제 Pod 비교 기록이 없어 성공을 확인하지 못했습니다.",run.steps(),run.cloudState(),images);
   return new DeploymentRuns.Run(run.id(),run.name(),run.state(),run.detail(),run.steps(),run.cloudState(),images);
  }
+ public synchronized DeployPlan prepareRedeploy(DeploymentOperations.Context c,String id){
+  var previous=status(c,id);var old=previous.release();
+  if(!old.state().equals("DEPLOYED")||previous.deployment()==null||!List.of("SUCCEEDED","FAILED","CANCELED").contains(previous.deployment().cloudState())||!previous.build().state().equals("SUCCEEDED")||!get(c,old.service().registration().name()).equals(old.service()))throw Errors.BUILD_CHANGED.exception();
+  var next=new Release(UUID.randomUUID().toString(),old.service(),old.commit(),old.buildRun(),"","BUILDING","");
+  save(key(c)+"\n"+next.id(),next);
+  try{var plan=prepareDeploy(c,next.id());remember(c,next);return plan;}
+  catch(RuntimeException e){store.delete(key(c)+"\n"+next.id());throw e;}
+ }
  public DeployPlan prepareDeploy(DeploymentOperations.Context c,String id){
   var status=status(c,id);var r=status.release();if(!r.deploymentRun().isBlank()||!r.state().equals("BUILDING")||!status.build().state().equals("SUCCEEDED")||!get(c,r.service().registration().name()).equals(r.service()))throw Errors.BUILD_CHANGED.exception();
   var image=status.build();if(!image.repository().equals(r.service().deployment().repository())||!image.digest().matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();

@@ -79,4 +79,13 @@ class OperatingServicesTest {
   var checked=OperatingServices.bindBuildDigest(run,built,"ns","app");assertEquals("FAILED",checked.state());assertEquals(built,checked.images().getFirst().expected());assertEquals(old,checked.images().getFirst().actual());
  }
 
+ @Test void completedBuildCanCreateNewPreviewWithoutRepeatingCloudWork(){
+  var original=service.build(context,service.prepareBuild(context,"app",commit));var deployed=service.deploy(context,service.prepareDeploy(context,original.id()));
+  when(operations.status(any(),any(),any())).thenReturn(new DeploymentRuns.Run("deployment-run","name","UNVERIFIED","",List.of(),"SUCCEEDED",List.of()));
+  var preview=service.prepareRedeploy(context,deployed.id());assertNotEquals(deployed.id(),preview.release().id());assertEquals(deployed.buildRun(),preview.release().buildRun());assertEquals(deployed,service.release(context,deployed.id()));
+  verify(builds,times(1)).start(any(),any(),any(),any(),any(),any());verify(operations,times(1)).execute(any(),any());
+  when(operations.status(any(),any(),any())).thenReturn(new DeploymentRuns.Run("deployment-run","name","IN_PROGRESS",""));assertThrows(RuntimeException.class,()->service.prepareRedeploy(context,deployed.id()));
+  when(operations.status(any(),any(),any())).thenReturn(new DeploymentRuns.Run("deployment-run","name","SUCCEEDED",""));service.register(context,registration);assertThrows(RuntimeException.class,()->service.prepareRedeploy(context,deployed.id()));
+ }
+
 }

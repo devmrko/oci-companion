@@ -56,3 +56,16 @@ Companion은 OKE Deployment 배포에서 OCI 실행 완료와 앱 이미지 적�
 ## 정리 결과
 
 검증 Deployment·Pod, 검증 DevOps stage·pipeline, 검증 artifact 4개를 삭제했습니다. 공용 project·OKE environment와 기존 이미지 저장소는 유지했습니다. 운영 `sustena-c` Deployment spec, `sustena-c-nodeport` Service spec, `sustena-config` 데이터가 이전 백업과 동일하고 운영 Ready 2개임을 읽기 전용으로 확인했습니다. 최종 전체 verify도 407개 통과·실제 테스트 1개 기본 skip으로 완료했습니다.
+
+## 직접 승인 후 운영 적용 — 2026-11-26
+
+오너가 이 작업자 터미널에서 운영 배포와 실패 시 백업 복구를 직접 승인한 뒤, 등록 서비스 `sustena-c`의 기존 Function 빌드 `d52337647c0c…`를 재사용해 새 배포를 실행했습니다. 완료된 빌드에도 **같은 digest로 새 배포 미리보기**를 제공하며, 이전 실행 기록은 보존합니다. 진행 중·결과 불명 배포, 변경된 서비스 등록은 재사용할 수 없고, 실제 배포에는 기존 확인 티켓과 명세 재검증을 그대로 적용합니다.
+
+07:09 KST 이후 최종 검증에서 다음 항목을 모두 확인했습니다.
+
+- OCI와 Companion 모두 SUCCEEDED, 실제 소유 Pod 2개 모두 기대 `d52337647c0c…` digest와 일치하고 Ready.
+- 외부 `https://sustena.store/readyz` HTTP 200.
+- 이미지 필드 외 Deployment spec, 기존 NodePort Service spec, ConfigMap 데이터가 재배포 직전 백업과 동일.
+- CLI 패치·기존 IAM/보안 규칙/Secret 수정 없음. 실패 조건이 없어 백업 복구는 실행하지 않음.
+
+직전 백업은 로컬 `.tools/verification/production-digest-approved-backup/`이며, Secret 값은 포함하지 않습니다. 검증 결과는 `production-digest-approved-acceptance.json`, 화면 증거는 `screenshots/72-production-digest-preview.png`, `73-production-digest-result.png`, `74-production-readyz.png`입니다(모두 `.tools/verification/` 아래). 전체 `./mvnw verify`는 409개 중 408개 통과, 실제 OCI 전용 1개 기본 skip입니다. 이 단락 이전의 승인 대기 기록은 당시 시점의 상태이며, 이번 직접 승인과 성공 결과로 운영 반영 공백을 해결했습니다.

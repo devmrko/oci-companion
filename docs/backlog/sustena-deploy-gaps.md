@@ -275,3 +275,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ## 2026-11-26 배포 결과 신뢰 후속 검증
 
 위 재배포 오류의 원인은 artifact·stage 변경의 **비동기 work request 완료 전 실행**으로 확정했습니다. 새 immutable artifact와 stage 변경 완료 대기, 실행 당시 기대 digest 저장, 실제 소유 Pod imageID·Ready 대조를 구현했습니다. 별도 `companion-verify-digest`에서 이전 이미지 실행은 OCI SUCCEEDED여도 Companion FAILED, 새 이미지 실행은 2/2 Ready·digest 일치·readyz 200을 확인했습니다. [원인 시각·설계·테스트·증거](../deployment-digest-verification.md)를 참고하세요. 이 후속 작업은 운영을 변경하지 않았으며, 운영 반영은 직접 승인 대기입니다.
+
+### 운영 적용 완료
+
+2026-11-26 작업자 터미널의 직접 승인 후 등록 서비스에서 Function digest `d52337647c0c…`로 재배포했습니다. 실제 Pod 2개의 digest 일치·2/2 Ready·외부 readyz 200과 이미지 외 Deployment 설정·Service·ConfigMap 동일을 확인했습니다. 백업 복구는 필요하지 않았고 CLI 패치는 하지 않았습니다. 완료된 빌드의 같은 digest를 새 배포 미리보기로 재사용하는 기능을 추가했으며 전체 테스트는 408개 통과했습니다. [상세 결과와 스크린샷](../deployment-digest-verification.md#직접-승인-후-운영-적용--2026-11-26)을 참고하세요.
