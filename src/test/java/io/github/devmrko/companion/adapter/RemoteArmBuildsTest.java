@@ -30,5 +30,6 @@ class RemoteArmBuildsTest {
  }
  @Test void testsPrecedeBuildPushAndDigestAndTemporaryFilesAreRemoved()throws Exception{String output=execute("printf passed > tested",true);assertTrue(output.indexOf("COMPANION_PHASE=test")<output.indexOf("COMPANION_PHASE=build"));assertTrue(output.indexOf("COMPANION_PHASE=build")<output.indexOf("COMPANION_PHASE=push"));assertTrue(output.contains("COMPANION_DIGEST=sha256:"+"a".repeat(64)));}
  @Test void failedTestsPreventBuildAndPush()throws Exception{String output=execute("exit 7",false);assertFalse(output.contains("COMPANION_PHASE=build"));assertFalse(output.contains("COMPANION_DIGEST="));}
+ @Test void registryAuthenticationFailureDoesNotExposeRawLogOrToken()throws Exception{String output=execute("echo 'unauthorized private-token'; exit 125",false);assertTrue(output.contains("COMPANION_ERROR=registry-auth"));assertFalse(output.contains("unauthorized"));}
  @Test void invalidCommitPathsAndBuilderOptionsAreRejected(){assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Input("arm","source","main","repo","tag","Dockerfile","true")));assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Input("arm","source","a".repeat(40),"repo","tag","../Dockerfile","true")));assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Builder("arm","-oProxyCommand=x","opc","/key")));}
 }

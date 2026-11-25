@@ -70,7 +70,16 @@ public class RemoteArmBuilds implements ArmBuilds {
   return """
 set -euo pipefail
 work=%s
-trap 'rm -rf -- "$work"' EXIT
+finish(){
+ code=$?
+ if [ "$code" != 0 ]; then
+  if grep -Eqi 'unauthorized|authentication required|invalid username|denied' "$work/build.log"; then printf 'COMPANION_ERROR=registry-auth\\n' >&3;
+  elif grep -Eqi 'no space left|disk quota' "$work/build.log"; then printf 'COMPANION_ERROR=disk-space\\n' >&3;
+  elif grep -Eqi 'certificate|TLS handshake' "$work/build.log"; then printf 'COMPANION_ERROR=tls\\n' >&3; fi
+ fi
+ rm -rf -- "$work"
+}
+trap finish EXIT
 exec 3>&1
 exec > "$work/build.log" 2>&1
 stage(){ printf 'COMPANION_PHASE=%%s\\n' "$1" >&3; }
@@ -102,7 +111,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
 """.formatted(quote(work),quote(plan.input().dockerfile()),auth,quote(plan.input().testCommand()),quote(plan.image()),quote(plan.image()));
  }
  private void build(Connection c,String region,String compartment,Plan plan,Builder builder,String identity,Run initial,String username,char[] password){
-  Path source=null;String work="/tmp/companion-arm-"+initial.id();var digest=new java.util.concurrent.atomic.AtomicReference<String>("");
+  Path source=null;String work="/tmp/companion-arm-"+initial.id();var digest=new java.util.concurrent.atomic.AtomicReference<String>("");var remoteError=new java.util.concurrent.atomic.AtomicReference<String>("");
   try{
    source=Files.createTempFile("companion-arm-source-",".tar");
    try(var client=clients.client(c,region);var in=client.getRepositoryArchiveContent(GetRepositoryArchiveContentRequest.builder().repositoryId(plan.input().sourceRepository()).refName(plan.input().commit()).format("zip").build()).getInputStream()){ArmBuildSource.tar(in,source);}
@@ -110,6 +119,9 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    String script=script(plan,work,username,password);Arrays.fill(password,'\0');
    command(builder,"bash -s",new ByteArrayInputStream(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)),1800,line->{
     if(line.startsWith("COMPANION_PHASE=")){String step=line.substring(16);if(Set.of("architecture","source","test","build","push").contains(step))phase(identity,step);}
+    if(line.equals("COMPANION_ERROR=registry-auth"))remoteError.set("레지스트리 인증·push 권한 오류입니다. 실행 미리보기에서 OCIR 사용자와 Auth token을 지정하세요.");
+    if(line.equals("COMPANION_ERROR=disk-space"))remoteError.set("원격 VM의 디스크 공간이 부족합니다.");
+    if(line.equals("COMPANION_ERROR=tls"))remoteError.set("원격 VM의 레지스트리 TLS 인증서 연결을 확인하세요.");
     if(line.matches("COMPANION_DIGEST=sha256:[a-f0-9]{64}"))digest.set(line.substring(17));
    });
    if(!digest.get().matches("sha256:[a-f0-9]{64}"))throw new IllegalStateException("push 결과 digest를 확인하지 못했습니다.");
@@ -122,7 +134,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    }
    if(!found)throw new IllegalStateException("push 후 OCIR에서 digest를 아직 확인하지 못했습니다. 이미지 목록을 다시 조회하세요.");
    save(identity,new Run(initial.id(),"SUCCEEDED","complete",plan.image(),initial.repository(),digest.get(),"",initial.startedAt(),Instant.now().toString()));
-  }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var current=active.getOrDefault(identity,initial);save(identity,new Run(initial.id(),"FAILED",current.phase(),initial.image(),initial.repository(),digest.get(),PipelineIamRules.safe(e.getMessage()),initial.startedAt(),Instant.now().toString()));}
+  }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var current=active.getOrDefault(identity,initial);save(identity,new Run(initial.id(),"FAILED",current.phase(),initial.image(),initial.repository(),digest.get(),PipelineIamRules.safe(e.getMessage())+(remoteError.get().isEmpty()?"":" · "+remoteError.get()),initial.startedAt(),Instant.now().toString()));}
   finally{Arrays.fill(password,'\0');if(source!=null)try{Files.deleteIfExists(source);}catch(Exception ignored){}try{command(builder,"rm -rf -- "+quote(work),new ByteArrayInputStream(new byte[0]),15,x->{});}catch(Exception ignored){}}
  }
 }
