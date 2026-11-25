@@ -53,6 +53,17 @@ Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다
 
 후속 B 단계에서는 ARM 빌드 대안 조사, OCIR 인증 재사용, 운영 서비스에서 이어지는 빌드·배포 흐름을 진행합니다.
 
+## B1: Functions/Fn ARM 이미지 경로 조사 (2026-11-25)
+
+과거 Function 성공 기록은 확인했지만 Sustena 컨테이너 이미지를 Function 내부에서 생성한 근거는 찾지 못했습니다. [기존 ARM Function 검증](../arm-function-build-validation.md)은 ARM에서 Maven 테스트 1,444개와 JAR 생성을 성공한 기록이며 컨테이너 이미지 생성은 명시적으로 범위 밖입니다. [Functions 빌드 환경](../function-build-environment.md)과 Python 빌더 구현도 JAR·wheel 산출물 경로입니다. 기존 Function 기능을 재사용할 수 있도록 ARM 이미지 화면에서 해당 환경 화면으로 연결했습니다.
+
+- 로컬 작업공간과 Gitea의 `oci-companion-build-validation`, `oci-data-flow-aidp`, `oci-management`, `oci-opensearch` 파일 목록에서 별도 Fn 이미지 빌드 경로를 찾지 못했습니다. Gitea `oci-companion` 기본 브랜치 tree API는 HTTP 404였지만 가져온 `gitea/devmrko/sustena-deploy`의 기존 검증 문서는 확인했습니다. 조회한 범위 밖 저장소까지 없다고 단정하지 않습니다.
+- 실제 `JOUNGMINKOKOR_API` / `ap-chuncheon-1`의 Functions API 조회 결과 애플리케이션은 0개였습니다. 재사용할 빌더가 없었으며 이번 조사에서 새 Function·IAM은 만들지 않았습니다. 로컬 `fn build --help` 시도는 `zsh:1: command not found: fn` (127)이었습니다. Docker·podman 실행 파일도 로컬 PATH에 없었습니다. 이는 현재 실행 환경의 한계이며 OCI Functions 자체가 ARM 이미지를 만들 수 없다는 증명은 아닙니다.
+- [공식 아키텍처 문서](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsspecifyingcomputearchitectures.htm)는 Generic_ARM을 함수 실행 아키텍처로 정의하며 Fn의 이미지 생성은 Docker 빌드 경로입니다. [Docker 준비 안내](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsinstalldocker.htm)도 별도 엔진이 필요함을 설명합니다. [Function 권한](https://docs.oracle.com/en-us/iaas/Content/Functions/Tasks/functionsrunningasunprivileged.htm)은 UID 1000과 권한 상승 제한을 명시하므로 중첩 컨테이너 빌더를 검증 없이 동작한다고 가정하지 않습니다.
+- [관리형 빌드 문서](https://docs.oracle.com/en-us/iaas/Content/devops/using/add_buildstage.htm)와 현재 SDK에는 사용할 ARM 관리형 이미지가 확인되지 않았습니다. 새로운 서비스 옵션의 존재 여부까지 확정하지 않았으며 실제 성공한 VM ARM 경로를 유지합니다.
+
+남은 검증은 별도 ARM Function에 이미지 빌더를 준비하고 실제 이미지 생성·push까지 수행하는 것입니다. 현재 Function 경로를 VM보다 우선하도록 바꾸지 않았습니다. 기능 검증 범위를 구분한 안내를 추가했으며, 기존 문서에 남아 있던 전체 Function OCID도 제거했습니다.
+
 ## 초기 검증 결론
 
 - Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.

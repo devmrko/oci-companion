@@ -33,7 +33,7 @@
 
 - 애플리케이션: `oci-companion-arm-build-test`
 - Function: `db-companion-builder`
-- Function OCID: `ocid1.fnfunc.oc1.ap-seoul-1.amaaaaaavsea7yiakod2mbauksgad3d5e27lq3d5vb7rm4todnv55h5zt7ra`
+- Function OCID: `<Function OCID 생략>`
 - 실행: `function-arm-5895c60c-0695-48d2-83dd-8900450c0e91`
 - 버킷: `oci-companion-arm-build-997`, namespace `apackrsct01`
 - 객체: `<실행>/result.json`, `build.log`, `db-companion.jar`, `test-reports.tar.gz`
