@@ -106,7 +106,7 @@ podman build "${auth[@]}" --platform linux/arm64 --file "$dockerfile" --tag %s .
 stage push
 if ! podman push "${auth[@]}" --digestfile "$work/digest" %s 2>"$work/push-error"; then
  printf 'COMPANION_PUSH_ERROR=' >&3
- head -c 512 "$work/push-error" | base64 | tr -d '\\n' >&3
+ tail -c 512 "$work/push-error" | base64 | tr -d '\\n' >&3
  printf '\\n' >&3
  cat "$work/push-error" >>"$work/build.log"
  exit 125
