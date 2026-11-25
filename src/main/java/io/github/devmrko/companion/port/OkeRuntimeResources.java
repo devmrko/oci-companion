@@ -11,5 +11,7 @@ public interface OkeRuntimeResources {
  record Ingress(String name,String controller,List<Route> routes,List<Tls> tls,List<String> addresses) {}
  record Service(String name,String type,List<String> addresses) {}
  record Snapshot(Instant observedAt,String cluster,String namespace,Map<String,Listing> resources,List<Ingress> ingresses,List<Service> services) {}
+ record PullRegistry(boolean available,List<String> hosts,String note) {}
+ default PullRegistry pullRegistry(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret){return new PullRegistry(false,List.of(),"pull Secret 레지스트리 조회 미지원");}
  Snapshot read(Connection connection,String region,String compartment,String environment,String endpoint,String namespace);
 }

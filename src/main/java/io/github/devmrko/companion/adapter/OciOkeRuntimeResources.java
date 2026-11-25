@@ -15,6 +15,23 @@ import org.springframework.stereotype.Component;
 public class OciOkeRuntimeResources implements OkeRuntimeResources {
  private final OciBuildHistory clients;private final OciOkeWorkloadConnections connections;private final OkeWorkloadHealth reader;
  public OciOkeRuntimeResources(OciBuildHistory clients,OciOkeWorkloadConnections connections,OkeWorkloadHealth reader){this.clients=clients;this.connections=connections;this.reader=reader;}
+ public PullRegistry pullRegistry(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret){
+  OkeWorkloadHealth.Target target=null;
+  try{
+   OciOkeWorkloadConnections.name(namespace);OciOkeWorkloadConnections.name(secret);OciOkeWorkloadConnections.endpoint(endpoint);
+   String cluster;
+   try(var d=clients.client(c,region)){
+    var e=d.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(environment).build()).getDeployEnvironment();
+    if(!(e instanceof OkeClusterDeployEnvironment oke)||!compartment.equals(e.getCompartmentId())||e.getLifecycleState()!=DeployEnvironment.LifecycleState.Active)throw Errors.SCOPE.exception();cluster=oke.getClusterId();
+   }
+   target=connections.prepare(c,region,compartment,cluster,endpoint,namespace,"unused");
+   byte[] encoded=reader.command(target,List.of("get","secret",secret,"-o","jsonpath={.data.\\.dockerconfigjson}"),65536);
+   var hosts=io.github.devmrko.companion.service.PullRegistryHosts.decode(encoded);
+   return new PullRegistry(!hosts.isEmpty(),hosts,hosts.isEmpty()?"dockerconfigjson 레지스트리 호스트를 확인하지 못했습니다.":"");
+  }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}
+  catch(Exception e){return new PullRegistry(false,List.of(),"pull Secret 레지스트리 조회 실패 · Secret get 권한·API 연결·dockerconfigjson 형식을 확인하세요.");}
+  finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
  public Snapshot read(Connection c,String region,String compartment,String environment,String endpoint,String namespace){
   OkeWorkloadHealth.Target target=null;
   try{
