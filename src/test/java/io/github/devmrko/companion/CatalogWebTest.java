@@ -573,4 +573,10 @@ class CatalogWebTest {
   }
   for(String path:java.util.List.of("https://example.com","//example.com","/builds/settings?secret=untrusted","/agents/connections/../other"))mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back",path)).andExpect(redirectedUrl("/"));
  }
+    @Test void pipelineIamPageRendersWithoutCloudMutation() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds/iam").session(session).param("pipeline","p"))
+            .andExpect(status().isOk()).andExpect(content().string(containsString("파이프라인 IAM 점검")))
+            .andExpect(content().string(containsString("실제 IAM을 조회하지 않았습니다")));
+    }
 }

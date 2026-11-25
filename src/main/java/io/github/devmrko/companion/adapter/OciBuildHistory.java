@@ -85,7 +85,7 @@ public class OciBuildHistory implements BuildHistory {
             var steps=new ArrayList<Step>();var artifacts=new ArrayList<StoredArtifact>();
             if(r.getBuildRunProgress()!=null && r.getBuildRunProgress().getBuildPipelineStageRunProgress()!=null)
                 for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values().stream().sorted(Comparator.comparing((com.oracle.bmc.devops.model.BuildPipelineStageRunProgress x)->x.getTimeStarted(),Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(x->Objects.toString(x.getBuildPipelineStageId(),""))).toList()) {
-                    steps.add(new Step(stage.getStageDisplayName(),stage.getStatus()==null?"—":stage.getStatus().getValue(),
+                    steps.add(new Step(stage.getStageDisplayName(),io.github.devmrko.companion.service.PipelineIamRules.stageStatus(r.getLifecycleState().getValue(),stage.getStatus()==null?null:stage.getStatus().getValue()),
                         stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress?"BUILD":stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress?"DELIVER":"OTHER",
                         stage.getBuildPipelineStageId(),time(stage.getTimeStarted()),time(stage.getTimeFinished())));
                     if(stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress delivery && delivery.getDeliveredArtifacts()!=null)

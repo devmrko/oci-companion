@@ -1,5 +1,7 @@
 <!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('빌드')}"></head><body>
-<header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
+<header th:replace="~{layout :: header}"></header>
+<section th:if="${pipelineIam != null}" class="card"><h2>파이프라인 IAM</h2><p th:text="${pipelineIam.ready() ? '필요한 정책 확인됨' : '실행 전 권한 확인 필요'}"></p><p th:if="${!pipelineIam.inspected()}" th:text="${pipelineIam.error()}"></p><pre th:each="line : ${pipelineIam.missing()}" th:text="${line}"></pre><a th:href="@{/builds/iam(pipeline=${pipeline})}">IAM 점검·생성 미리보기</a></section>
+<section th:if="${detail != null and detail.state() == 'FAILED'}" class="card"><p>RelatedResourceNotAuthorizedOrNotFound 오류이면 파이프라인 리소스 주체의 권한을 확인하세요.</p><a th:href="@{/builds/iam(pipeline=${pipeline})}">IAM 점검</a></section><main class="catalog-shell page-content app-content"><div th:replace="~{layout :: notice}"></div>
 <h1>빌드</h1><nav th:replace="~{build-context :: links(${pipeline})}"></nav><div class="form-toolbar" th:if="${!#strings.isEmpty(pipeline)}"><a class="ui-button" th:href="@{/builds/settings(pipeline=${pipeline})}">명세 조회·수정</a></div>
 <nav th:replace="~{build-projects :: tabs}"></nav>
 <div th:replace="~{build-flow :: flow(${tab},${pipeline})}"></div>

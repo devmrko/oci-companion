@@ -11,15 +11,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 class OciBuildControlTest {
+    final io.github.devmrko.companion.port.PipelineIam iam=mock(io.github.devmrko.companion.port.PipelineIam.class);
     final Connection c=new Connection("DEFAULT","tenant","user","region","label",false);
     final io.github.devmrko.companion.port.BuildProjectResources resources=mock(io.github.devmrko.companion.port.BuildProjectResources.class);
-    @org.junit.jupiter.api.BeforeEach void readyLogs(){when(resources.logReadiness(any(),any(),any(),any())).thenReturn(io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.READY);}
+    @org.junit.jupiter.api.BeforeEach void readyLogs(){when(iam.inspect(any(),any(),any(),any())).thenReturn(new io.github.devmrko.companion.port.PipelineIam.Check(true,false,"g",false,"",List.of(),List.of(),""));when(resources.logReadiness(any(),any(),any(),any())).thenReturn(io.github.devmrko.companion.port.BuildProjectResources.LogReadiness.READY);}
     @Test void staleDefaultsAndForeignCompartmentNeverWrite() throws Exception {
         var clients=mock(OciBuildHistory.class);var client=mock(DevopsClient.class);
         when(clients.client(c,"region")).thenReturn(client);
         when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().etag("new")
             .buildPipeline(BuildPipeline.builder().id("p").projectId("project").compartmentId("comp").build()).build());
-        var adapter=new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class),resources);
+        var adapter=new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class),resources,iam);
         assertThrows(RuntimeException.class,()->adapter.defaults(c,"region","comp","p","old",List.of()));
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","foreign","p","new","run",List.of(),"token"));
         verify(client,never()).updateBuildPipeline(any()); verify(client,never()).createBuildRun(any());
@@ -29,7 +30,7 @@ class OciBuildControlTest {
         when(clients.client(c,"region")).thenReturn(client);
         when(client.getBuildPipeline(any())).thenReturn(GetBuildPipelineResponse.builder().etag("etag")
             .buildPipeline(BuildPipeline.builder().id("p").projectId("project").compartmentId("comp").build()).build());
-        new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class),resources).defaults(c,"region","comp","p","etag",List.of(new BuildControl.Parameter("VERSION","1","release")));
+        new OciBuildControl(clients,mock(io.github.devmrko.companion.port.BuildDefinition.class),resources,iam).defaults(c,"region","comp","p","etag",List.of(new BuildControl.Parameter("VERSION","1","release")));
         var captor=org.mockito.ArgumentCaptor.forClass(UpdateBuildPipelineRequest.class);
         verify(client).updateBuildPipeline(captor.capture());
         assertEquals("etag",captor.getValue().getIfMatch());
@@ -48,7 +49,7 @@ class OciBuildControlTest {
         when(definitions.branches(c,"region",source)).thenReturn(List.of(new io.github.devmrko.companion.port.BuildDefinition.Choice("main","main")));
         when(definitions.commits(c,"region",source,"main")).thenReturn(List.of(new io.github.devmrko.companion.port.BuildDefinition.Choice("hash","hash")));
         when(client.createBuildRun(any())).thenReturn(CreateBuildRunResponse.builder().buildRun(BuildRun.builder().id("run").build()).build());
-        var adapter=new OciBuildControl(clients,definitions,resources);
+        var adapter=new OciBuildControl(clients,definitions,resources,iam);
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("foreign","main","hash"),"rev"));
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","unlisted"),"rev"));
         assertThrows(RuntimeException.class,()->adapter.start(c,"region","comp","p","etag","name",List.of(),"token",new io.github.devmrko.companion.port.BuildDefinition.SourceOverride("stage::source","main","hash"),"stale-stage-revision"));

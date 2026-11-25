@@ -13,9 +13,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class OciBuildControl implements BuildControl {
     private final OciBuildHistory clients;
+    private final io.github.devmrko.companion.port.PipelineIam iam;
     private final BuildDefinition definitions;
     private final BuildProjectResources resources;
-    public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions,BuildProjectResources resources) { this.clients=clients;this.definitions=definitions;this.resources=resources; }
+    public OciBuildControl(OciBuildHistory clients,BuildDefinition definitions,BuildProjectResources resources,io.github.devmrko.companion.port.PipelineIam iam) { this.iam=iam;this.clients=clients;this.definitions=definitions;this.resources=resources; }
     public void cancel(Connection c,String region,String compartment,String pipeline,String run) {
         try(var client=clients.client(c,region)) {
             var response=client.getBuildRun(GetBuildRunRequest.builder().buildRunId(run).build());var r=response.getBuildRun();
@@ -73,6 +74,7 @@ public class OciBuildControl implements BuildControl {
             if(!compartment.equals(p.getCompartmentId())) throw Errors.SCOPE.exception();
             var readiness=resources.logReadiness(c,r,compartment,p.getProjectId());
             io.github.devmrko.companion.service.BuildLogChecks.requireReady(readiness);
+            if(!iam.inspect(c,r,compartment,pipeline).ready())throw Errors.PIPELINE_IAM.exception();
             return client.createBuildRun(CreateBuildRunRequest.builder().opcRetryToken(token)
                 .createBuildRunDetails(CreateBuildRunDetails.builder().buildPipelineId(pipeline).commitInfo(commit).displayName(name.isBlank()?null:name)
                     .buildRunArguments(BuildRunArgumentCollection.builder().items(parameters.stream()
