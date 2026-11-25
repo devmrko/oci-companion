@@ -271,3 +271,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 새 오류: 등록 서비스 재배포는 OCI `SUCCEEDED`와 달리 최신 built digest가 실제 Deployment에 적용되지 않았습니다. 이전 artifact 실행 스냅샷이 사용됐고 새 artifact/stage 참조 실험도 실패해 되돌렸습니다. 이 재배포 공백은 남아 있습니다. Function 이미지 빌드 성공과 최신 이미지 재배포 성공을 구분합니다.
 
 운영 a829ff9의 Function 빌드도 155.98초에 성공했습니다. 직접 사용자 승인 후 실제 운영 배포를 시도했으나 기대 d5233764… 대신 이전 d822e917…가 두 Pod에서 실행되어 **이미지 불일치 실패**로 판정했습니다. 기존 구성·2/2 Ready·readyz 200은 유지했고, 이번에 바뀐 파이프라인 manifest는 이전 내용으로 복구했습니다. 실제 Pod digest 기반 성공 판정과 실행 snapshot 불일치 해결이 남아 있습니다.
+
+## 2026-11-26 배포 결과 신뢰 후속 검증
+
+위 재배포 오류의 원인은 artifact·stage 변경의 **비동기 work request 완료 전 실행**으로 확정했습니다. 새 immutable artifact와 stage 변경 완료 대기, 실행 당시 기대 digest 저장, 실제 소유 Pod imageID·Ready 대조를 구현했습니다. 별도 `companion-verify-digest`에서 이전 이미지 실행은 OCI SUCCEEDED여도 Companion FAILED, 새 이미지 실행은 2/2 Ready·digest 일치·readyz 200을 확인했습니다. [원인 시각·설계·테스트·증거](../deployment-digest-verification.md)를 참고하세요. 이 후속 작업은 운영을 변경하지 않았으며, 운영 반영은 직접 승인 대기입니다.

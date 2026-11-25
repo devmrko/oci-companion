@@ -176,6 +176,37 @@ public class OkeWorkloadHealth {
         String state=desired==0?"복제본 0개":failed?"배포 확인 필요":!observed?"변경 반영 대기":ready>=desired&&updated==desired&&status.path("availableReplicas").asInt(0)>=desired&&status.path("replicas").asInt(0)==desired&&!podIssue&&pods.size()==desired?"준비 완료":"배포 진행·준비 확인 필요";
         return new Status(state,t.namespace(),t.deployment(),desired,ready,updated,Instant.now().toString(),"Deployment·Pod 조회 시점의 상태입니다. 실제 요청 성공·로그·알람은 별도로 확인하세요. 노드 상태는 아래 별도 조회 결과를 확인하세요.",List.copyOf(pods));
     }
+    static io.github.devmrko.companion.port.DeploymentImageVerification.Result verifyImages(Target target,io.github.devmrko.companion.port.DeploymentImageVerification.Expected expected,JsonNode deployment,JsonNode sets,JsonNode podList){
+        var t=new Target(target.appId(),target.profile(),target.tenancy(),target.user(),target.region(),target.compartment(),target.clusterId(),target.kubeconfig(),expected.namespace(),expected.deployment(),target.server(),target.tlsServerName());
+        var health=summarize(t,deployment,sets,podList);
+        if(expected.replicas()<1||expected.images().isEmpty()||expected.images().values().stream().anyMatch(x->!x.matches("[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}")))throw new IllegalArgumentException();
+        var evidence=new ArrayList<io.github.devmrko.companion.port.DeploymentImageVerification.Image>();boolean mismatch=false,complete=true;
+        for(var pod:health.pods()){
+            if(pod.phase().equals("Terminating")){complete=false;continue;}
+            JsonNode raw=null;for(var candidate:podList.path("items"))if(pod.uid().equals(candidate.path("metadata").path("uid").asText())){raw=candidate;break;}
+            if(raw==null)throw new IllegalArgumentException();
+            for(var image:expected.images().entrySet()){
+                boolean init=image.getKey().startsWith("init/");String name=init?image.getKey().substring(5):image.getKey(),actual="";boolean ready=false;
+                for(var container:raw.path("status").path(init?"initContainerStatuses":"containerStatuses"))if(name.equals(container.path("name").asText())){
+                    String value=container.path("imageID").asText("");var match=java.util.regex.Pattern.compile("(?:^|@)(sha256:[a-f0-9]{64})$").matcher(value);actual=match.find()?match.group(1):"미확인";
+                    ready=init?container.path("state").path("terminated").path("exitCode").asInt(-1)==0:container.path("ready").asBoolean(false);
+                }
+                String digest=image.getValue().substring(image.getValue().indexOf('@')+1);
+                if(!actual.isBlank()&&!actual.equals("미확인")&&!digest.equals(actual))mismatch=true;
+                if(!digest.equals(actual)||!ready)complete=false;
+                evidence.add(new io.github.devmrko.companion.port.DeploymentImageVerification.Image(expected.namespace()+"/"+expected.deployment(),pod.name(),image.getKey(),digest,actual.isBlank()?"미확인":actual,ready));
+            }
+        }
+        // A stale Deployment cannot pass merely because old Pods happen to be Ready.
+        var actualNames=new HashSet<String>();
+        for(String group:List.of("containers","initContainers"))for(var container:deployment.path("spec").path("template").path("spec").path(group)){
+            String key=(group.equals("initContainers")?"init/":"")+container.path("name").asText();String wanted=expected.images().get(key);actualNames.add(key);
+            if(wanted==null||!wanted.substring(wanted.indexOf('@')+1).equals(container.path("image").asText().replaceFirst("^.*@","")))mismatch=true;
+        }
+        if(!actualNames.equals(expected.images().keySet()))mismatch=true;
+        boolean success=!mismatch&&complete&&health.state().equals("준비 완료")&&health.desired()==expected.replicas()&&health.pods().size()==expected.replicas();
+        return new io.github.devmrko.companion.port.DeploymentImageVerification.Result(success?"SUCCEEDED":"FAILED",mismatch?"실패: 이미지 불일치":success?"실제 Pod imageID 일치 · Ready 확인":"실패: Pod 이미지 또는 Ready 확인 미완료",List.copyOf(evidence));
+    }
     private static Status withNodes(Status s,NodeReport nodes){return new Status(s.state(),s.namespace(),s.deployment(),s.desired(),s.ready(),s.updated(),s.checkedAt(),s.guidance(),s.pods(),nodes,s.events());}
     private static Status withEvents(Status s,Events events){return new Status(s.state(),s.namespace(),s.deployment(),s.desired(),s.ready(),s.updated(),s.checkedAt(),s.guidance(),s.pods(),s.nodes(),events);}
     JsonNode readEvents(Target t)throws Exception{return execute(t,List.of("events","--field-selector=type=Warning"));}

@@ -72,4 +72,11 @@ class OperatingServicesTest {
   verify(setup,never()).update(any(),any(),any(),any(),any(),any());verify(operations,never()).execute(any(),any());
  }
 
+ @Test void oldArtifactCannotRedefineTheExpectedBuildDigest(){
+  String old="sha256:"+"a".repeat(64),built="sha256:"+"b".repeat(64);
+  var image=new DeploymentImageVerification.Image("ns/app","pod","app",old,old,true);
+  var run=new DeploymentRuns.Run("run","name","SUCCEEDED","",List.of(),"SUCCEEDED",List.of(image));
+  var checked=OperatingServices.bindBuildDigest(run,built,"ns","app");assertEquals("FAILED",checked.state());assertEquals(built,checked.images().getFirst().expected());assertEquals(old,checked.images().getFirst().actual());
+ }
+
 }

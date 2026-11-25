@@ -67,7 +67,15 @@ public class OperatingServices {
   String run=builds.start(c.connection(),c.region(),c.compartment(),plan.build(),"",new char[0]);var release=new Release(UUID.randomUUID().toString(),plan.service(),plan.commit(),run,"","BUILDING","");save(key(c)+"\n"+release.id(),release);remember(c,release);return release;
  }
  public Release release(DeploymentOperations.Context c,String id){if(id==null||!id.matches("[a-f0-9-]{36}"))throw Errors.INVALID.exception();return store.read(key(c)+"\n"+id).map(d->json.readValue(d.content(),Release.class)).orElseThrow(Errors.MISSING::exception);}
- public Status status(DeploymentOperations.Context c,String id){var r=release(c,id);remember(c,r);return new Status(r,builds.read(c.connection(),c.region(),c.compartment(),r.buildRun()),r.deploymentRun().isBlank()?null:deployments.status(c,r.service().registration().pipeline(),r.deploymentRun()));}
+ public Status status(DeploymentOperations.Context c,String id){var r=release(c,id);remember(c,r);var build=builds.read(c.connection(),c.region(),c.compartment(),r.buildRun());var deployment=r.deploymentRun().isBlank()?null:deployments.status(c,r.service().registration().pipeline(),r.deploymentRun());return new Status(r,build,bindBuildDigest(deployment,build.digest(),r.service().deployment().namespace(),r.service().deployment().app()));}
+ static DeploymentRuns.Run bindBuildDigest(DeploymentRuns.Run run,String digest,String namespace,String app){
+  if(run==null||!run.cloudState().equals("SUCCEEDED"))return run;
+  var images=run.images().stream().map(i->i.workload().equals(namespace+"/"+app)&&i.container().equals(app)?new DeploymentImageVerification.Image(i.workload(),i.pod(),i.container(),digest,i.actual(),i.ready()):i).toList();
+  var target=images.stream().filter(i->i.workload().equals(namespace+"/"+app)&&i.container().equals(app)).toList();
+  if(!target.isEmpty()&&target.stream().anyMatch(i->!digest.equals(i.actual())))return new DeploymentRuns.Run(run.id(),run.name(),"FAILED","실패: 이미지 불일치 · 빌드 결과와 실제 Pod imageID가 다릅니다.",run.steps(),run.cloudState(),images);
+  if(run.state().equals("SUCCEEDED")&&(target.isEmpty()||!digest.matches("sha256:[a-f0-9]{64}")))return new DeploymentRuns.Run(run.id(),run.name(),"UNVERIFIED","빌드 digest와 실제 Pod 비교 기록이 없어 성공을 확인하지 못했습니다.",run.steps(),run.cloudState(),images);
+  return new DeploymentRuns.Run(run.id(),run.name(),run.state(),run.detail(),run.steps(),run.cloudState(),images);
+ }
  public DeployPlan prepareDeploy(DeploymentOperations.Context c,String id){
   var status=status(c,id);var r=status.release();if(!r.deploymentRun().isBlank()||!r.state().equals("BUILDING")||!status.build().state().equals("SUCCEEDED")||!get(c,r.service().registration().name()).equals(r.service()))throw Errors.BUILD_CHANGED.exception();
   var image=status.build();if(!image.repository().equals(r.service().deployment().repository())||!image.digest().matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();

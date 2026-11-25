@@ -31,6 +31,15 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
   }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){throw Errors.DEPLOYMENT_RUNTIME.exception();}
   finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
  }
+ public io.github.devmrko.companion.port.DeploymentImageVerification.Result verifyImages(Connection c,String region,String compartment,String environment,String endpoint,io.github.devmrko.companion.port.DeploymentImageVerification.Expected expected){
+  OkeWorkloadHealth.Target target=null;
+  try{
+   OciOkeWorkloadConnections.name(expected.namespace());OciOkeWorkloadConnections.name(expected.deployment());OciOkeWorkloadConnections.endpoint(endpoint);
+   target=environmentTarget(c,region,compartment,environment,endpoint,expected.namespace());
+   return OkeWorkloadHealth.verifyImages(target,expected,reader.read(target,"deployment",expected.deployment()),reader.read(target,"replicasets",null),reader.read(target,"pods",null));
+  }catch(Exception e){return io.github.devmrko.companion.port.DeploymentImageVerification.Result.unknown();}
+  finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
  public NodePorts nodePorts(Connection c,String region,String compartment,String environment,String endpoint,String namespace){
   OkeWorkloadHealth.Target target=null;
   try{

@@ -91,3 +91,7 @@ VM은 최초 Function 실행 이미지를 준비하는 데만 사용했습니다
 백업 복구 절차에서 Kubernetes 구성이 이미 백업과 같음을 확인해 불필요한 재적용을 하지 않았습니다. 이번 요청이 갱신한 DevOps manifest는 실행 snapshot에 보관된 이전 manifest로 되돌리고 다시 조회해 일치를 확인했습니다. NodePort 31083·Trilium nginx·보안 규칙·기존 Secret은 변경하지 않았습니다. 기존 운영 이미지는 계속 정상 서비스 중이며 Function 결과 이미지의 운영 적용은 완료되지 않았습니다.
 
 근거는 로컬 `.tools/verification/production-function-acceptance.json`, `production-function-execution-log.txt`, `production-function-backup/`, 스크린샷 `65`–`69`입니다. OCI 상태 화면의 SUCCEEDED를 실제 이미지 교체 성공으로 해석하면 안 됩니다. 다음 작업은 배포 후 실제 Pod digest 대조를 제품 성공 판정에 반영하고 새 manifest artifact의 실행 스냅샷 일치 문제를 해결하는 것입니다.
+
+## 후속: 실행 snapshot 불일치 원인 확정
+
+2026-11-26 후속 조사에서 위 미확정 원인을 artifact·stage 비동기 변경 완료 전 배포 시작으로 확인했습니다. 별도 검증에서 새 artifact 생성·stage 변경 work request 완료를 기다리자 기대 이미지가 적용됐고, Pod imageID 기반 성공 판정도 검증했습니다. [배포 결과 신뢰 검증](deployment-digest-verification.md)에 원본 시각과 결과를 기록했습니다. 운영 적용은 아직 하지 않았습니다.

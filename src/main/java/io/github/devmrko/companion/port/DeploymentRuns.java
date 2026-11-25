@@ -20,7 +20,8 @@ public interface DeploymentRuns {
         }
     }
     record Step(String stage,String target,String name,String state) {}
-    record Run(String id,String name,String state,String detail,List<Step> steps) {
+    record Run(String id,String name,String state,String detail,List<Step> steps,String cloudState,List<DeploymentImageVerification.Image> images) {
+        public Run(String id,String name,String state,String detail,List<Step> steps){this(id,name,state,detail,steps,state,List.of());}
         public Run(String id,String name,String state,String detail){this(id,name,state,detail,List.of());}
     }
     record History(List<Run> items,String next) {}
