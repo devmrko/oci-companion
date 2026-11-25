@@ -24,8 +24,10 @@ public class OciPipelineIam implements PipelineIam {
     }
     void scope(Connection c,String region,String compartment,String pipeline)throws Exception {
         try(var devops=clients.client(c,region)) {
-            var p=devops.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(pipeline).build()).getBuildPipeline();
-            if(!compartment.equals(p.getCompartmentId()))throw Errors.SCOPE.exception();
+            String owner=pipeline.startsWith("ocid1.devopsdeploypipeline.")
+                ?devops.getDeployPipeline(com.oracle.bmc.devops.requests.GetDeployPipelineRequest.builder().deployPipelineId(pipeline).build()).getDeployPipeline().getCompartmentId()
+                :devops.getBuildPipeline(GetBuildPipelineRequest.builder().buildPipelineId(pipeline).build()).getBuildPipeline().getCompartmentId();
+            if(!compartment.equals(owner))throw Errors.SCOPE.exception();
         }
     }
     public Check inspect(Connection c,String region,String compartment,String pipeline) {

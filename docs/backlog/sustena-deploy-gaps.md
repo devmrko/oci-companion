@@ -279,3 +279,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ### 운영 적용 완료
 
 2026-11-26 작업자 터미널의 직접 승인 후 등록 서비스에서 Function digest `d52337647c0c…`로 재배포했습니다. 실제 Pod 2개의 digest 일치·2/2 Ready·외부 readyz 200과 이미지 외 Deployment 설정·Service·ConfigMap 동일을 확인했습니다. 백업 복구는 필요하지 않았고 CLI 패치는 하지 않았습니다. 완료된 빌드의 같은 digest를 새 배포 미리보기로 재사용하는 기능을 추가했으며 전체 테스트는 408개 통과했습니다. [상세 결과와 스크린샷](../deployment-digest-verification.md#직접-승인-후-운영-적용--2026-11-26)을 참고하세요.
+
+## 2026-11-26 처음 설정 자동화 후속
+
+기존 등록 서비스의 live 설정을 읽어 새 이름의 환경·파이프라인·artifact·Deployment·ClusterIP를 만들고 실제 이미지 검증 후 등록하는 흐름을 추가했습니다. `companion-verify-onboard`에서 2/2 Ready·digest 일치·readyz 200·REGISTERED를 확인했습니다. 환경 생성 지연은 같은 환경에서 재개하도록 보강했습니다. [결과·스크린샷·남은 입력](../service-onboarding-validation.md)을 참고하세요. 설정 근거가 없는 새 소스의 범용 첫 설정과 다른 Namespace 이관은 아직 상세 입력이 필요합니다.
