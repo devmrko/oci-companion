@@ -1,38 +1,143 @@
 # Sustena OKE 배포에서 확인한 Companion 기능 공백
 
-2026-11-25. new-sustena(Gitea `joungmin/new-sustena`)를 joungminkokor 테넌시 OKE `oke-shared-a1`(ap-chuncheon-1, ARM64 A1 노드 2대) `personal-services`에 배포하고 https://sustena.store 로 공개했다. 오너 원칙은 "배포는 oci-companion을 가능한 한 사용하고, 안 되는 단계는 CLI로 임시 진행한 뒤 공백을 기록한다"였다.
-
-이 문서는 Companion 개발자가 다음 보강 순서를 정할 때 쓴다. 실제 배포에서 Companion을 쓰지 못한 단계, 그 원인, 대신 쓴 방법, 보강 제안을 단계별로 적는다. 기능 보강 구현은 이번 범위가 아니다.
+Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다. 2026-11-25 new-sustena(Gitea `joungmin/new-sustena`)를 joungminkokor 테넌시 OKE `oke-shared-a1`(ap-chuncheon-1, ARM64 A1 노드 2대) `personal-services`에 Companion 화면으로 다시 배포하면서, 단계마다 Companion이 해 준 것, 실패한 지점의 실제 오류 원문, CLI로 메운 방법을 적었습니다. 기능 보강 구현은 이번 범위가 아닙니다(인증 보강 1건만 예외, 아래 참고).
 
 ## 결론
 
-이번 배포에서는 **Companion을 한 단계도 사용하지 못했다.** 가장 큰 원인은 인증이다. joungminkokor 테넌시의 CLI 프로필 `JOUNGMINKOKOR`는 브라우저 로그인으로 만든 security_token 세션인데, Companion은 API 서명 키 프로필만 읽는다. 인증 문제가 풀려도 아래 표의 단계별 공백이 남는다.
+- Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.
+- Companion만으로는 서비스가 뜨지 않았습니다. 막힌 지점은 다섯 곳입니다.
+  1. 파이프라인 리소스 주체용 IAM(동적 그룹·정책)이 없으면 빌드가 명세 조회 단계에서 실패. Companion은 사용자 그룹 정책 예시만 보여 줍니다.
+  2. OCI Managed Build 이미지가 x86 전용이라 ARM64 이미지를 빌드할 수 없습니다.
+  3. 배포 명세의 이미지 주소가 `yny.ocir.io`(리전 키)라 `ap-chuncheon-1.ocir.io`용 pull Secret으로 인증되지 않습니다.
+  4. Secret을 파일 볼륨으로 붙이는 입력(ADB 지갑)이 없고, 프로브에 Host 헤더를 넣을 수 없습니다.
+  5. 서비스 노출은 ClusterIP와 기존 Ingress 연결뿐이라 NodePort를 만들 수 없습니다.
+- 사설 API 클러스터는 Companion 앱 서버가 API에 직접 닿아야 참조 확인·상태 조회가 됩니다. 이번에는 kubectl 실행 파일 설정(`companion.kubectl`)을 SSH 터널 래퍼로 바꿔 우회했습니다.
 
 우선순위 제안:
 
-1. security_token(세션) 프로필 지원 — 이게 없으면 이 테넌시의 어떤 화면도 쓸 수 없다.
-2. 기존 kubeconfig(사설 API 터널) 기반의 상태·로그 조회 — 배포 경로와 무관하게 운영 확인에 바로 쓸 수 있다.
-3. 준비된 매니페스트(kustomize) 적용과 1회성 Job 실행.
-4. ARM 이미지 빌드(Managed Build의 ARM shape 또는 기존 ARM VM 빌더).
+1. 파이프라인 IAM 사전 점검과 생성 명령 제공(아래 [IAM](#파이프라인을-처음-쓸-때-필요한-iam)).
+2. 배포 명세 이미지 주소를 pull Secret의 레지스트리 호스트와 맞추기(리전 이름 형식 선택 또는 점검).
+3. Secret 볼륨 마운트·프로브 헤더·보안 컨텍스트 입력.
+4. 사설 API용 접속 주소 재정의(server·tls-server-name)를 배포 구성 화면에도 적용.
+5. NodePort Service 생성(포트 지정, 기존 포트 충돌 검사).
+6. ARM 빌드 경로(ARM 러너 지원 확인 또는 등록된 ARM VM 빌더).
 
-## 단계별 공백
+## 단계별 결과
 
-| 단계 | 이번에 쓴 방법 | Companion에 없던 것 | 보강 제안 |
+스크린샷은 비공개 경로 `~/.local/state/oke-joungminkokor/sustena/companion-shots/`에 있습니다(번호는 파일 이름 앞부분).
+
+| 단계 | Companion에서 한 일 | 결과 | 메운 방법 |
 |---|---|---|---|
-| 인증 | OCI CLI `--auth security_token`, `oci session authenticate`로 재로그인 | `ConfigFileAuthenticationDetailsProvider`만 사용(`OciCloud`, `OciResourceCatalog`, `OciBuildHistory`). `user`가 없는 세션 프로필은 연결 단계에서 실패. 화면 안내도 "보안 토큰은 후속"(`OciGuides`) | `security_token_file`이 있는 프로필을 `SessionTokenAuthenticationDetailsProvider`로 연결. `Connection.user`가 비는 경우의 범위 키(테넌시+프로필) 정의, 세션 만료 시각 표시와 재로그인 명령 안내 |
-| ① ADB 스키마 | new-sustena `scripts/provision_oracle.py`(ADMIN) | ADB 사용자 생성 기능 없음 | Companion 범위로 보지 않음. DB Companion 쪽 기능 후보로만 기록 |
-| ③ Secret | `kubectl create secret`(지갑 파일), 표준 입력으로 만든 JSON을 `kubectl apply`(값 출력 없음) | 기존 Secret 선택·참조 검사만 있음(`oke-runtime-resources` 검증). 로컬 파일·.env에서 Secret을 만드는 기능 없음 | 로컬 파일 경로를 받아 값은 표시하지 않고 Opaque Secret을 생성·갱신하는 기능. 키 이름만 보여 주는 미리보기 |
-| ④ linux/arm64 빌드 | instance-trilium(aarch64)의 rootless podman | 컨테이너 빌드 실검증은 x86 Managed Build. Gitea 등록은 OCI 빌드의 네이티브 소스 연결을 만들지 않음(`build-specification-delivery.md`). ARM 컨테이너 이미지 빌드 경로 없음 | Managed Build ARM shape 지원 여부를 실측한 뒤 명세 템플릿에 아키텍처 선택 추가. 또는 등록된 ARM VM을 빌더로 쓰는 실행기 |
-| ⑤ OCIR push | 같은 VM에서 `podman push --digestfile`(기존 Auth Token) | 빌드 전달 단계 경유만 있음. 전달 결과에 digest가 비는 문제도 이미 기록됨(`live-build-oke-2026-11-20.md`) | push 결과 digest를 저장하고 배포 구성에 바로 넘기기 |
-| ⑥ 이미지 고정 | kustomization `images:`에 digest 직접 기록·커밋 | 배포 구성은 Companion이 만든 인라인 명세에만 digest를 넣음 | 저장소의 kustomization 이미지 항목을 digest로 갱신하는 커밋 기능(기존 Git 명세 커밋 경로 재사용) |
-| ⑦ 배포 적용 | `kubectl apply -k deploy/k8s`(사설 API, SSH 터널 kubeconfig) | OKE 배포는 OCI DevOps 파이프라인 + Companion 생성 명세(Namespace·Deployment·ClusterIP Service)만. kustomize, ConfigMap 명세, NodePort Service 미지원. 기존 NodePort Service가 있으면 덮어쓰기를 거부(`DefaultOkeRuntimePreparation`). DevOps 프로젝트·IAM 준비도 필요 | 저장소의 준비된 kustomize 디렉터리를 렌더링해 종류·namespace·digest를 검사하고 적용하는 경로. 허용 종류에 ConfigMap·NodePort Service 추가 |
-| ⑧ init-db Job | `kubectl apply -k deploy/k8s/init-db`, `wait`, `logs` | Job은 Companion 자체 검증 Job(`oke-validation-jobs.md`)만 | 앱 이미지로 1회성 Job을 실행·대기·로그 확인하는 기능(완료 후 TTL 정리) |
-| ⑨ 노출·TLS | Trilium VM nginx → NodePort 31082, 워커 보안 목록에 10.55.0.190/32 → 31082 추가(OCI CLI, 변경 전 규칙 백업), certbot webroot | Ingress·LB 경로의 접속 점검만 있음(`oke-public-https`). VM 리버스 프록시·보안 목록 규칙 편집 없음 | 보안 목록 규칙 추가의 미리보기·적용(기존 규칙 보존 확인). DNS·인증서 점검을 Ingress 외 임의 호스트에도 적용 |
-| ⑩ DNS | 오너가 등록기관(registrar-servers) 화면에서 변경 | 해당 없음 | 범위 밖 |
-| 운영 확인 | `kubectl get/logs`, `curl --resolve`, 브라우저 | 등록 앱 상태·Pod 로그 화면은 API 키 프로필과 OCI kubeconfig 생성이 전제. 사설 API는 server/tlsServerName 설정이 있으나 SSH 터널을 만들지 않음 | 인증 보강 후 기존 kubeconfig 파일을 등록해 상태·로그 화면을 쓰는 경로 검증 |
+| 프로필 연결 | 새 API 키 프로필 `JOUNGMINKOKOR_API`, 세션 프로필 `JOUNGMINKOKOR` 연결(01, 02) | 성공. 세션 프로필은 이번 작업의 보강 커밋 `7b9ee67` 이후 연결됨 | 보강 전에는 `user`가 없는 세션 프로필을 SDK 공급자가 읽지 못함(코드 확인, 보강 전 화면 재현은 안 함) |
+| DevOps 준비 | 알림 토픽 `sustena-devops`, 프로젝트 `sustena`, 코드 저장소 `new-sustena`, 로그 그룹·프로젝트 로그 생성(08–12) | 성공 | — |
+| 소스 | OCI 코드 저장소에 소스 push | Companion에 Git push 기능 없음. 저장소 자동 초기 커밋과 충돌해 `main`은 non-fast-forward 거부 | Git CLI로 `gitea-main`, `companion-build` 브랜치에 push(강제 push 없음) |
+| 빌드 명세 | 명세 작성 화면에서 Python·ARM64·컨테이너 이미지·Dockerfile 선택(14, 15) | YAML 생성 성공. 화면 안내의 "Git 저장" 버튼은 이 구성(OCI 코드 저장소)에서 보이지 않음 | 생성된 YAML을 `deploy/oci/build_spec.yaml`로 커밋 |
+| 빌드 단계·전달 | 빌드 단계 `build-arm64`, OCIR 산출물 `sustena-ocir`, Registry 전달 연결(16–19) | 성공. 빌드 이미지 선택지는 `OL7_X86_64_STANDARD_10`, `OL8_X86_64_STANDARD_10`뿐 | — |
+| 빌드 실행 1·2 | `companion-arm64-1`, `-2` 실행(20–22, 30) | FAILED: IAM 없음(아래 오류 1). 화면의 단계 표시는 실패 후에도 `ACCEPTED`로 남음 | 오너 승인 후 동적 그룹·정책 생성 |
+| 빌드 실행 3 | `companion-arm64-3` 실행(31) | FAILED: `Build architecture: x86_64`, `Architecture mismatch: use a matching build environment` | Trilium VM(aarch64)에서 rootless podman 빌드·push. `oke/sustena:a829ff9` |
+| OKE 배포 환경 | 클러스터 사양 확인, 사설 접속 서브넷 `oke-shared-workers`로 환경 `sustena-c-oke` 생성(25–29) | 성공(CREATING → ACTIVE 약 3분) | — |
+| 배포 구성 | 이미지 버전(a829ff9 digest)·ARM64·복제 2·포트 8845·`/readyz`·`/healthz`·사설 엔드포인트 입력(33–36) | Namespace 리소스 조회 실패 → Secret·ConfigMap 선택 목록이 비고 저장 버튼 비활성("필수 참조 확인 후 다시 구성하세요") | `companion.kubectl`을 SSH 터널 래퍼로 바꿔 재시작. 한 번은 secrets 조회가 시간 초과로 "미확인", 재시도에서 확인됨 |
+| 배포 실행 1 | 파이프라인 `sustena-c-oke` 실행(37–41) | FAILED(Check deployment status): `ImagePullBackOff`(아래 오류 3) | `yny.ocir.io`용 pull Secret `ocir-pull-yny`를 기존 인증으로 별도 생성(기존 `ocir-pull`은 변경 안 함) |
+| 배포 실행 2 | 파이프라인 `sustena-c-oke-2`(pull Secret `ocir-pull-yny`) 실행(42) | 이미지 pull 성공, 컨테이너 재시작 반복: `ValueError: Wallet directory must contain tnsnames.ora` | CLI `kubectl patch`로 지갑 Secret 볼륨, `/tmp` emptyDir, 보안 컨텍스트, 프로브 Host 헤더 추가. 패치 후 롤아웃이 OCI 상태 확인 시간 안에 끝나 실행 2는 SUCCEEDED로 기록됨 |
+| 노출 | 구성 화면의 Service 선택지 확인 | ClusterIP와 기존 Ingress 연결만 있음. NodePort 입력 없음 | CLI로 NodePort Service `sustena-c-nodeport`(31083), 워커 보안 목록에 Trilium 사설 IP/32 → 31083 규칙 추가(변경 전 규칙 백업), Trilium nginx upstream을 31083으로 전환(`.bak` 보관) |
+| 운영 확인 | OKE 조회 연결 등록, 앱 상태·노드·경고 이벤트·Pod 로그 조회(43–47) | 성공(터널 래퍼 사용). 첫 등록 중 Mac 절전으로 끊겨 같은 앱이 두 번 등록됨 | — |
+
+## 파이프라인을 처음 쓸 때 필요한 IAM
+
+이번 테넌시에는 `Tenant Admin Policy` 하나만 있었고 동적 그룹과 거부 정책은 없었습니다. 오너 승인(2026-11-25) 후 OCI CLI로 아래를 만들었습니다. 범위는 테넌시 루트입니다(DevOps 리소스를 루트 구획에 만들었기 때문). 별도 구획을 쓰면 `in compartment <구획>`으로 좁히는 편이 좋습니다.
+
+동적 그룹 `sustena-devops`:
+
+```text
+ALL {resource.compartment.id = '<tenancy>',
+     ANY {resource.type = 'devopsbuildpipeline',
+          resource.type = 'devopsdeploypipeline',
+          resource.type = 'devopsrepository'}}
+```
+
+정책 `sustena-devops`(테넌시):
+
+| 정책 문장 | 필요한 이유 | 이번에 확인한 것 |
+|---|---|---|
+| `Allow dynamic-group sustena-devops to manage devops-family in tenancy` | 빌드 파이프라인이 코드 저장소에서 소스·빌드 명세를 읽고 빌드 실행·전달을 기록 | 없을 때 오류 1. 추가 후 소스 다운로드·명세 파싱 성공 |
+| `Allow dynamic-group sustena-devops to manage repos in tenancy` | Registry 전달 단계의 OCIR push | 이번 빌드는 아키텍처 검사에서 멈춰 전달까지 가지 않음. 미확인 |
+| `Allow dynamic-group sustena-devops to read all-artifacts in tenancy` | 배포 파이프라인이 DevOps 산출물(인라인 Kubernetes 명세)을 읽음 | 배포 실행에서 명세 적용 성공. 없을 때의 오류는 미확인 |
+| `Allow dynamic-group sustena-devops to use ons-topics in tenancy` | 빌드·배포 이벤트를 프로젝트 알림 토픽으로 보냄 | 없을 때의 오류는 미확인 |
+| `Allow dynamic-group sustena-devops to manage cluster-family in tenancy` | 배포 파이프라인이 OKE에 명세를 적용하고 롤아웃 상태를 확인. 공용 클러스터 전체에 미치는 넓은 권한 | 배포 실행에서 적용·상태 확인 성공. 없을 때의 오류는 미확인 |
+| `Allow dynamic-group sustena-devops to use virtual-network-family in tenancy` | 사설 API 클러스터에 접속하려고 배포 환경의 사설 엔드포인트(VNIC)를 워커 서브넷에 만듦 | 배포 실행에서 사설 엔드포인트 경유 적용 성공. 없을 때의 오류는 미확인 |
+
+정책을 만든 직후(약 40초 뒤) 실행한 빌드 2도 오류 1로 실패했고, 약 6분 뒤 실행한 빌드 3에서 반영됐습니다. 정책 전파 대기가 필요합니다.
+
+사용자(프로필) 쪽 권한은 이번 프로필 사용자가 관리자 그룹이라 따로 만들지 않았습니다.
+
+### 실제로 본 오류 원문
+
+1. 동적 그룹·정책 없음(빌드 1·2, 22번 화면):
+
+   ```text
+   Unable to fetch build_spec file deploy/oci/build_spec.yaml due to RelatedResourceNotAuthorizedOrNotFound. Please check if dynamic groups and the corresponding policies are properly configured.
+   Example of Required Policies :
+    "Allow dynamic-group <buildPipelineDynamicGroup> to manage devops-family in tenancy"
+   "Allow dynamic-group <externalConnectionDynamicGroup> to read secret-family in tenancy"
+   ```
+
+2. x86 빌드 러너에서 ARM 명세 실행(빌드 3, 31번 화면):
+
+   ```text
+   EXEC: Build architecture: x86_64
+   EXEC: Architecture mismatch: use a matching build environment
+   Step 'Build and test' failed with exit code: '1', please check the commands on the spec file.
+   ```
+
+3. 이미지 주소와 pull Secret 호스트 불일치(배포 1, kubelet 이벤트):
+
+   ```text
+   Failed to pull image "yny.ocir.io/<namespace>/oke/sustena@sha256:…": … reading manifest … in yny.ocir.io/<namespace>/oke/sustena: denied: Anonymous users are only allowed read access on public repos
+   ```
+
+4. 지갑 볼륨 없음(배포 2, 컨테이너 직전 로그):
+
+   ```text
+   ValueError: Wallet directory must contain tnsnames.ora
+   ```
+
+5. 사설 API에 닿지 않을 때의 참조 확인(배포 구성, 36번 화면): `configmaps/sustena-config 미확인 · 목록 조회 불가 · configmaps list 권한과 API 연결 확인`, 이어서 `필수 참조 확인 후 다시 구성하세요.` 리소스 조회 응답은 `"services 조회 실패 · list 권한·API 연결·500개 한도 확인"`.
+
+### Companion이 지금 해 주는 것과 해 주지 않는 것
+
+- 해 주는 것: 빌드 실행 결과 화면에 OCI 오류 원문 표시. "권한 설정" 안내에 사용자 그룹용 정책 예시(`Allow group id <GROUP_OCID> to read devops-family …`, `… manage devops-build-run … where request.permission = 'DEVOPS_BUILD_RUN_CREATE'`, 로그 조회 등)와 콘솔 작업 순서 표시. 화면 문구대로 "앱은 정책을 변경하지 않습니다".
+- 해 주지 않는 것: 파이프라인 리소스 주체용 동적 그룹·정책 예시, 현재 정책에 필요한 문장이 있는지 점검, 동적 그룹·정책 생성. 실행 전 "실행 권한 · 미확인"으로만 표시되고 실제 실패는 실행 후에 알 수 있습니다.
+
+### 보강 제안
+
+- 파이프라인 생성 직후 또는 실행 전에 테넌시·구획 정책을 읽어 위 문장(또는 동등한 상위 권한)이 있는지 점검하고, 빠진 줄만 보여 주기.
+- 동적 그룹 규칙과 정책 문장을 현재 구획 OCID로 채운 OCI CLI 명령 복사 버튼. 권한이 있는 사용자에게는 미리보기 후 생성 버튼(기존 정책 수정 없이 새 정책으로).
+- 정책 생성 직후 전파 대기를 안내하고, 실패가 `RelatedResourceNotAuthorizedOrNotFound`이면 IAM 점검 화면으로 연결.
+- 빌드 실행이 FAILED이면 단계 표시도 FAILED·미실행으로 갱신(지금은 `ACCEPTED`로 남음).
+
+## ARM64 이미지 빌드
+
+- 확인한 사실: OCI Java SDK 3.94.1의 `BuildStage.Image` 값은 `OL7_X86_64_STANDARD_10`, `OL8_X86_64_STANDARD_10` 두 가지이고, OCI CLI(`oci devops build-pipeline-stage create-build-stage --image`) 모델도 같습니다. 실제 러너의 `uname -m`은 `x86_64`였습니다.
+- Companion 명세는 아키텍처가 다르면 의도대로 중단합니다(교차 빌드 미지원). 그래서 OKE A1 노드용 이미지는 Companion 빌드 경로로 만들 수 없습니다.
+- 지금 쓰는 우회: Trilium VM(aarch64)에서 `podman build --platform linux/arm64` → `podman push --digestfile` → Companion 배포 구성의 이미지 버전 목록에서 그 digest 선택. 이 경로에서 테스트(155개)는 같은 VM의 `python:3.13-slim` 컨테이너에서 실행했습니다.
+- 보강 제안: (1) OCI가 ARM 러너를 지원하는지 주기적으로 확인하는 점검과, 지원 시 명세 템플릿에 반영. (2) 등록한 ARM VM을 원격 빌더로 쓰는 실행기(소스 전달·빌드·push·digest 기록을 한 화면에서). (3) x86 러너에서 buildx·QEMU 교차 빌드 선택지(느리고 결과 검증이 더 필요함을 명시).
+
+## 배포 구성의 나머지 공백
+
+- 이미지 주소: 배포 명세와 산출물 경로가 `yny.ocir.io/…`(리전 키)로 만들어집니다. 클러스터의 기존 pull Secret이 `ap-chuncheon-1.ocir.io`만 갖고 있으면 인증이 실패합니다. 선택한 pull Secret의 레지스트리 호스트를 읽어 이미지 주소와 맞는지 점검하거나, 주소 형식을 고를 수 있어야 합니다.
+- 생성되는 Deployment에 없는 항목: Secret·ConfigMap 파일 볼륨, emptyDir, Pod·컨테이너 보안 컨텍스트(`runAsNonRoot`, `readOnlyRootFilesystem`, `capabilities.drop`), `automountServiceAccountToken: false`, 프로브 HTTP 헤더, 프로브 시간 제한. Host 헤더를 검사하는 앱(Starlette `TrustedHostMiddleware`)은 헤더 없이 프로브가 실패합니다. 명세에 Namespace 객체도 함께 들어가므로 공용 Namespace에 배포할 때 소유권이 섞이지 않는지 안내가 필요합니다.
+- CLI 패치는 다음 Companion 배포 실행에서 덮어써집니다. 지금 운영 중인 `sustena-c`를 Companion으로 다시 배포하면 지갑 볼륨이 빠져 같은 오류 4가 납니다. 위 입력이 보강되기 전에는 재배포 후 같은 패치(`kubectl patch deploy sustena-c --type strategic --patch-file …`)를 다시 적용해야 합니다.
+- 노출: NodePort Service 생성과 포트 지정이 없습니다. 보안 목록 규칙 추가·제거도 없습니다.
+- 사설 API: OKE 조회 연결(상태·로그)에는 내부적으로 server·tls-server-name 재정의가 있지만 화면 입력이 없고, 배포 구성의 Namespace 리소스 조회에는 적용되지 않습니다. 앱 서버가 사설 API에 직접 닿지 않으면 참조 확인이 막혀 저장할 수 없습니다. 이번 우회 래퍼는 `--server`가 없으면 `--server=https://127.0.0.1:<터널 포트> --tls-server-name=<API 사설 IP>`를 붙여 실제 kubectl을 실행합니다.
+- 참조 확인 시간 제한: kubectl 한 번에 8초 제한이고 5종 조회를 동시에 실행합니다. 매 호출마다 `oci ce cluster generate-token`이 돌아 터널 경유 시 한 번 시간 초과가 났습니다. 재시도 버튼이나 더 긴 제한이 필요합니다.
+
+## 이번 작업의 Companion 코드 변경
+
+- `7b9ee67` feat: OCI 세션(security_token) 프로필 지원 — `security_token_file`이 있는 프로필을 `ST$<token>` 키 ID로 서명하고, 토큰 파일을 요청마다 다시 읽음. OKE kubeconfig의 `--auth` 값도 프로필에 맞춤. `./mvnw verify` 330개 통과. Gitea `joungmin/oci-companion`(비공개) 브랜치 `devmrko/sustena-deploy`에 push, GitHub에는 push하지 않음.
 
 ## 확인 방법과 한계
 
-- 공백 판단 근거: 이 작업공간 커밋 `14142cb`의 코드와 `docs/design`, `docs/validation` 문서. 인증 실패는 코드 경로로 확인했고 Companion 화면을 띄워 재현하지는 않았다.
-- ARM Managed Build 지원 여부는 실측하지 않았다. "없음"은 Companion에 검증된 경로가 없다는 뜻이다.
-- 이번 배포의 실제 명령과 결과는 new-sustena 커밋 기록과 `~/.local/state/oke-joungminkokor/sustena/`(비공개, Git 제외)에 있다.
+- 오류 원문은 Companion 빌드·배포 결과 화면, OCI CLI `build-run get`·`deployment get`, kubelet 이벤트와 컨테이너 직전 로그에서 옮겼습니다. 이미지 digest·OCID는 줄였습니다.
+- 위 IAM 표에서 "없을 때의 오류는 미확인"인 줄은 정책을 한 번에 만들어 개별 효과를 나눠 보지 않았다는 뜻입니다. 최소 권한 조합은 검증하지 않았습니다.
+- ARM 러너 미지원은 SDK·CLI 모델과 실제 러너 1회 실행으로 확인했습니다. OCI 콘솔에서 다른 이미지가 노출되는지는 보지 않았습니다.
+- 실제 Google 로그인과 X-Forwarded-For의 실제 클라이언트 IP 반영은 사람이 확인해야 합니다(앱 접근 로그 없음).
