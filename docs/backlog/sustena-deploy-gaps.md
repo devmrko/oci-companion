@@ -1,8 +1,46 @@
 # Sustena OKE 배포에서 확인한 Companion 기능 공백
 
-Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다. 2026-11-25 new-sustena(Gitea `joungmin/new-sustena`)를 joungminkokor 테넌시 OKE `oke-shared-a1`(ap-chuncheon-1, ARM64 A1 노드 2대) `personal-services`에 Companion 화면으로 다시 배포하면서, 단계마다 Companion이 해 준 것, 실패한 지점의 실제 오류 원문, CLI로 메운 방법을 적었습니다. 기능 보강 구현은 이번 범위가 아닙니다(인증 보강 1건만 예외, 아래 참고).
+Companion 개발자가 다음 보강 순서를 정할 때 쓰는 기록입니다. 2026-11-25 new-sustena(Gitea `joungmin/new-sustena`)를 joungminkokor 테넌시 OKE `oke-shared-a1`(ap-chuncheon-1, ARM64 A1 노드 2대) `personal-services`에 Companion 화면으로 다시 배포하면서, 단계마다 Companion이 해 준 것, 실패한 지점의 실제 오류 원문, CLI로 메운 방법을 적었습니다. 이 문서에는 초기 공백과 이후 보강 재검증 결과를 구분해 기록합니다.
 
-## 결론
+## 보강 구현 후 재검증 (2026-11-25)
+
+별도 작업 브랜치의 Companion을 `127.0.0.1:18991`에서 실행하여 검증 앱을 처음부터 배포하고 재배포했습니다. 기존 운영 앱은 이 검증에서 변경하지 않았습니다. 아래 초기 기록은 당시 결과로 보존합니다.
+
+| 항목 | 실제 결과 | 증거 스크린샷 |
+|---|---|---|
+| IAM | `JOUNGMINKOKOR_API`에서 기존 정책의 요구 권한 6종 확인. 새 정책·동적 그룹 생성 없음 | `02-iam.png` |
+| 이미지 주소 | 기존 `ocir-pull`의 리전 이름 호스트와 일치하는 주소로 이미지 pull 성공 | `14-deployment-preview.png`, `19-deployment-status.png` |
+| 배포 입력 | 지갑 Secret 파일 볼륨, `/tmp` emptyDir, 보안 컨텍스트, 토큰 자동 마운트 해제, 프로브 Host·시간 제한을 입력하여 2/2 Ready. 앱 재시작 후 입력 유지 및 같은 구성 재배포 성공 | `13-deployment-input.png`, `21-redeploy-ready-reused.png` |
+| 사설 API | Companion 관리 SSH 터널과 기본 `/opt/homebrew/bin/kubectl`로 Namespace 5개, 배포 참조, 상태, Pod 로그 조회. 래퍼 사용 없음 | `03-api-access.png`, `04-private-api-namespaces.png`, `20-pod-logs.png` |
+| NodePort | 새 Service `sustena-verify-nodeport`의 31084 충돌 검사·생성. 승인된 출발지 /32 규칙 한 개를 미리보기·백업 후 추가하고 검증 후 제거 | `17-nodeport-rule-preview.png`, `18-nodeport-rule-added.png`, `25-nodeport-remove-preview.png`, `26-nodeport-removed.png` |
+| ARM 빌드 | 화면에서 커밋 `a829ff928af94ea1275e27170fdf6b0d067429b0` 선택 → ARM VM 소스 전달 → Python AST 구문 검사 → podman ARM64 빌드 → OCIR push → digest 선택 → OKE 배포 성공 | `06-arm-preview.png`, `12-arm-diagnostic.png`, `14-deployment-preview.png` |
+| 소스·Git 저장 | OCI `new-sustena/companion-build`에서 검증 저장소의 새 브랜치로 push. OCI 구성에서도 Git 저장 버튼으로 `deploy/companion-verify.yaml` 커밋 성공 | `22-source-push-preview.png`, `23-source-pushed.png`, `24-oci-git-save.png` |
+| 조회 연결 | 동일 클러스터·Namespace·Deployment를 다시 등록해도 기존 연결 ID 재사용 | `21-redeploy-ready-reused.png` |
+
+배포 대상은 `oke-shared-a1` / `personal-services` / `sustena-verify`이며 이미지 digest는 `sha256:87cb144fd0bd85cdaef0b6172fedf779d3932008311755ad562f6a812cffc25c`입니다. 두 차례 OCI 배포 실행 모두 `SUCCEEDED`, 상태 화면은 Ready 2/2였습니다. Namespace 객체는 생성하지 않았고 기존 Secret·ConfigMap은 참조만 했습니다. CLI 패치는 하지 않았습니다. Pod 로그는 실제 6줄 조회했으며 스크린샷에서는 원문을 생략했습니다.
+
+실행 중 발견해 수정한 오류:
+
+- IAM 목록 응답에서 동적 그룹 규칙·정책 문장이 생략되어 상세 조회로 보충했습니다.
+- 새 화면의 사이드바 겹침은 공통 레이아웃으로, CSP의 인라인 스크립트 차단은 외부 스크립트로 수정했습니다.
+- 기본 VM 인증으로 OCIR push가 종료 코드 125, `StatusCode: 403`으로 실패했습니다. 레지스트리가 일치하는 기존 인증을 일회성으로 입력한 재시도는 성공했습니다. 오류 출력은 제한된 길이로 마스킹합니다.
+- 세 프로브가 공유한 HTTP 헤더 목록이 YAML 별칭으로 출력되어 실행 전 검증에서 거부됐습니다. 각 프로브의 독립 목록을 생성하도록 수정하고 실제 생성 명세를 파서에 통과시키는 회귀 테스트를 추가했습니다.
+- OCI Git 인증에는 해당 계정의 도메인까지 포함한 사용자명이 필요했습니다. [Oracle HTTPS 인증 안내](https://docs.oracle.com/en-us/iaas/Content/devops/using/https_auth.htm)의 형식으로 입력한 후 push·명세 저장에 성공했습니다.
+- 빌드·배포·Pod 로그의 전체 OCID, JSON 비밀 필드, 인라인 명세 base64를 가리는 공통 처리를 보강했습니다.
+
+검증 정리 완료: Deployment·Service·Pod, DevOps 파이프라인 두 개와 단계·산출물, OKE 환경, 코드 저장소, OCIR 저장소 및 ARM VM의 검증 이미지 태그를 삭제했습니다. 이름으로 재조회한 검증용 클라우드 리소스와 Kubernetes 리소스는 0개였습니다. 임시 보안 규칙도 0개이며 기존 워커 수신 규칙 6개가 유지됐습니다. 삭제 기능이 없는 리소스 정리에는 OCI SDK와 기본 kubectl을 사용했습니다. 정리 후 운영 Deployment Ready 수는 `sustena-c` 2, `knowledge-mcp` 2, `finance-mcp` 1이었습니다. 후속 운영 재배포 지시에 따라 검증용 Companion 서버는 이어서 사용합니다.
+
+검증 한계 및 남은 공백:
+
+- IAM이 없는 테넌시에서 새 정책 생성·전파·빌드 통과 과정은 이번에 재현하지 않았습니다. 기존 정책 점검과 적용 가능한 권한만 확인했습니다.
+- ARM 러너 점검은 현재 SDK의 지원 이미지 목록에 근거합니다. OCI 전체 서비스의 ARM 러너 제공 여부를 증명하지 않습니다. 원격 빌드의 테스트 단계는 Python AST 검사이며 Sustena 전체 단위 테스트 실행은 아닙니다.
+- NodePort 생성·규칙 추가/제거·Pod Ready는 확인했지만 외부 HTTP 요청 성공은 별도 검증하지 않았습니다.
+- 소스 push의 실제 검증은 OCI 저장소 간 새 브랜치 전달입니다. 초기 브랜치 충돌 방지는 회귀 테스트로 확인했습니다.
+- 운영 `sustena-c` 재배포, 반복 사용을 위한 OCIR 인증 자동화와 운영 서비스 등록은 후속 작업입니다.
+
+최신 `./mvnw verify`: **378개 테스트 통과**. 로그는 `/tmp/ridley-verify-1.log`, 스크린샷은 이 작업 트리의 `.tools/verification/screenshots/`에 있으며 Git에는 포함하지 않습니다. 전체 OCID·비밀값·API 키 지문을 문서에 남기지 않습니다.
+
+## 초기 검증 결론
 
 - Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.
 - Companion만으로는 서비스가 뜨지 않았습니다. 막힌 지점은 다섯 곳입니다.
