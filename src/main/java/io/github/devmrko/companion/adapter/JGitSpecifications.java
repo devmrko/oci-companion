@@ -34,14 +34,15 @@ public class JGitSpecifications implements GitSpecifications {
         }catch(Exception e){throw Errors.INVALID.exception();}
     }
     @FunctionalInterface interface Work<T>{T run(Git git,CredentialsProvider credentials,ObjectId head) throws Exception;}
-    private <T> T withRepository(Connection c,String region,Target t,Work<T> work) {
+    private <T> T withRepository(Connection c,String region,Target t,Work<T> work) {return withRepository(c,region,t,false,work);}
+    <T> T withRepository(Connection c,String region,Target t,boolean full,Work<T> work) {
         validate(t,region,authentication.allowedHost(URI.create(t.source().url()).getHost()));Path directory=null;UsernamePasswordCredentialsProvider credentials=null;
         try {
             credentials=new UsernamePasswordCredentialsProvider(t.username(),authentication.secret(c,region,URI.create(t.source().url()).getHost(),t.secret()));
             directory=Files.createTempDirectory("oci-spec-");
             try(var git=Git.init().setBare(true).setDirectory(directory.toFile()).call()) {
                 var config=git.getRepository().getConfig();config.setString("http",null,"followRedirects","false");config.setBoolean("http",null,"sslVerify",true);config.save();
-                var fetched=git.fetch().setRemote(t.source().url()).setRefSpecs(new RefSpec("refs/heads/"+t.branch()+":refs/heads/source")).setDepth(1).setCredentialsProvider(credentials).setTimeout(60).call();
+                var fetch=git.fetch().setRemote(t.source().url()).setRefSpecs(new RefSpec("refs/heads/"+t.branch()+":refs/heads/source")).setCredentialsProvider(credentials).setTimeout(120);if(!full)fetch.setDepth(1);fetch.call();
                 var head=git.getRepository().resolve("refs/heads/source");if(head==null)throw Errors.MISSING.exception();
                 return work.run(git,credentials,head);
             }

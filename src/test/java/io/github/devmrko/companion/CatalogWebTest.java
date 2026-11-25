@@ -50,6 +50,11 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkePreparation okePreparation;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.ContainerPreparation containerPreparation;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildHandoff handoff;
+    @Test void pipelineSpecificationHasGitSaveAndSourcePushPageRenders()throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds").param("tab","pipelines").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("id=\"git-spec-form\""))).andExpect(content().string(containsString("id=\"git-spec-save\"")));
+        mvc.perform(get("/sources/push").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("새 브랜치")));
+    }
     @Test void deploymentHistoryAndNativeLogsRenderWithoutInjectingMarkup() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var run=new io.github.devmrko.companion.port.DeploymentRuns.Run("run","release-v1","SUCCEEDED","",java.util.List.of(new io.github.devmrko.companion.port.DeploymentRuns.Step("Deploy VM","vm","Rollout deployment","SUCCEEDED")));

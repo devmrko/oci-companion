@@ -172,6 +172,7 @@ public class CatalogPages {
         model.addAttribute("projectsLoaded",false);model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
+            model.addAttribute("specSources",service.sources(c,s.region(),s.compartment()));
             if(!registeredSource.isEmpty())model.addAttribute("handoffSource",service.sources(c,s.region(),s.compartment()).stream().filter(v->v.id().equals(registeredSource)).findFirst().orElseThrow(Errors.MISSING::exception));
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
             if(tab.equals("registry")) {

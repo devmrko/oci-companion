@@ -83,17 +83,24 @@ public class OciOkeWorkloadConnections implements OkeWorkloadConnections {
    store.remove(c,r,comp,id);registry.remove(c,r,comp,id);
   }catch(Exception e){throw new IllegalArgumentException("연결 해제를 완료하지 못했습니다. 로컬 파일 권한을 확인하고 다시 시도하세요. 클라우드 앱은 변경되지 않았습니다.");}
  }
+ String existing(Connection c,String r,String comp,Settings s){
+  for(var app:registry.list(c,r,comp))if("oke-workload-v1".equals(app.adapter())){
+   var t=store.get(c,r,comp,app.id());
+   if(t!=null&&Objects.equals(t.clusterId(),s.cluster())&&Objects.equals(t.namespace(),s.namespace())&&Objects.equals(t.deployment(),s.deployment()))return app.id();
+  }return "";
+ }
  public synchronized String save(Connection c,String r,String comp,Settings s){
   OkeWorkloadHealth.Target t=null;String id=s.id();boolean created=false;AgentConnectionRegistry.Registration previous=null;OkeWorkloadHealth.Target oldTarget=null;
   try{
    if(s.name()==null||s.name().isBlank()||s.name().length()>100||s.environment()==null||s.environment().isBlank()||s.environment().length()>80)throw new IllegalArgumentException();
+   if(id.isBlank())id=existing(c,r,comp,s);
    if(!id.isBlank()){current(c,r,comp,id);previous=registry.get(c,r,comp,id);oldTarget=store.get(c,r,comp,id);}
    t=prepare(c,r,comp,s.cluster(),s.endpoint(),s.namespace(),s.deployment());
    var dep=reader.read(t,"deployment",s.deployment());
    if(!"Deployment".equals(dep.path("kind").asText())||!s.namespace().equals(dep.path("metadata").path("namespace").asText())||!s.deployment().equals(dep.path("metadata").path("name").asText())||dep.path("metadata").path("uid").asText().isBlank())throw new IllegalArgumentException();
    // Validate the same namespace reads the status screen will need before saving.
    reader.read(t,"replicasets",null);reader.read(t,"pods",null);
-   id=registry.registerOke(c,r,comp,id,s.name(),s.environment(),new AgentConnectionRegistry.Dependency("OKE",s.name(),s.cluster()));created=s.id().isBlank();
+   boolean isNew=id.isBlank();id=registry.registerOke(c,r,comp,id,s.name(),s.environment(),new AgentConnectionRegistry.Dependency("OKE",s.name(),s.cluster()));created=isNew;
    store.save(c,r,comp,id,new OkeWorkloadHealth.Target(id,c.profile(),c.tenancy(),c.user(),r,comp,t.clusterId(),t.kubeconfig(),t.namespace(),t.deployment(),null,null,s.inspectNodes(),s.endpoint()));
    t=null;if(oldTarget!=null){var oldPath=Path.of(oldTarget.kubeconfig()).toAbsolutePath().normalize();if(oldPath.getParent().equals(root.normalize())&&!Files.isSymbolicLink(root)&&!Files.isSymbolicLink(oldPath))cleanup(oldTarget);}return id;
   }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();if(created)registry.remove(c,r,comp,id);else if(previous!=null)registry.registerOke(c,r,comp,id,previous.name(),previous.environment(),previous.dependencies().getFirst());throw new IllegalArgumentException("연결 저장 실패 · 입력값, OCI 접근, deployments get·replicasets/pods list RBAC와 API 연결을 확인하세요.");}finally{cleanup(t);}
