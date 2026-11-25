@@ -68,8 +68,26 @@ VM은 최초 Function 실행 이미지를 준비하는 데만 사용했습니다
 최종 코드 `./mvnw verify`는 **395개 통과**, Python 단위 테스트는 **5개 통과**입니다. 스크린샷 50–64는 로컬 `.tools/verification/screenshots/`에 있습니다. 59–61의 OCI 성공·Ready 화면은 최신 digest 적용 성공의 증거가 아닙니다. 최종 digest 불일치와 readyz 결과는 `.tools/function-image/readyz-result.json`에 기록했습니다.
 
 
-## 운영 재배포 추가 지시의 진행 결과
+## 운영 재배포 추가 지시와 최초 승인 대기
 
 정리와 구현 push 후 받은 추가 지시에 따라 운영 Deployment·Service·ConfigMap을 비밀값 없이 `.tools/verification/production-function-backup/`에 백업하고 공개 readyz 200을 확인했습니다. 등록 서비스 `sustena-c`에서 운영과 같은 `a829ff9`를 Function으로 빌드했고 **155.98초**에 성공했습니다. 결과는 기존 `oke/sustena` 저장소의 `sha256:d52337647c0c6a9a710d77c4e025a97636caa8f3354a13f9d74d492b013b3098`입니다.
 
-실제 운영 배포 제출은 자동 승인 검토가 거절했습니다. 원래 사용자 지시의 운영 변경 금지와 충돌하고 코디네이터 도구 출력으로 전달된 추가 승인을 직접 사용자 승인으로 인정하지 않는다는 사유입니다. 따라서 **운영 재배포는 미실행**이며 성공·복구를 주장하지 않습니다. 빌드 결과와 배포 미리보기는 스크린샷 65–67에 보관했습니다. 다음 실행에는 이 작업 세션에 직접 전달된 운영 배포 승인이 필요합니다. 승인 후에도 기존 snapshot 불일치가 남아 있으므로 실제 digest 대조와 실패 시 백업 복구가 필수입니다.
+실제 운영 배포 제출은 자동 승인 검토가 거절했습니다. 원래 사용자 지시의 운영 변경 금지와 충돌하고 코디네이터 도구 출력으로 전달된 추가 승인을 직접 사용자 승인으로 인정하지 않는다는 사유입니다. 이 시점에는 **운영 재배포 미실행**이었으며 성공·복구를 주장하지 않았습니다. 빌드 결과와 배포 미리보기는 스크린샷 65–67에 보관했습니다. 이후 오너가 작업 세션에 직접 승인했고 아래 결과로 이어졌습니다.
+
+
+## 직접 승인 후 운영 배포 결과 — 실패, 기존 상태 유지
+
+2026-11-26 오너가 이 작업 세션에 직접 운영 배포와 실패 시 복구를 승인한 뒤, 등록 서비스에서 위 `d5233764…` digest로 배포를 실행했습니다. OCI는 `SUCCEEDED`였지만 실제 실행 snapshot과 두 Pod의 `imageID`는 모두 이전 이미지였습니다.
+
+| 확인 항목 | 결과 |
+|---|---|
+| 기대 digest | `sha256:d52337647c0c6a9a710d77c4e025a97636caa8f3354a13f9d74d492b013b3098` |
+| 실제 두 Pod imageID digest | `sha256:d822e917de25d58511296d430e1038a4f5da0c6c0847b1ef66947f97741d4cfb` |
+| Ready | 2/2 |
+| `https://sustena.store/readyz` | HTTP 200 |
+| Deployment 설정·Service·ConfigMap | 백업과 동일 |
+| 최종 판정 | **실패: 이미지 불일치** |
+
+백업 복구 절차에서 Kubernetes 구성이 이미 백업과 같음을 확인해 불필요한 재적용을 하지 않았습니다. 이번 요청이 갱신한 DevOps manifest는 실행 snapshot에 보관된 이전 manifest로 되돌리고 다시 조회해 일치를 확인했습니다. NodePort 31083·Trilium nginx·보안 규칙·기존 Secret은 변경하지 않았습니다. 기존 운영 이미지는 계속 정상 서비스 중이며 Function 결과 이미지의 운영 적용은 완료되지 않았습니다.
+
+근거는 로컬 `.tools/verification/production-function-acceptance.json`, `production-function-execution-log.txt`, `production-function-backup/`, 스크린샷 `65`–`69`입니다. OCI 상태 화면의 SUCCEEDED를 실제 이미지 교체 성공으로 해석하면 안 됩니다. 다음 작업은 배포 후 실제 Pod digest 대조를 제품 성공 판정에 반영하고 새 manifest artifact의 실행 스냅샷 일치 문제를 해결하는 것입니다.
