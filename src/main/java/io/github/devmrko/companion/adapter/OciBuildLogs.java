@@ -50,7 +50,7 @@ public class OciBuildLogs implements BuildLogs {
                 for(var result:response.getSearchResponse().getResults()) {
                     var row=map(result.getData());var content=map(row.get("logContent"));var data=map(content.get("data"));
                     String stage=text(data.containsKey("buildStageId")?data.get("buildStageId"):data.get("stageName"));
-                    lines.add(new Line(text(content.containsKey("time")?content.get("time"):row.get("datetime")),names.getOrDefault(stage,stage.isEmpty()?"공통":stage),text(data.get("message"))));
+                    lines.add(new Line(text(content.containsKey("time")?content.get("time"):row.get("datetime")),io.github.devmrko.companion.service.PipelineIamRules.safe(names.getOrDefault(stage,stage.isEmpty()?"공통":stage)),io.github.devmrko.companion.service.PipelineIamRules.safe(text(data.get("message")))));
                 }
                 lines.sort(Comparator.comparing(Line::time));
                 return new Page(lines.isEmpty()?"EMPTY":"READY",lines.isEmpty()?"로그가 아직 없거나 반영이 지연 중입니다. 보존 기간도 확인하세요.":"한 번에 최대 1,000건 · 시간순",

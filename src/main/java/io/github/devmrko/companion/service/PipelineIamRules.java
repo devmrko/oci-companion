@@ -47,7 +47,10 @@ public final class PipelineIamRules {
         })).map(r->"Allow dynamic-group "+targetGroup+" to "+r+" "+scope).toList();
     }
     public static String safe(String message) {
-        return Objects.toString(message, "").replaceAll("ocid1\\.[A-Za-z0-9._-]+", "[OCID]")
+        return Objects.toString(message, "")
+            .replaceAll("(?i)(\"base64EncodedContent\"\\s*:\\s*\")[^\"]*", "$1[OMITTED]")
+            .replaceAll("(?i)(\"(?:authorization|token|password|secret)\"\\s*:\\s*\")[^\"]*", "$1[REDACTED]")
+            .replaceAll("ocid1\\.[A-Za-z0-9._-]+", "[OCID]")
             .replaceAll("(?i)(?:[0-9a-f]{2}:){15}[0-9a-f]{2}","[FINGERPRINT]")
             .replaceAll("(?i)(authorization|token|password|secret)\\s*[:=]\\s*[^\\s,]+", "$1=[REDACTED]");
     }

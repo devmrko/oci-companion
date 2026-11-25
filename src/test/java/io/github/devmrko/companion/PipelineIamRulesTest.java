@@ -18,4 +18,8 @@ class PipelineIamRulesTest {
     @Test void rulesBindResourceTypeAndCompartment(){assertTrue(PipelineIamRules.matches(PipelineIamRules.rule("comp"),pipeline,"comp"));assertFalse(PipelineIamRules.matches(PipelineIamRules.rule("other"),pipeline,"comp"));assertFalse(PipelineIamRules.matches("ALL {resource.id = 'different', resource.type = 'devopsbuildpipeline'}",pipeline,"comp"));assertTrue(PipelineIamRules.matches("resource.id = '"+pipeline+"'",pipeline,"comp"));assertFalse(PipelineIamRules.matches("tag.team.value = 'build'",pipeline,"comp"));}
     @Test void failedRunDoesNotLeaveAcceptedStageButPreservesCompletedStages(){assertEquals("FAILED",PipelineIamRules.stageStatus("FAILED","ACCEPTED"));assertEquals("SUCCEEDED",PipelineIamRules.stageStatus("FAILED","SUCCEEDED"));assertEquals("ACCEPTED",PipelineIamRules.stageStatus("ACCEPTED","ACCEPTED"));}
     @Test void errorTextRedactsIdentifiersAndSecrets(){assertEquals("RelatedResourceNotAuthorizedOrNotFound [OCID] token=[REDACTED]",PipelineIamRules.safe("RelatedResourceNotAuthorizedOrNotFound ocid1.pipeline.oc1.test token=hidden"));}
+    @Test void cloudSnapshotsOmitEncodedManifestsAndJsonCredentials(){
+        String result=PipelineIamRules.safe("{\"password\": \"private-value\",\"base64EncodedContent\": \"encoded-private-value\",\"id\":\"ocid1.pipeline.oc1.test\"}");
+        assertFalse(result.contains("private-value"));assertFalse(result.contains("ocid1."));assertTrue(result.contains("[OMITTED]"));assertTrue(result.contains("[REDACTED]"));
+    }
 }
