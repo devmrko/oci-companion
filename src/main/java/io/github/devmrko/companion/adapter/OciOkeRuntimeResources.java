@@ -22,6 +22,15 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
    return connections.prepare(c,region,compartment,oke.getClusterId(),endpoint,namespace,"unused");
   }
  }
+ public String deployment(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String name){
+  OkeWorkloadHealth.Target target=null;
+  try{
+   OciOkeWorkloadConnections.name(namespace);OciOkeWorkloadConnections.name(name);OciOkeWorkloadConnections.endpoint(endpoint);
+   target=environmentTarget(c,region,compartment,environment,endpoint,namespace);
+   return new String(reader.command(target,List.of("get","deployment",name,"-o","json"),524288),StandardCharsets.UTF_8);
+  }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){throw Errors.DEPLOYMENT_RUNTIME.exception();}
+  finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
  public NodePorts nodePorts(Connection c,String region,String compartment,String environment,String endpoint,String namespace){
   OkeWorkloadHealth.Target target=null;
   try{

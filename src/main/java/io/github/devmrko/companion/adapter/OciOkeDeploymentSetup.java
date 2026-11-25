@@ -23,8 +23,9 @@ public class OciOkeDeploymentSetup implements OkeDeploymentSetup {
    var repo=a.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(i.repository()).build()).getContainerRepository();if(!comp.equals(repo.getCompartmentId())||!"AVAILABLE".equals(repo.getLifecycleState().getValue()))throw Errors.SCOPE.exception();
    var pull=i.pullSecret().isBlank()?null:resources.pullRegistry(c,r,comp,i.environment(),i.endpoint(),i.namespace(),i.pullSecret());
    String host=io.github.devmrko.companion.service.PullRegistryHosts.choose(i.registryHost(),r,com.oracle.bmc.Region.fromRegionId(r).getRegionCode(),pull);
-   String url=host+"/"+repo.getNamespace()+"/"+repo.getDisplayName()+"@"+image.getDigest();String yaml=OkeDeploymentManifest.render(i,url);
-   String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((i.toString()+yaml+e.toString()+Objects.toString(response.getEtag(),"")+Objects.toString(ir.getEtag(),"")).getBytes(StandardCharsets.UTF_8)));
+   String live="ExistingDeployment".equals(i.serviceType())?resources.deployment(c,r,comp,i.environment(),i.endpoint(),i.namespace(),i.app()):"";
+   String url=host+"/"+repo.getNamespace()+"/"+repo.getDisplayName()+"@"+image.getDigest();String yaml="ExistingDeployment".equals(i.serviceType())?ExistingOkeDeployment.render(live,i.namespace(),i.app(),url):OkeDeploymentManifest.render(i,url);
+   String hash=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((i.toString()+yaml+(live.isEmpty()?"":ExistingOkeDeployment.version(live))+e.toString()+Objects.toString(response.getEtag(),"")+Objects.toString(ir.getEtag(),"")).getBytes(StandardCharsets.UTF_8)));
    var report=runtime.inspect(c,r,comp,i);
    if(!i.pullSecret().isBlank()) {
     var checks=new ArrayList<OkeRuntimePreparation.Check>(report==null?List.of():report.checks());

@@ -16,5 +16,6 @@ public interface OkeRuntimeResources {
  record AllocatedPort(String namespace,String service,int port){}
  record NodePorts(boolean available,List<AllocatedPort> ports){}
  default NodePorts nodePorts(Connection c,String region,String compartment,String environment,String endpoint,String namespace){return new NodePorts(false,List.of());}
+ default String deployment(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String name){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
  Snapshot read(Connection connection,String region,String compartment,String environment,String endpoint,String namespace);
 }
