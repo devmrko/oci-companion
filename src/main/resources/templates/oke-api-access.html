@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OKE API 접속 설정')}"></head><body><header th:replace="~{layout :: header}"></header><main>
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('OKE API 접속 설정')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content">
 <h1>OKE API 접속 설정</h1><p>상태·로그 조회와 배포 참조 확인에 같은 설정을 사용합니다.</p><p th:if="${message}" th:text="${message}"></p>
 <form method="get" th:action="@{/environments/oke/access}"><label>클러스터<select name="cluster"><option value="">선택하세요</option><option th:each="item : ${clusters}" th:value="${item.id()}" th:text="${item.name()}" th:selected="${item.id()==cluster}"></option></select></label><button>선택</button></form>
 <form th:if="${settings != null}" method="post" th:action="@{/environments/oke/access}" th:object="${settings}" class="card section-stack"><input type="hidden" name="ticket" th:value="${ticket}">
