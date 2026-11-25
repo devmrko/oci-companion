@@ -81,6 +81,15 @@ Cloud Shell은 [공식 문서](https://docs.oracle.com/en-us/iaas/Content/API/Co
 
 후속 실검증은 인증된 콘솔에서 Actions → Architecture → ARM 선택 후 `uname -m`, `podman build --platform linux/arm64`, OCIR push를 확인하는 것입니다. 지금은 성공을 확인한 VM 경로를 유지하고 Cloud Shell은 대화형 대안으로 안내합니다.
 
+## B2: 기존 pull Secret으로 OCIR 인증 재사용
+
+등록 빌더 `sustena-arm`에 기존 `sustena-c-oke` 환경과 `personal-services/ocir-pull` 참조만 저장했습니다. 사용자명·Auth token 입력을 모두 비운 채 Companion에서 a829ff9 소스의 ARM 빌드와 `sustena-verify-auth` 저장소 push가 **SUCCEEDED**였습니다. digest는 `sha256:5b528b6231a98fb3d832d36ffdd0a793d7051a123d2f0d36559ae93fade73176`입니다. Secret·IAM·보안 규칙 변경은 없습니다.
+
+- 저장하는 것은 환경·Namespace·Secret 이름이며 인증값은 실행마다 읽습니다. 레지스트리 호스트 불일치, 잘못된 인증 형식, 복수 동일 호스트 항목은 거부합니다. 비밀 버퍼와 실행 임시 인증 파일을 정리합니다.
+- 인증값 재입력 없이 동작한 증거: `.tools/verification/screenshots/36-registered-auth-preview.png`, `37-registered-auth-result.png`.
+- `./mvnw verify` **383개 통과**. 호스트 선택·오류 비밀값 미노출·버퍼 초기화와 기존 빌드 순서/실패 정리 테스트가 포함됩니다.
+- 검증 저장소는 다음 운영 서비스 흐름 검증에 재사용한 뒤 삭제합니다. 운영 서비스 이미지는 이 단계에서 변경하지 않았습니다.
+
 ## 초기 검증 결론
 
 - Companion 화면으로 끝까지 간 단계: API 키·세션 프로필 연결, DevOps 프로젝트·코드 저장소·로그·빌드 파이프라인·빌드 명세·빌드 단계·OCIR 전달 생성, 빌드 실행과 로그 확인, OKE 배포 환경(사설 엔드포인트) 생성, OKE 배포 파이프라인 저장과 실행, 앱 상태·노드·Pod 로그 조회.

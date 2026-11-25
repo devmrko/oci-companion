@@ -16,15 +16,17 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RemoteArmBuilds implements ArmBuilds {
- private final OciBuildHistory clients;private final OciDeploymentSetup images;private final BuildSpecDraftStore store;
+ private final OciBuildHistory clients;private final OciDeploymentSetup images;private final BuildSpecDraftStore store;private final OkeRuntimeResources resources;
  private final tools.jackson.databind.json.JsonMapper json=tools.jackson.databind.json.JsonMapper.builder().build();
  private final ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();
  private final Map<String,Run> active=new ConcurrentHashMap<>();
- public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store){this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;}
+ public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store,OkeRuntimeResources resources){this.resources=resources;this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;}
  @jakarta.annotation.PreDestroy public void close(){executor.shutdownNow();}
  private String key(Connection c,String region,String compartment){return String.join("\n","arm-build-v1",c.profile(),c.tenancy(),c.user(),region,compartment);}
  public List<Builder> builders(Connection c,String region,String compartment){return store.read(key(c,region,compartment)+"\nbuilders").map(d->List.of(json.readValue(d.content(),Builder[].class))).orElse(List.of());}
- static void validate(Builder b){if(b.name()==null||!b.name().matches("[a-z0-9][a-z0-9-]{0,62}"))throw Errors.INVALID.exception();OkeApiAccess.validate(new OkeApiAccess.Settings("https://localhost","",b.host(),b.user(),b.keyPath()));if(b.host()==null||b.host().isBlank())throw Errors.INVALID.exception();}
+ static void validate(Builder b){if(b.name()==null||!b.name().matches("[a-z0-9][a-z0-9-]{0,62}"))throw Errors.INVALID.exception();OkeApiAccess.validate(new OkeApiAccess.Settings("https://localhost","",b.host(),b.user(),b.keyPath()));if(b.host()==null||b.host().isBlank())throw Errors.INVALID.exception();
+  if(!b.secretEnvironment().isBlank()){OciOkeWorkloadConnections.name(b.secretNamespace());OciOkeWorkloadConnections.name(b.secretName());OciOkeWorkloadConnections.endpoint(b.secretEndpoint());}
+  else if(!b.secretNamespace().isBlank()||!b.secretName().isBlank())throw Errors.INVALID.exception();}
  public synchronized void saveBuilder(Connection c,String region,String compartment,Builder builder){validate(builder);var list=new ArrayList<>(builders(c,region,compartment));list.removeIf(x->x.name().equals(builder.name()));if(list.size()>=16)throw Errors.INVALID.exception();list.add(builder);store.save(key(c,region,compartment)+"\nbuilders",new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(list),Instant.now().toString()));}
  static void validate(Input i){
   if(i.commit()==null||!i.commit().matches("[a-f0-9]{40}")||i.tag()==null||!i.tag().matches("[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")||i.dockerfile()==null||!i.dockerfile().matches("[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}")||Arrays.asList(i.dockerfile().split("/")).contains("..")||i.testCommand()==null||i.testCommand().isBlank()||i.testCommand().length()>8192||i.testCommand().contains("\u0000"))throw Errors.INVALID.exception();
@@ -44,8 +46,11 @@ public class RemoteArmBuilds implements ArmBuilds {
   var checked=preview(c,region,compartment,plan.input());if(!checked.equals(plan))throw Errors.CONFLICT.exception();
   if(username==null||username.length()>512||username.chars().anyMatch(Character::isISOControl)||password.length>8192||(password.length>0&&username.isBlank()))throw Errors.INVALID.exception();
   String id=UUID.randomUUID().toString(),identity=key(c,region,compartment)+"\n"+id;var builder=builders(c,region,compartment).stream().filter(b->b.name().equals(plan.input().builder())).findFirst().orElseThrow();
-  var initial=new Run(id,"RUNNING","source",plan.image(),plan.input().imageRepository(),"","",Instant.now().toString(),"");save(identity,initial);
-  char[] secret=password.clone();Arrays.fill(password,'\0');executor.submit(()->build(c,region,compartment,plan,builder,identity,initial,username,secret));return id;
+  var initial=new Run(id,"RUNNING","source",plan.image(),plan.input().imageRepository(),"","",Instant.now().toString(),"");
+  char[] secret=password.clone();String login=username;
+  if(secret.length==0&&!builder.secretEnvironment().isBlank())try(var credential=resources.pullCredentials(c,region,compartment,builder.secretEnvironment(),builder.secretEndpoint(),builder.secretNamespace(),builder.secretName(),plan.image().substring(0,plan.image().indexOf('/')))){login=credential.username();secret=credential.password();}
+  final String loginUser=login;final char[] loginSecret=secret;
+  Arrays.fill(password,'\0');save(identity,initial);executor.submit(()->build(c,region,compartment,plan,builder,identity,initial,loginUser,loginSecret));return id;
  }
  private void save(String identity,Run run){active.put(identity,run);store.save(identity,new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(run),Instant.now().toString()));}
  private void phase(String identity,String phase){var r=active.get(identity);save(identity,new Run(r.id(),r.state(),phase,r.image(),r.repository(),r.digest(),r.error(),r.startedAt(),r.finishedAt()));}
@@ -126,7 +131,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    command(builder,"bash -s",new ByteArrayInputStream(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)),1800,line->{
     if(line.startsWith("COMPANION_PHASE=")){String step=line.substring(16);if(Set.of("architecture","source","test","build","push").contains(step))phase(identity,step);}
     if(line.startsWith("COMPANION_PUSH_ERROR="))try{remoteError.set(PipelineIamRules.safe(new String(Base64.getDecoder().decode(line.substring(21)),java.nio.charset.StandardCharsets.UTF_8)));}catch(IllegalArgumentException ignored){}
-    if(line.equals("COMPANION_ERROR=registry-auth"))remoteError.set("레지스트리 인증·push 권한 오류입니다. 실행 미리보기에서 OCIR 사용자와 Auth token을 지정하세요.");
+    if(line.equals("COMPANION_ERROR=registry-auth"))remoteError.set("레지스트리 인증·push 권한 오류입니다. 등록한 OCIR 인증 Secret의 push 권한·호스트를 확인하거나 실행 미리보기에서 일회성 인증을 지정하세요.");
     if(line.equals("COMPANION_ERROR=disk-space"))remoteError.set("원격 VM의 디스크 공간이 부족합니다.");
     if(line.equals("COMPANION_ERROR=tls"))remoteError.set("원격 VM의 레지스트리 TLS 인증서 연결을 확인하세요.");
     if(line.matches("COMPANION_DIGEST=sha256:[a-f0-9]{64}"))digest.set(line.substring(17));

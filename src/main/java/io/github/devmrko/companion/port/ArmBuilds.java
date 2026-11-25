@@ -2,7 +2,10 @@ package io.github.devmrko.companion.port;
 import io.github.devmrko.companion.domain.Models.Connection;
 import java.util.List;
 public interface ArmBuilds {
- record Builder(String name,String host,String user,String keyPath){}
+ record Builder(String name,String host,String user,String keyPath,String secretEnvironment,String secretNamespace,String secretName,String secretEndpoint){
+  public Builder(String name,String host,String user,String keyPath){this(name,host,user,keyPath,"","","","PRIVATE_ENDPOINT");}
+  public Builder {secretEnvironment=secretEnvironment==null?"":secretEnvironment;secretNamespace=secretNamespace==null?"":secretNamespace;secretName=secretName==null?"":secretName;secretEndpoint=secretEndpoint==null||secretEndpoint.isBlank()?"PRIVATE_ENDPOINT":secretEndpoint;}
+ }
  record Input(String builder,String sourceRepository,String commit,String imageRepository,String tag,String dockerfile,String testCommand){}
  record Plan(Input input,String image,String sourceName,String builderName,Builder target){}
  record Run(String id,String state,String phase,String image,String repository,String digest,String error,String startedAt,String finishedAt){}

@@ -42,6 +42,18 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
   }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){return new NodePorts(false,List.of());}
   finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
  }
+ public io.github.devmrko.companion.port.RegistryCredentials pullCredentials(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret,String host){
+  OkeWorkloadHealth.Target target=null;
+  try{
+   OciOkeWorkloadConnections.name(namespace);OciOkeWorkloadConnections.name(secret);OciOkeWorkloadConnections.endpoint(endpoint);
+   if(!host.equals(region+".ocir.io")&&!host.equals(com.oracle.bmc.Region.fromRegionId(region).getRegionCode()+".ocir.io"))throw Errors.SCOPE.exception();
+   target=environmentTarget(c,region,compartment,environment,endpoint,namespace);
+   byte[] encoded=reader.command(target,List.of("get","secret",secret,"-o","jsonpath={.data.\\.dockerconfigjson}"),65536);
+   return io.github.devmrko.companion.service.PullRegistryCredentials.decode(encoded,host);
+  }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}
+  catch(Exception e){throw new IllegalStateException("OCIR 인증 Secret 조회 실패 · 환경·Namespace·Secret get 권한·레지스트리 호스트를 확인하세요.");}
+  finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
  public PullRegistry pullRegistry(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret){
   OkeWorkloadHealth.Target target=null;
   try{
