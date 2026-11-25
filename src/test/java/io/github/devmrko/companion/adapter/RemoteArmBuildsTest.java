@@ -33,4 +33,30 @@ class RemoteArmBuildsTest {
  @Test void registryAuthenticationFailureDoesNotExposeRawLogOrToken()throws Exception{String output=execute("echo 'unauthorized private-token'; exit 125",false);assertTrue(output.contains("COMPANION_ERROR=registry-auth"));assertFalse(output.contains("unauthorized"));}
  @Test void pushFailureReturnsOnlyBoundedDedicatedPushError()throws Exception{String output=execute("touch tested fail-push",false);String encoded=output.lines().filter(x->x.startsWith("COMPANION_PUSH_ERROR=")).findFirst().orElseThrow().substring(21);assertTrue(new String(Base64.getDecoder().decode(encoded),StandardCharsets.UTF_8).contains("registry unreachable"));assertFalse(output.contains("private-token"));}
  @Test void invalidCommitPathsAndBuilderOptionsAreRejected(){assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Input("arm","source","main","repo","tag","Dockerfile","true")));assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Input("arm","source","a".repeat(40),"repo","tag","../Dockerfile","true")));assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Builder("arm","-oProxyCommand=x","opc","/key")));}
+ @Test void functionSourceRetainsEvidenceAndPinnedManifestWithoutEnvironmentFiles()throws Exception{
+  Path input=directory.resolve("input.tar"),output=directory.resolve("source.tgz");
+  ArmBuildSource.tar(new ByteArrayInputStream(zip(Map.of("repo/pyproject.toml","[project]","repo/src/app.py","print(1)","repo/docs/evidence.md","evidence","repo/.env","private"))),input);
+  FunctionImageBuilds.bundle(input,output,"a".repeat(40));var found=new HashMap<String,String>();
+  try(var in=new TarArchiveInputStream(new GZIPInputStream(Files.newInputStream(output)))){for(var e=in.getNextEntry();e!=null;e=in.getNextEntry())found.put(e.getName(),new String(in.readAllBytes(),StandardCharsets.UTF_8));}
+  assertTrue(found.containsKey("docs/evidence.md"));assertFalse(found.containsKey(".env"));assertTrue(found.get("source.json").contains("a".repeat(40)));
+ }
+ @Test void functionBuildersRequireExistingSecretReferenceAndKeepVmBackwardCompatibility(){
+  assertEquals("VM",new Builder("vm","host","opc","/key").kind());
+  assertThrows(RuntimeException.class,()->RemoteArmBuilds.validate(new Builder("fn","","","","","","","PRIVATE_ENDPOINT","FUNCTION","ocid1.fnfunc.test")));
+  assertDoesNotThrow(()->RemoteArmBuilds.validate(new Builder("fn","","","","environment","apps","pull","PRIVATE_ENDPOINT","FUNCTION","ocid1.fnfunc.test")));
+ }
+
+ @Test void removingFunctionRegistrationIsOwnerScopedAndPreservesVmFallback(){
+  var records=new HashMap<String,io.github.devmrko.companion.port.BuildSpecDraftStore.Draft>();
+  var store=new io.github.devmrko.companion.port.BuildSpecDraftStore(){public Optional<Draft> read(String key){return Optional.ofNullable(records.get(key));}public void save(String key,Draft draft){records.put(key,draft);}public void delete(String key){records.remove(key);}};
+  var resources=org.mockito.Mockito.mock(io.github.devmrko.companion.port.OkeRuntimeResources.class);
+  var builds=new RemoteArmBuilds("unused",store,resources);
+  var actor=new io.github.devmrko.companion.domain.Models.Connection("p","t","u","r","label",false);
+  var other=new io.github.devmrko.companion.domain.Models.Connection("p","t","other","r","label",false);
+  builds.saveBuilder(actor,"r","c",new Builder("vm","host","opc","/key"));
+  builds.saveBuilder(actor,"r","c",new Builder("fn","","","","environment","apps","pull","PRIVATE_ENDPOINT","FUNCTION","ocid1.fnfunc.test"));
+  assertThrows(RuntimeException.class,()->builds.removeBuilder(other,"r","c","fn"));
+  builds.removeBuilder(actor,"r","c","fn");assertEquals(List.of("vm"),builds.builders(actor,"r","c").stream().map(Builder::name).toList());org.mockito.Mockito.verifyNoInteractions(resources);builds.close();
+ }
+
 }

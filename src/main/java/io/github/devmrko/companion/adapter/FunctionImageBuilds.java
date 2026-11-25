@@ -1,0 +1,89 @@
+package io.github.devmrko.companion.adapter;
+
+import com.oracle.bmc.ClientConfiguration;
+import com.oracle.bmc.functions.*;
+import com.oracle.bmc.functions.requests.*;
+import com.oracle.bmc.retrier.RetryConfiguration;
+import io.github.devmrko.companion.domain.Models.Connection;
+import io.github.devmrko.companion.port.ArmBuilds;
+import io.github.devmrko.companion.service.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.MessageDigest;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.zip.GZIPOutputStream;
+import org.apache.commons.compress.archivers.tar.*;
+import tools.jackson.databind.json.JsonMapper;
+
+/** Reuses the ARM source/registry flow; only application image assembly runs in Functions. */
+final class FunctionImageBuilds {
+ record Target(String endpoint,String fingerprint,String sourceRepository){}
+ private final OciBuildHistory clients;private final String crane;
+ private final JsonMapper json=JsonMapper.builder().build();
+ FunctionImageBuilds(OciBuildHistory clients,String crane){this.clients=clients;this.crane=crane;}
+ Target inspect(Connection c,String region,String compartment,String id,String image)throws Exception {
+  try(var client=FunctionsManagementClient.builder().build(clients.authentication(c))){
+   client.setRegion(region);var response=client.getFunction(GetFunctionRequest.builder().functionId(id).build());var f=response.getFunction();
+   var app=client.getApplication(GetApplicationRequest.builder().applicationId(f.getApplicationId()).build()).getApplication();
+   var config=new HashMap<String,String>();if(app.getConfig()!=null)config.putAll(app.getConfig());if(f.getConfig()!=null)config.putAll(f.getConfig());
+   String repository=image.substring(0,image.lastIndexOf(':')),source=config.getOrDefault("SOURCE_REPOSITORY","");
+   if(!compartment.equals(f.getCompartmentId())||!compartment.equals(app.getCompartmentId())||!"ACTIVE".equals(f.getLifecycleState().getValue())||!"GENERIC_ARM".equals(app.getShape().getValue())||!"sustena-layer-v1".equals(config.get("BUILD_RUNNER_CONTRACT"))||!repository.equals(config.get("IMAGE_REPOSITORY"))||!source.matches("[a-z0-9.-]+\\.ocir\\.io/[a-z0-9_-]+/[a-z0-9_./-]+")||!source.startsWith(image.substring(0,image.indexOf('/'))+"/")||source.contains("/../"))throw Errors.SCOPE.exception();
+   return new Target(f.getInvokeEndpoint(),response.getEtag()+"/"+app.getTimeUpdated(),source);
+  }
+ }
+ static String sha(Path path)throws Exception {try(var in=Files.newInputStream(path)){var digest=MessageDigest.getInstance("SHA-256");byte[] buffer=new byte[65536];for(int n;(n=in.read(buffer))!=-1;)digest.update(buffer,0,n);return HexFormat.of().formatHex(digest.digest());}}
+ static void bundle(Path source,Path output,String commit)throws Exception {
+  String prefix="";int best=Integer.MAX_VALUE;
+  try(var in=new TarArchiveInputStream(Files.newInputStream(source))){for(var entry=in.getNextEntry();entry!=null;entry=in.getNextEntry()){String name=entry.getName();if(name.equals("pyproject.toml")||name.endsWith("/pyproject.toml")){int depth=name.split("/").length;if(depth<best){best=depth;prefix=name.substring(0,name.length()-"pyproject.toml".length());}}}}
+  if(best==Integer.MAX_VALUE)throw Errors.SOURCE_READ.exception();
+  long total=0;
+  try(var in=new TarArchiveInputStream(Files.newInputStream(source));var out=new TarArchiveOutputStream(new GZIPOutputStream(Files.newOutputStream(output)))){
+   out.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+   for(var entry=in.getNextEntry();entry!=null;entry=in.getNextEntry()){
+    if(!entry.getName().startsWith(prefix)||!entry.isFile())continue;String name=entry.getName().substring(prefix.length());
+    if(!Set.of("src","tests","vendor","docs","pyproject.toml","uv.lock","README.md").contains(name.split("/")[0]))continue;
+    total+=entry.getSize();if(total>80L*1024*1024)throw Errors.SOURCE_READ.exception();var next=new TarArchiveEntry(name);next.setSize(entry.getSize());next.setMode(0644);out.putArchiveEntry(next);in.transferTo(out);out.closeArchiveEntry();
+   }
+   byte[] manifest=("{\"schema_version\":1,\"commit\":\""+commit+"\"}").getBytes(StandardCharsets.UTF_8);var next=new TarArchiveEntry("source.json");next.setSize(manifest.length);out.putArchiveEntry(next);out.write(manifest);out.closeArchiveEntry();
+  }
+  if(Files.size(output)>48L*1024*1024)throw Errors.SOURCE_READ.exception();
+ }
+ String build(Connection c,String region,String compartment,ArmBuilds.Plan plan,Path source,String username,char[] password)throws Exception {
+  var target=inspect(c,region,compartment,plan.target().functionId(),plan.image());if(!target.fingerprint().equals(plan.functionFingerprint()))throw Errors.BUILD_CHANGED.exception();
+  Path root=Files.createTempDirectory("companion-function-image-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+  try{
+   Path archive=root.resolve("source.tgz"),layer=root.resolve("source-layer.tar");bundle(source,archive,plan.input().commit());
+   try(var out=new TarArchiveOutputStream(Files.newOutputStream(layer));var in=Files.newInputStream(archive)){var entry=new TarArchiveEntry("source.tgz");entry.setSize(Files.size(archive));out.putArchiveEntry(entry);in.transferTo(out);out.closeArchiveEntry();}
+   String host=plan.image().substring(0,plan.image().indexOf('/'));String token=new String(password);
+   Path auth=root.resolve("config.json");Files.writeString(auth,json.writeValueAsString(Map.of("auths",Map.of(host,Map.of("auth",Base64.getEncoder().encodeToString((username+":"+token).getBytes(StandardCharsets.UTF_8)))))));Files.setPosixFilePermissions(auth,PosixFilePermissions.fromString("rw-------"));
+   // crane accepts the config directory explicitly; the token never enters command arguments.
+   String sourceTag=target.sourceRepository()+":source-"+UUID.randomUUID();
+   authCommand(List.of(crane,"append","-f",layer.toString(),"-t",sourceTag),root);
+   String digest=authCommand(List.of(crane,"digest",sourceTag),root);
+   if(!digest.matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
+   var payload=new LinkedHashMap<String,Object>();payload.put("action","build");payload.put("commit",plan.input().commit());payload.put("tag",plan.input().tag());payload.put("sourceImage",target.sourceRepository()+"@"+digest);payload.put("sourceSha256",sha(archive));payload.put("registryCredentials",Map.of("username",username,"password",token));
+   var configuration=ClientConfiguration.builder().connectionTimeoutMillis(10000).readTimeoutMillis(330000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();
+   try(var invoke=FunctionsInvokeClient.builder().configuration(configuration).endpoint(target.endpoint()).build(clients.authentication(c))){
+    var response=invoke.invokeFunction(InvokeFunctionRequest.builder().functionId(plan.target().functionId()).fnInvokeType(InvokeFunctionRequest.FnInvokeType.Sync).invokeFunctionBody(new OciFunctionBuilds.SignedBody(json.writeValueAsBytes(payload))).build());
+    try(var body=response.getInputStream()){
+     byte[] bytes=body.readNBytes(65537);if(bytes.length>65536)throw Errors.HANDOFF.exception();var result=json.readTree(bytes);
+     if(!"SUCCEEDED".equals(result.path("status").asText()))throw new IllegalStateException("Function "+result.path("phase").asText()+": "+PipelineIamRules.safe(result.path("error").asText().replace(token,"[REDACTED]")));
+     String built=result.path("digest").asText(),repository=plan.image().substring(0,plan.image().lastIndexOf(':'));
+     if(!built.matches("sha256:[a-f0-9]{64}")||!result.path("image").asText().equals(repository+"@"+built)||!result.path("commit").asText().equals(plan.input().commit())||result.path("tests").path("tests").asInt()<=0||result.path("tests").path("failures").asInt()!=0||result.path("tests").path("errors").asInt()!=0||!result.path("environment").path("arch").asText().equals("aarch64"))throw Errors.HANDOFF.exception();return built;
+    }
+   }
+  }finally{try(var paths=Files.walk(root)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
+ }
+ private String authCommand(List<String> args,Path root)throws Exception {
+  // Separate helper keeps registry authentication out of all application/global environment state.
+  var process=new ProcessBuilder(args).redirectErrorStream(true);process.environment().put("DOCKER_CONFIG",root.toString());
+  var p=process.start();try(var readers=Executors.newVirtualThreadPerTaskExecutor()){
+   var output=readers.submit(()->{try(var in=p.getInputStream()){return in.readNBytes(131073);}});
+   try{if(!p.waitFor(180,TimeUnit.SECONDS))throw new IOException("crane source upload timed out");byte[] value=output.get(5,TimeUnit.SECONDS);if(value.length>131072)throw new IOException("crane response exceeded limit");String text=new String(value,StandardCharsets.UTF_8).trim();if(p.exitValue()!=0)throw new IOException("crane: "+PipelineIamRules.safe(text));return text;}
+   finally{p.descendants().forEach(ProcessHandle::destroyForcibly);p.destroyForcibly();output.cancel(true);}
+  }
+ }
+}

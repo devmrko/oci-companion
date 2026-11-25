@@ -262,3 +262,10 @@ ALL {resource.compartment.id = '<tenancy>',
 - 위 IAM 표에서 "없을 때의 오류는 미확인"인 줄은 정책을 한 번에 만들어 개별 효과를 나눠 보지 않았다는 뜻입니다. 최소 권한 조합은 검증하지 않았습니다.
 - ARM 러너 미지원은 SDK·CLI 모델과 실제 러너 1회 실행으로 확인했습니다. OCI 콘솔에서 다른 이미지가 노출되는지는 보지 않았습니다.
 - 실제 Google 로그인과 X-Forwarded-For의 실제 클라이언트 IP 반영은 사람이 확인해야 합니다(앱 접근 로그 없음).
+
+
+## 2026-11-26 ARM Function 이미지 후속 검증
+
+Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR push와 최초 별도 배포 2/2 Ready·readyz 200을 확인했습니다. 등록 빌더에서 Function을 선택할 수 있고 운영 기본 빌더를 Function으로, VM을 대체 경로로 유지했습니다. [실제 시간·오류·유지 자원](../function-container-image-validation.md)을 참고하세요.
+
+새 오류: 등록 서비스 재배포는 OCI `SUCCEEDED`와 달리 최신 built digest가 실제 Deployment에 적용되지 않았습니다. 이전 artifact 실행 스냅샷이 사용됐고 새 artifact/stage 참조 실험도 실패해 되돌렸습니다. 이 재배포 공백은 남아 있습니다. Function 이미지 빌드 성공과 최신 이미지 재배포 성공을 구분합니다.

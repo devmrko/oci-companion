@@ -16,18 +16,22 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RemoteArmBuilds implements ArmBuilds {
+ private final FunctionImageBuilds functionImages;
  private final OciBuildHistory clients;private final OciDeploymentSetup images;private final BuildSpecDraftStore store;private final OkeRuntimeResources resources;
  private final tools.jackson.databind.json.JsonMapper json=tools.jackson.databind.json.JsonMapper.builder().build();
  private final ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();
  private final Map<String,Run> active=new ConcurrentHashMap<>();
- public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store,OkeRuntimeResources resources){this.resources=resources;this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;}
+ public RemoteArmBuilds(String config,BuildSpecDraftStore store,OkeRuntimeResources resources){this(config,store,resources,"crane");}
+ @org.springframework.beans.factory.annotation.Autowired
+ public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store,OkeRuntimeResources resources,@Value("${companion.crane:crane}") String crane){this.resources=resources;this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;this.functionImages=new FunctionImageBuilds(clients,crane);}
  @jakarta.annotation.PreDestroy public void close(){executor.shutdownNow();}
  private String key(Connection c,String region,String compartment){return String.join("\n","arm-build-v1",c.profile(),c.tenancy(),c.user(),region,compartment);}
  public List<Builder> builders(Connection c,String region,String compartment){return store.read(key(c,region,compartment)+"\nbuilders").map(d->List.of(json.readValue(d.content(),Builder[].class))).orElse(List.of());}
- static void validate(Builder b){if(b.name()==null||!b.name().matches("[a-z0-9][a-z0-9-]{0,62}"))throw Errors.INVALID.exception();OkeApiAccess.validate(new OkeApiAccess.Settings("https://localhost","",b.host(),b.user(),b.keyPath()));if(b.host()==null||b.host().isBlank())throw Errors.INVALID.exception();
+ static void validate(Builder b){if(b.name()==null||!b.name().matches("[a-z0-9][a-z0-9-]{0,62}"))throw Errors.INVALID.exception();if(b.kind().equals("FUNCTION")){if(!b.functionId().startsWith("ocid1.fnfunc.")||b.secretEnvironment().isBlank())throw Errors.INVALID.exception();}else {if(!b.kind().equals("VM"))throw Errors.INVALID.exception();OkeApiAccess.validate(new OkeApiAccess.Settings("https://localhost","",b.host(),b.user(),b.keyPath()));if(b.host()==null||b.host().isBlank())throw Errors.INVALID.exception();}
   if(!b.secretEnvironment().isBlank()){OciOkeWorkloadConnections.name(b.secretNamespace());OciOkeWorkloadConnections.name(b.secretName());OciOkeWorkloadConnections.endpoint(b.secretEndpoint());}
   else if(!b.secretNamespace().isBlank()||!b.secretName().isBlank())throw Errors.INVALID.exception();}
  public synchronized void saveBuilder(Connection c,String region,String compartment,Builder builder){validate(builder);var list=new ArrayList<>(builders(c,region,compartment));list.removeIf(x->x.name().equals(builder.name()));if(list.size()>=16)throw Errors.INVALID.exception();list.add(builder);store.save(key(c,region,compartment)+"\nbuilders",new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(list),Instant.now().toString()));}
+ public synchronized void removeBuilder(Connection c,String region,String compartment,String name){var list=builders(c,region,compartment);if(list.stream().noneMatch(b->b.name().equals(name)))throw Errors.MISSING.exception();store.save(key(c,region,compartment)+"\nbuilders",new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(list.stream().filter(b->!b.name().equals(name)).toList()),Instant.now().toString()));}
  static void validate(Input i){
   if(i.commit()==null||!i.commit().matches("[a-f0-9]{40}")||i.tag()==null||!i.tag().matches("[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}")||i.dockerfile()==null||!i.dockerfile().matches("[A-Za-z0-9_][A-Za-z0-9_./-]{0,200}")||Arrays.asList(i.dockerfile().split("/")).contains("..")||i.testCommand()==null||i.testCommand().isBlank()||i.testCommand().length()>8192||i.testCommand().contains("\u0000"))throw Errors.INVALID.exception();
  }
@@ -37,7 +41,8 @@ public class RemoteArmBuilds implements ArmBuilds {
    var repository=client.getRepository(com.oracle.bmc.devops.requests.GetRepositoryRequest.builder().repositoryId(i.sourceRepository()).build()).getRepository();if(!compartment.equals(repository.getCompartmentId()))throw Errors.SCOPE.exception();
    var commit=client.getCommit(GetCommitRequest.builder().repositoryId(i.sourceRepository()).commitId(i.commit()).build()).getRepositoryCommit();if(!i.commit().equals(commit.getCommitId()))throw Errors.SOURCE_READ.exception();
    var target=registry.getContainerRepository(GetContainerRepositoryRequest.builder().repositoryId(i.imageRepository()).build()).getContainerRepository();if(!compartment.equals(target.getCompartmentId())||!"AVAILABLE".equals(target.getLifecycleState().getValue()))throw Errors.SCOPE.exception();
-   return new Plan(i,region+".ocir.io/"+target.getNamespace()+"/"+target.getDisplayName()+":"+i.tag(),repository.getName(),builder.name(),builder);
+   String image=region+".ocir.io/"+target.getNamespace()+"/"+target.getDisplayName()+":"+i.tag();
+   return new Plan(i,image,repository.getName(),builder.name(),builder,builder.kind().equals("FUNCTION")?functionImages.inspect(c,region,compartment,builder.functionId(),image).fingerprint():"");
   }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){throw new IllegalStateException(OciPipelineIam.error(e));}
  }
  public List<String> managedImages(){return Arrays.stream(com.oracle.bmc.devops.model.BuildStage.Image.values()).filter(x->x!=com.oracle.bmc.devops.model.BuildStage.Image.UnknownEnumValue).map(com.oracle.bmc.devops.model.BuildStage.Image::getValue).toList();}
@@ -126,6 +131,8 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
   try{
    source=Files.createTempFile("companion-arm-source-",".tar");
    try(var client=clients.client(c,region);var in=client.getRepositoryArchiveContent(GetRepositoryArchiveContentRequest.builder().repositoryId(plan.input().sourceRepository()).refName(plan.input().commit()).format("zip").build()).getInputStream()){ArmBuildSource.tar(in,source);}
+   if(builder.kind().equals("FUNCTION")){phase(identity,"function");digest.set(functionImages.build(c,region,compartment,plan,source,username,password));}
+   else {
    phase(identity,"transfer");command(builder,"umask 077; mkdir "+quote(work)+" && cat > "+quote(work+"/source.tar"),Files.newInputStream(source),120,x->{});
    String script=script(plan,work,username,password);Arrays.fill(password,'\0');
    command(builder,"bash -s",new ByteArrayInputStream(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)),1800,line->{
@@ -136,6 +143,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
     if(line.equals("COMPANION_ERROR=tls"))remoteError.set("원격 VM의 레지스트리 TLS 인증서 연결을 확인하세요.");
     if(line.matches("COMPANION_DIGEST=sha256:[a-f0-9]{64}"))digest.set(line.substring(17));
    });
+   }
    if(!digest.get().matches("sha256:[a-f0-9]{64}"))throw new IllegalStateException("push 결과 digest를 확인하지 못했습니다.");
    phase(identity,"registry");boolean found=false;
    try(var registry=images.artifacts(c,region)){
@@ -147,6 +155,6 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    if(!found)throw new IllegalStateException("push 후 OCIR에서 digest를 아직 확인하지 못했습니다. 이미지 목록을 다시 조회하세요.");
    save(identity,new Run(initial.id(),"SUCCEEDED","complete",plan.image(),initial.repository(),digest.get(),"",initial.startedAt(),Instant.now().toString()));
   }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var current=active.getOrDefault(identity,initial);save(identity,new Run(initial.id(),"FAILED",current.phase(),initial.image(),initial.repository(),digest.get(),PipelineIamRules.safe(e.getMessage())+(remoteError.get().isEmpty()?"":" · "+remoteError.get()),initial.startedAt(),Instant.now().toString()));}
-  finally{Arrays.fill(password,'\0');if(source!=null)try{Files.deleteIfExists(source);}catch(Exception ignored){}try{command(builder,"rm -rf -- "+quote(work),new ByteArrayInputStream(new byte[0]),15,x->{});}catch(Exception ignored){}}
+  finally{Arrays.fill(password,'\0');if(source!=null)try{Files.deleteIfExists(source);}catch(Exception ignored){}try{if(builder.kind().equals("VM"))command(builder,"rm -rf -- "+quote(work),new ByteArrayInputStream(new byte[0]),15,x->{});}catch(Exception ignored){}}
  }
 }
