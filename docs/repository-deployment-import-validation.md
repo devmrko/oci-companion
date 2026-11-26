@@ -38,17 +38,6 @@ helm template verify /tmp/ridley-helm-missing --dry-run=client --no-hooks --skip
 
 [이관 흐름과 삭제 보호 조건](design/namespace-migration.md)에 따라 기존 서비스 설정 재사용 화면에서 다른 Namespace를 고를 수 있습니다. 대상 참조가 없으면 배포 전에 중단하고, 원본 정리는 대상 Pod의 digest·Ready를 다시 확인한 후 별도 확인으로 실행합니다. 실제 검증 결과는 아래에 기록합니다.
 
-## 운영 Function 자동 캐시 적용안 — 아직 적용하지 않음
-
-운영 Function은 기존 runtime-v3와 옵션 비활성 상태를 유지합니다. 오너의 별도 승인 후 다음 순서로 적용할 수 있습니다.
-
-1. 현재 Function image·digest·config·메모리·timeout을 비공개 백업합니다. 기존 설정 전체를 보존하고 변경할 항목만 별도 미리보기로 비교합니다.
-2. 검증한 `fn-image-template`의 `func.py`, `image_layer.py`, `dependency_cache.py`를 포함하는 ARM 런타임 이미지를 별도 새 태그로 만들고 digest를 고정합니다. `SOURCE_REPOSITORY` 안의 `RUNTIME_BASE_IMAGE`를 해당 고정 digest로 설정하고 `IMAGE_BASE`도 검증한 기반 digest를 유지합니다.
-3. 운영 빌더 Function에 `AUTOMATIC_DEPENDENCIES=true`와 `RUNTIME_BASE_IMAGE`를 적용하고, 관리 API의 ACTIVE뿐 아니라 실제 런타임 probe로 새 코드·aarch64·잠금 해시를 확인합니다. 진행 중인 빌드가 없을 때 변경하며 새 IAM이 필요하면 먼저 승인을 받습니다.
-4. 별도 앱 이름으로 첫 빌드와 같은 커밋 재빌드를 검증합니다. 실패하면 백업 image와 config로 빌더를 복구하고 실행 probe를 다시 확인합니다. 운영 앱 배포는 별도 결정이며 이 설정 변경이 자동으로 배포하지는 않습니다.
-
-영향: 잠금 파일이 바뀐 첫 빌드에 의존성 설치·OCIR 캐시 저장·빌더 Function 이미지 전환과 전파 대기가 추가됩니다. 기존 실검증에서는 첫 빌드 180초, 캐시 재사용 144초였으며 시간은 소스·네트워크에 따라 달라집니다. OCIR 저장량과 Function 실행 비용이 늘고, 동일 빌더의 런타임이 변경되므로 동시 빌드를 피해야 합니다. 캐시 삭제 정책과 실패한 전환의 운영 절차도 정해야 합니다. [앞선 실제 캐시 검증](function-dependency-cache-validation.md)의 범위와 오류를 함께 참고하세요.
-
 2026-11-26 `personal-services/companion-verify-advanced`를 새 Namespace의 `companion-verify-migrate/companion-verify-moved`로 실제 이관했습니다. 대상 Namespace·별도 pull Secret·테스트용 ConfigMap/Secret은 검증 준비로 새로 만들었고 기존 Secret은 변경하지 않았습니다. 제품 흐름은 이 참조들의 존재만 확인했습니다.
 
 - 대상 2/2 Ready, 두 Pod의 digest `7cefbee7030cd792157026ad5cd4a7c7b96a3991c31dbe0fa3e849744c43dce4` 일치, `/readyz` 200, 고급 Pod 설정과 미리보기 명세 일치.
@@ -59,8 +48,21 @@ helm template verify /tmp/ridley-helm-missing --dry-run=client --no-hooks --skip
 
 Helm 소스도 ARM 빌드에 성공해 같은 앱 digest를 얻고 적용 명세 미리보기까지 확인했습니다(`86-helm-built-preview.png`). Helm 전용 서비스는 배포하지 않았으며, 실제 런타임 설정 검증은 고급 명세 서비스와 그 Namespace 이관에서 수행했습니다.
 
+
+## 운영 Function 자동 캐시 적용안 — 승인 전 계획
+
+아래는 적용 전 승인에 사용한 계획입니다. 이후 직접 승인을 받아 수행한 결과는 [운영 Function 캐시 적용 기록](production-function-cache-enablement.md)에 별도로 기록합니다.
+
+1. 현재 Function image·digest·config·메모리·timeout을 비공개 백업합니다. 기존 설정 전체를 보존하고 변경할 항목만 별도 미리보기로 비교합니다.
+2. 검증한 `fn-image-template`의 `func.py`, `image_layer.py`, `dependency_cache.py`를 포함하는 ARM 런타임 이미지를 별도 새 태그로 만들고 digest를 고정합니다. `SOURCE_REPOSITORY` 안의 `RUNTIME_BASE_IMAGE`를 해당 고정 digest로 설정하고 `IMAGE_BASE`도 검증한 기반 digest를 유지합니다.
+3. 운영 빌더 Function에 `AUTOMATIC_DEPENDENCIES=true`와 `RUNTIME_BASE_IMAGE`를 적용하고, 관리 API의 ACTIVE뿐 아니라 실제 런타임 probe로 새 코드·aarch64·잠금 해시를 확인합니다. 진행 중인 빌드가 없을 때 변경하며 새 IAM이 필요하면 먼저 승인을 받습니다.
+4. 별도 앱 이름으로 첫 빌드와 같은 커밋 재빌드를 검증합니다. 실패하면 백업 image와 config로 빌더를 복구하고 실행 probe를 다시 확인합니다. 운영 앱 배포는 별도 결정이며 이 설정 변경이 자동으로 배포하지는 않습니다.
+
+영향: 잠금 파일이 바뀐 첫 빌드에 의존성 설치·OCIR 캐시 저장·빌더 Function 이미지 전환과 전파 대기가 추가됩니다. 기존 실검증에서는 첫 빌드 180초, 캐시 재사용 144초였으며 시간은 소스·네트워크에 따라 달라집니다. OCIR 저장량과 Function 실행 비용이 늘고, 동일 빌더의 런타임이 변경되므로 동시 빌드를 피해야 합니다. 캐시 삭제 정책과 실패한 전환의 운영 절차도 정해야 합니다. [앞선 실제 캐시 검증](function-dependency-cache-validation.md)의 범위와 오류를 함께 참고하세요.
+
+
 ## 최종 정리와 운영 보존
 
 검증용 원본·이관 대상 워크로드, 새 Namespace와 테스트 Secret/ConfigMap, 서비스 등록·조회 연결·소스 등록, 두 OCI 환경·파이프라인·stage·artifact, ARM VM의 검증 태그 두 개를 삭제했습니다. 공유 프로젝트와 기존 정책·보안 규칙·Secret은 유지했습니다. 클러스터 정리 첫 스크립트는 Namespace 삭제 후 `Fixture cleanup failed`로 중단됐으며, 남은 정상 조회 연결로 정확히 두 테스트 자원을 삭제하고 부재를 재확인했습니다. 정리 로그는 `/tmp/ridley-import-clean-*.log`, 화면은 `91-import-cleaned.png`입니다.
 
-운영 읽기 전용 검증은 기존 `d52337647c0c…` digest를 실행하는 두 Ready Pod, readyz 200, 이미지 외 Deployment 설정·NodePort Service·ConfigMap 동일을 확인했습니다. 운영 Function 자동 캐시는 적용하지 않았으며 위 적용안은 다음 승인에 사용할 설명입니다. Knowledge MCP 연결 오류로 문서 가이드 최신 원문과 자동 지식 저장은 수행하지 못했고, 이 문서는 코드·실검증의 원본 증거를 기준으로 작성했습니다.
+운영 읽기 전용 검증은 기존 `d52337647c0c…` digest를 실행하는 두 Ready Pod, readyz 200, 이미지 외 Deployment 설정·NodePort Service·ConfigMap 동일을 확인했습니다. 이 검증 당시 운영 Function 자동 캐시는 적용하지 않았습니다. 이후 직접 승인에 따른 활성화·첫 빌드·재빌드 결과는 [운영 Function 캐시 적용 기록](production-function-cache-enablement.md)에 있습니다. Knowledge MCP 연결 오류로 문서 가이드 최신 원문과 자동 지식 저장은 수행하지 못했고, 이 문서는 코드·실검증의 원본 증거를 기준으로 작성했습니다.
