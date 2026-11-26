@@ -80,7 +80,9 @@ def handler(ctx, data=None):
                 dependency_base = dependency_cache.cached(request, root, command, os.environ['SOURCE_REPOSITORY'], key['app'], key['lock'])
                 if not dependency_base:
                     raise ValueError('Prepared application dependency cache is missing')
-                result.update(lockHash=key['lock'], dependencyCacheHit=True)
+                result.update(lockHash=key['lock'], dependencyCacheHit=True, dependencyImage=dependency_base,
+                              dependencyTag=key['app'], runtimeTag=key['runtime'],
+                              runtimeImage=dependency_cache.cached(request, root, command, os.environ['SOURCE_REPOSITORY'], key['runtime'], key['lock']))
                 test_python = '/usr/local/bin/python'
                 test_path = str(source / 'src') + ':' + installed + '/site-packages'
             else:

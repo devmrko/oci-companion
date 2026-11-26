@@ -19,5 +19,9 @@ public interface ArmBuilds {
  default Run reconcile(Connection c,String region,String compartment,String id){throw new UnsupportedOperationException();}
  default void abandon(Connection c,String region,String compartment,String id){throw new UnsupportedOperationException();}
  default List<Run> pending(Connection c,String region,String compartment){return List.of();}
+ record CacheItem(String digest,String tag,String lastUsed,boolean deletable,String reason){}
+ record CachePlan(String builder,String repository,List<CacheItem> items,String fingerprint,boolean automatic){}
+ default CachePlan cachePreview(Connection c,String region,String compartment,String builder){throw new UnsupportedOperationException();}
+ default void cacheApply(Connection c,String region,String compartment,CachePlan plan,boolean automatic){throw new UnsupportedOperationException();}
  List<String> managedImages();
 }

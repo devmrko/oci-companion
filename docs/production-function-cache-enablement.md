@@ -44,3 +44,7 @@
 정상 테스트 구성의 `./mvnw verify` 결과는 **433개 중 431개 통과·실환경 opt-in 2개 건너뜀**, 실패/오류 0입니다. 운영 적용 일회성 실제 테스트는 별도로 성공했습니다. 증거 스크린샷 `.tools/verification/screenshots/92-production-function-cache.png`는 실제 로그·JSON을 렌더링한 결과 표이며 Companion UI 화면은 아닙니다. 삭제 목록과 결과는 비공개 `resources.json`, 운영 보존 결과는 `.tools/verification/production-final-readonly-acceptance.json`에 있습니다.
 
 문서 가이드 최신 원문 조회는 Knowledge MCP 연결 오류로 실패했습니다. 위 내용은 이번 실제 실행과 프로젝트 원본 코드·기존 검증 문서를 근거로 기록했으며 별도 지식 저장이 완료됐다고 주장하지 않습니다.
+
+## 후속 보강
+
+빌드 중복 실행과 결과 유실은 [완료 결과 복구](build-result-recovery-validation.md), 캐시 보존·정리는 [캐시 정리 검증](function-cache-maintenance-validation.md)을 참고하세요. 후속 기능은 격리 자원에서 검증했으며 운영 Function 템플릿 갱신과 운영 캐시 자동 삭제 활성화는 별도입니다.

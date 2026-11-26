@@ -21,9 +21,11 @@ import tools.jackson.databind.json.JsonMapper;
 /** Reuses the ARM source/registry flow; only application image assembly runs in Functions. */
 final class FunctionImageBuilds {
  record Target(String endpoint,String fingerprint,String sourceRepository,boolean automaticDependencies,String etag){}
- private final OciBuildHistory clients;private final String crane;
+ interface CacheObserver {void used(Connection c,String region,BuildCacheJournal.Use use);}
+ private final OciBuildHistory clients;private final String crane;private final CacheObserver cacheObserver;
  private final JsonMapper json=JsonMapper.builder().build();
- FunctionImageBuilds(OciBuildHistory clients,String crane){this.clients=clients;this.crane=crane;}
+ FunctionImageBuilds(OciBuildHistory clients,String crane){this(clients,crane,(c,r,u)->{});}
+ FunctionImageBuilds(OciBuildHistory clients,String crane,CacheObserver observer){this.clients=clients;this.crane=crane;this.cacheObserver=observer;}
  Target inspect(Connection c,String region,String compartment,String id,String image)throws Exception {
   try(var client=FunctionsManagementClient.builder().build(clients.authentication(c))){
    client.setRegion(region);var response=client.getFunction(GetFunctionRequest.builder().functionId(id).build());var f=response.getFunction();
@@ -69,6 +71,7 @@ final class FunctionImageBuilds {
    authCommand(List.of(crane,"append","-f",layer.toString(),"-t",sourceTag),root);
    String digest=authCommand(List.of(crane,"digest",sourceTag),root);
    if(!digest.matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
+   var createdCacheImages=new HashSet<String>();
    var payload=new LinkedHashMap<String,Object>();payload.put("action","build");if(!runId.isBlank()){BuildReceipt.labels(runId,plan.input().commit());payload.put("buildId",runId);}payload.put("commit",plan.input().commit());payload.put("tag",plan.input().tag());payload.put("sourceImage",target.sourceRepository()+"@"+digest);payload.put("sourceSha256",sha(archive));payload.put("registryCredentials",Map.of("username",username,"password",token));
    var configuration=ClientConfiguration.builder().connectionTimeoutMillis(10000).readTimeoutMillis(330000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();
    try(var invoke=FunctionsInvokeClient.builder().configuration(configuration).endpoint(target.endpoint()).build(clients.authentication(c))){
@@ -82,6 +85,7 @@ final class FunctionImageBuilds {
      if("RUNTIME_REQUIRED".equals(result.path("status").asText())){
       if(attempt!=0||!target.automaticDependencies())throw Errors.HANDOFF.exception();
       validateRuntime(result,target.sourceRepository(),plan.input().commit());
+      for(var created:result.path("createdImages"))if(Set.of(result.path("runtimeImage").asText(),result.path("dependencyImage").asText()).contains(created.asText()))createdCacheImages.add(created.asText().substring(created.asText().indexOf('@')+1));
       String runtimeDigest=authCommand(List.of(crane,"digest",result.path("runtimeTag").asText()),root);
       var runtimeConfig=json.readTree(authCommand(List.of(crane,"config",result.path("runtimeImage").asText()),root));
       if(!result.path("runtimeImage").asText().endsWith("@"+runtimeDigest)||!"arm64".equals(runtimeConfig.path("architecture").asText())||!"linux".equals(runtimeConfig.path("os").asText())||!result.path("lockHash").asText().equals(runtimeConfig.path("config").path("Labels").path("companion.lock").asText())||!"v2".equals(runtimeConfig.path("config").path("Labels").path("companion.cache").asText()))throw Errors.HANDOFF.exception();
@@ -89,7 +93,14 @@ final class FunctionImageBuilds {
      }
      if(!"SUCCEEDED".equals(result.path("status").asText()))throw new IllegalStateException("Function "+result.path("phase").asText()+": "+PipelineIamRules.safe(result.path("error").asText().replace(token,"[REDACTED]")));
      String built=result.path("digest").asText(),repository=plan.image().substring(0,plan.image().lastIndexOf(':'));
-     if(!built.matches("sha256:[a-f0-9]{64}")||!result.path("image").asText().equals(repository+"@"+built)||!result.path("commit").asText().equals(plan.input().commit())||result.path("tests").path("tests").asInt()<=0||result.path("tests").path("failures").asInt()!=0||result.path("tests").path("errors").asInt()!=0||!result.path("environment").path("arch").asText().equals("aarch64"))throw Errors.HANDOFF.exception();return built;
+     if(!built.matches("sha256:[a-f0-9]{64}")||!result.path("image").asText().equals(repository+"@"+built)||!result.path("commit").asText().equals(plan.input().commit())||result.path("tests").path("tests").asInt()<=0||result.path("tests").path("failures").asInt()!=0||result.path("tests").path("errors").asInt()!=0||!result.path("environment").path("arch").asText().equals("aarch64"))throw Errors.HANDOFF.exception();
+     if(target.automaticDependencies()&&result.has("dependencyTag"))try{
+      validateRuntime(result,target.sourceRepository(),plan.input().commit());
+      String dependency=result.path("dependencyImage").asText(),runtime=result.path("runtimeImage").asText(),depTag=result.path("dependencyTag").asText();
+      if(!depTag.matches(java.util.regex.Pattern.quote(target.sourceRepository())+":deps-[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
+      cacheObserver.used(c,region,new BuildCacheJournal.Use(target.sourceRepository(),result.path("lockHash").asText(),Map.of("deps",dependency.substring(dependency.indexOf('@')+1),"runtime",runtime.substring(runtime.indexOf('@')+1)),Map.of("deps",depTag.substring(depTag.lastIndexOf(':')+1),"runtime",result.path("runtimeTag").asText().substring(result.path("runtimeTag").asText().lastIndexOf(':')+1)),createdCacheImages));
+     }catch(Exception ignored){System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING,"캐시 사용 기록 저장 실패 · 미추적 이미지는 삭제하지 않습니다");}
+     return built;
     }
     throw Errors.HANDOFF.exception();
    }

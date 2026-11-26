@@ -86,6 +86,7 @@ def prepare(request, root, source, command, base, runtime_base, repository):
     app = cached(request, root, command, repository, key['app'], key['lock'])
     runtime = cached(request, root, command, repository, key['runtime'], key['lock'])
     hit = bool(app and runtime)
+    created = []
     if not hit:
         venv = root / 'dependency-environment'
         extra = {'UV_PROJECT_ENVIRONMENT': str(venv)}
@@ -96,12 +97,14 @@ def prepare(request, root, source, command, base, runtime_base, repository):
             runtime_layer(site, source / 'uv.lock', layer, key['path'])
             runtime = publish(request, root, command, repository, runtime_base, layer,
                               key['runtime'], key['lock'], key['path'])
+            created.append(runtime)
             layer.unlink()
         if not app:
             command(['uv', 'sync', '--locked', '--no-editable', '--no-dev', '--no-install-project'], source, extra)
             image_layer.layer(site, layer)
             app = publish(request, root, command, repository, base, layer, key['app'], key['lock'])
+            created.append(app)
             layer.unlink()
         shutil.rmtree(venv)
     return {'status': 'RUNTIME_REQUIRED', 'runtimeImage': runtime, 'runtimeTag': key['runtime'],
-            'dependencyImage': app, 'lockHash': key['lock'], 'cacheHit': hit}
+            'dependencyImage': app, 'lockHash': key['lock'], 'cacheHit': hit, 'createdImages': created}
