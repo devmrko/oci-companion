@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><body><div th:fragment="content" class="section-stack">
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><body><div th:fragment="content" class="section-stack"><div th:if="${armCheck != null}" th:insert="~{deployment-checks :: item(${armCheck})}"></div>
 <section class="card" th:if="${sourceChoices!=null}"><h2>소스에서 새 서비스 만들기</h2><form method="post" th:action="@{/services/new/source/inspect}" class="section-stack">
 <label>소스 저장소<select name="source" class="ui-control" required><option th:each="s:${sourceChoices}" th:value="${s.id()}" th:text="${s.name()}"></option></select></label>
 <label>클러스터·Namespace 연결<select name="context" class="ui-control" required><option th:each="e:${templates}" th:value="${e.registration().name()}" th:text="${e.registration().name()+' · '+e.deployment().namespace()}"></option></select></label><p>기존 연결의 API 접속 설정과 Namespace를 사용합니다. 앱의 배포 설정은 선택한 새 소스에서 읽습니다.</p>

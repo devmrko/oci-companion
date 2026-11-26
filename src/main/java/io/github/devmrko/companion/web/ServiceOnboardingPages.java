@@ -36,5 +36,5 @@ public class ServiceOnboardingPages {
   var c=context(a,session);RetirementTicket t;synchronized(session){t=(RetirementTicket)session.getAttribute("retirementTicket");session.removeAttribute("retirementTicket");}
   if(!confirmed||t==null||!t.token().equals(ticket)||!t.context().equals(c)||t.expires().isBefore(Instant.now()))throw Errors.SCOPE.exception();onboarding.retire(c,t.plan());return "redirect:/services/new?run="+t.plan().run();
  }
- @ExceptionHandler({IllegalStateException.class,IllegalArgumentException.class,io.github.devmrko.companion.error.BusinessException.class}) String error(Exception e,Model m){m.addAttribute("message",PipelineIamRules.safe(e.getMessage()));return "operating-service-error";}
+ @ExceptionHandler({IllegalStateException.class,IllegalArgumentException.class,io.github.devmrko.companion.error.BusinessException.class}) String error(Exception e,Model m){if(e instanceof ExistingDeploymentName existing)m.addAttribute("redeployHref",existing.href());m.addAttribute("message",PipelineIamRules.safe(e.getMessage()));return "operating-service-error";}
 }

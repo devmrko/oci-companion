@@ -10,9 +10,11 @@ import java.util.*;
 public class OkeToolReadiness {
  public record Tool(String name,String configured,String resolved,boolean available,String setting) {}
  private final String kubectl,oci;
+ private io.github.devmrko.companion.service.KubectlExecutable executable;
+ @org.springframework.beans.factory.annotation.Autowired void executable(io.github.devmrko.companion.service.KubectlExecutable executable){this.executable=executable;}
  public OkeToolReadiness(@Value("${companion.kubectl:/usr/local/bin/kubectl}") String kubectl,
    @Value("${companion.oci-cli:oci}") String oci){this.kubectl=kubectl;this.oci=oci;}
- public List<Tool> tools(){return List.of(check("kubectl",kubectl,"COMPANION_KUBECTL",false,System.getenv("PATH")),check("OCI CLI",oci,"COMPANION_OCI_CLI",true,System.getenv("PATH")));}
+ public List<Tool> tools(){return List.of(check("kubectl",executable==null?kubectl:executable.current(),"COMPANION_KUBECTL",false,System.getenv("PATH")),check("OCI CLI",oci,"COMPANION_OCI_CLI",true,System.getenv("PATH")));}
  static Tool check(String name,String command,String setting,boolean allowPath,String searchPath){
   try{
    var path=Path.of(command);

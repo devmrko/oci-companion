@@ -17,33 +17,37 @@ public final class OkeDeploymentManifest {
   for(String ref:List.of(i.configMap(),i.secret(),i.serviceAccount()))if(!ref.isBlank()&&!label(ref))throw Errors.DEPLOYMENT_INPUT.exception();
   for(String path:List.of(i.startupPath(),i.livenessPath()))if(!path.isBlank()&&(!path.startsWith("/")||path.length()>1024||path.chars().anyMatch(Character::isISOControl)))throw Errors.DEPLOYMENT_INPUT.exception();
   if(i.terminationSeconds()<1||i.terminationSeconds()>600)throw Errors.DEPLOYMENT_INPUT.exception();
-  var fileVolumes=DeploymentVolumes.parse(i.fileVolumes());var emptyDirs=DeploymentVolumes.emptyDirs(i.emptyDirs());var headers=DeploymentVolumes.headers(i.probeHeaders());
+  var fileVolumes=DeploymentVolumes.parse(i.fileVolumes());var emptyDirs=DeploymentVolumes.scratch(i.emptyDirs());var headers=DeploymentVolumes.headers(i.probeHeaders());
   if(i.probeTimeout()<1||i.probeTimeout()>60)throw Errors.DEPLOYMENT_INPUT.exception();
+  int defaultMode=DeploymentVolumes.mode(i.fileDefaultMode());DeploymentVolumes.size(i.emptyDirSizeLimit());
+  if(i.runAsUser()<1||i.runAsUser()>2147483647L||!Set.of("RuntimeDefault","Unconfined").contains(i.seccompProfile()))throw Errors.DEPLOYMENT_INPUT.exception();
+  for(int delay:List.of(i.readinessInitialDelay(),i.livenessInitialDelay(),i.startupInitialDelay()))if(delay<0||delay>3600)throw Errors.DEPLOYMENT_INPUT.exception();
+  for(int period:List.of(i.readinessPeriod(),i.livenessPeriod(),i.startupPeriod()))if(period<1||period>3600)throw Errors.DEPLOYMENT_INPUT.exception();
   var labels=Map.of("app.kubernetes.io/name",i.app());var container=new LinkedHashMap<String,Object>();container.put("name",i.app());container.put("image",image);container.put("ports",List.of(Map.of("name","http","containerPort",i.port())));
   var resources=Map.of("cpu",i.cpuMillis()+"m","memory",i.memoryMi()+"Mi");container.put("resources",Map.of("requests",new LinkedHashMap<>(resources),"limits",new LinkedHashMap<>(resources)));
   var names=new HashSet<String>();var env=new ArrayList<Map<String,String>>();
   for(var line:i.variables().lines().filter(x->!x.isBlank()).toList()){int pos=line.indexOf('=');if(pos<1)throw Errors.DEPLOYMENT_INPUT.exception();String key=line.substring(0,pos).strip();if(!key.matches("[A-Za-z_][A-Za-z0-9_]*")||!names.add(key)||names.size()>100)throw Errors.DEPLOYMENT_INPUT.exception();env.add(Map.of("name",key,"value",line.substring(pos+1)));}if(!env.isEmpty())container.put("env",env);
-  if(!i.healthPath().isBlank())container.put("readinessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.healthPath()),"initialDelaySeconds",5,"periodSeconds",10));
+  if(!i.healthPath().isBlank())container.put("readinessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.healthPath()),"initialDelaySeconds",i.readinessInitialDelay(),"periodSeconds",i.readinessPeriod()));
   var envFrom=new ArrayList<Map<String,Object>>();
   if(!i.configMap().isBlank())envFrom.add(Map.of("configMapRef",Map.of("name",i.configMap(),"optional",false)));
   if(!i.secret().isBlank())envFrom.add(Map.of("secretRef",Map.of("name",i.secret(),"optional",false)));
   if(!envFrom.isEmpty())container.put("envFrom",envFrom);
-  if(!i.startupPath().isBlank())container.put("startupProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.startupPath()),"periodSeconds",10,"failureThreshold",30));
-  if(!i.livenessPath().isBlank())container.put("livenessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.livenessPath()),"periodSeconds",10,"failureThreshold",3));
+  if(!i.startupPath().isBlank())container.put("startupProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.startupPath()),"initialDelaySeconds",i.startupInitialDelay(),"periodSeconds",i.startupPeriod(),"failureThreshold",30));
+  if(!i.livenessPath().isBlank())container.put("livenessProbe",Map.of("httpGet",Map.of("port",i.port(),"path",i.livenessPath()),"initialDelaySeconds",i.livenessInitialDelay(),"periodSeconds",i.livenessPeriod(),"failureThreshold",3));
   for(String key:List.of("readinessProbe","startupProbe","livenessProbe"))if(container.containsKey(key)){
    var original=(Map<String,Object>)container.get(key);var probe=new LinkedHashMap<>(original);var http=new LinkedHashMap<>((Map<String,Object>)probe.get("httpGet"));if(!headers.isEmpty())http.put("httpHeaders",headers.stream().map(LinkedHashMap::new).toList());probe.put("httpGet",http);probe.put("timeoutSeconds",i.probeTimeout());container.put(key,probe);
   }
-  var containerSecurity=new LinkedHashMap<String,Object>();if(i.containerRunAsNonRoot()!=null)containerSecurity.put("runAsNonRoot",i.containerRunAsNonRoot());if(i.readOnlyRootFilesystem()!=null)containerSecurity.put("readOnlyRootFilesystem",i.readOnlyRootFilesystem());if(Boolean.TRUE.equals(i.dropAllCapabilities()))containerSecurity.put("capabilities",Map.of("drop",List.of("ALL")));if(!containerSecurity.isEmpty())container.put("securityContext",containerSecurity);
+  var containerSecurity=new LinkedHashMap<String,Object>();containerSecurity.put("allowPrivilegeEscalation",i.allowPrivilegeEscalation());if(i.containerRunAsNonRoot()!=null)containerSecurity.put("runAsNonRoot",i.containerRunAsNonRoot());if(i.readOnlyRootFilesystem()!=null)containerSecurity.put("readOnlyRootFilesystem",i.readOnlyRootFilesystem());if(Boolean.TRUE.equals(i.dropAllCapabilities()))containerSecurity.put("capabilities",Map.of("drop",List.of("ALL")));if(!containerSecurity.isEmpty())container.put("securityContext",containerSecurity);
   var pod=new LinkedHashMap<String,Object>();pod.put("containers",List.of(container));pod.put("nodeSelector",Map.of("kubernetes.io/arch",i.architecture()));
   pod.put("terminationGracePeriodSeconds",i.terminationSeconds());
   if(!i.serviceAccount().isBlank())pod.put("serviceAccountName",i.serviceAccount());
   if(!i.pullSecret().isBlank())pod.put("imagePullSecrets",List.of(Map.of("name",i.pullSecret())));
   var volumes=new ArrayList<Map<String,Object>>();var mounts=new ArrayList<Map<String,Object>>();var paths=new HashSet<String>();
   if(!i.claim().isBlank()){mounts.add(Map.of("name","data","mountPath",i.mountPath()));volumes.add(Map.of("name","data","persistentVolumeClaim",Map.of("claimName",i.claim())));paths.add(i.mountPath());}
-  int index=0;for(var v:fileVolumes){if(!paths.add(v.path()))throw Errors.DEPLOYMENT_INPUT.exception();String name="file-"+index++;mounts.add(Map.of("name",name,"mountPath",v.path(),"readOnly",v.readOnly()));volumes.add(Map.of("name",name,v.kind().equals("secret")?"secret":"configMap",Map.of(v.kind().equals("secret")?"secretName":"name",v.name())));}
-  index=0;for(var path:emptyDirs){if(!paths.add(path))throw Errors.DEPLOYMENT_INPUT.exception();String name="scratch-"+index++;mounts.add(Map.of("name",name,"mountPath",path));volumes.add(Map.of("name",name,"emptyDir",Map.of()));}
+  int index=0;for(var v:fileVolumes){if(!paths.add(v.path()))throw Errors.DEPLOYMENT_INPUT.exception();String name="file-"+index++;mounts.add(Map.of("name",name,"mountPath",v.path(),"readOnly",v.readOnly()));volumes.add(Map.of("name",name,v.kind().equals("secret")?"secret":"configMap",Map.of(v.kind().equals("secret")?"secretName":"name",v.name(),"defaultMode",v.mode()==null?defaultMode:v.mode())));}
+  index=0;for(var dir:emptyDirs){String path=dir.path();if(!paths.add(path))throw Errors.DEPLOYMENT_INPUT.exception();String name="scratch-"+index++;mounts.add(Map.of("name",name,"mountPath",path));volumes.add(Map.of("name",name,"emptyDir",Map.of("sizeLimit",dir.sizeLimit().isBlank()?i.emptyDirSizeLimit():dir.sizeLimit())));}
   if(!volumes.isEmpty()){container.put("volumeMounts",mounts);pod.put("volumes",volumes);}
-  var podSecurity=new LinkedHashMap<String,Object>();if(i.fsGroup()!=null){podSecurity.put("fsGroup",i.fsGroup());podSecurity.put("fsGroupChangePolicy","OnRootMismatch");}if(i.podRunAsNonRoot()!=null)podSecurity.put("runAsNonRoot",i.podRunAsNonRoot());if(!podSecurity.isEmpty())pod.put("securityContext",podSecurity);
+  var podSecurity=new LinkedHashMap<String,Object>();podSecurity.put("runAsUser",i.runAsUser());podSecurity.put("seccompProfile",Map.of("type",i.seccompProfile()));pod.put("enableServiceLinks",i.enableServiceLinks());if(i.fsGroup()!=null){podSecurity.put("fsGroup",i.fsGroup());podSecurity.put("fsGroupChangePolicy","OnRootMismatch");}if(i.podRunAsNonRoot()!=null)podSecurity.put("runAsNonRoot",i.podRunAsNonRoot());if(!podSecurity.isEmpty())pod.put("securityContext",podSecurity);
   if(i.automountServiceAccountToken()!=null)pod.put("automountServiceAccountToken",i.automountServiceAccountToken());
   var spec=new LinkedHashMap<String,Object>();spec.put("replicas",i.replicas());spec.put("revisionHistoryLimit",5);spec.put("progressDeadlineSeconds",600);spec.put("selector",Map.of("matchLabels",new LinkedHashMap<>(labels)));spec.put("strategy",Map.of("type",i.claim().isBlank()?"RollingUpdate":"Recreate"));spec.put("template",Map.of("metadata",Map.of("labels",new LinkedHashMap<>(labels)),"spec",pod));
   if(!Set.of("ClusterIP","NodePort").contains(i.serviceType())||!label(i.serviceName())||(i.serviceType().equals("NodePort")&&(i.nodePort()<30000||i.nodePort()>32767)))throw Errors.DEPLOYMENT_INPUT.exception();

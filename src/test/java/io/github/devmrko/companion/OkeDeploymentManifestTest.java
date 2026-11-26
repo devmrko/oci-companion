@@ -19,7 +19,7 @@ class OkeDeploymentManifestTest {
   assertFalse(OkeDeploymentManifest.render(input("companion-demo","","data","/data",1),image).contains("fsGroup"));
   for(long group:new long[]{0,1000,2147483647L}){
    var i=new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","pull-secret","data","/data",true,group);
-   String yaml=OkeDeploymentManifest.render(i,image);assertTrue(yaml.contains("fsGroup: "+group));assertTrue(yaml.contains("fsGroupChangePolicy: OnRootMismatch"));assertFalse(yaml.contains("runAsUser"));
+   String yaml=OkeDeploymentManifest.render(i,image);assertTrue(yaml.contains("fsGroup: "+group));assertTrue(yaml.contains("fsGroupChangePolicy: OnRootMismatch"));assertTrue(yaml.contains("runAsUser: 10001"));
   }
   for(long group:new long[]{-1,2147483648L})assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","data","/data",true,group),image));
   assertThrows(RuntimeException.class,()->OkeDeploymentManifest.render(new Input("env","repo","image","demo","description","companion-demo","hello","amd64",1,250,256,8080,"/hello","","","","",true,1000L),image));

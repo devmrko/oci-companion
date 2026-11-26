@@ -9,6 +9,13 @@ public final class Readiness {
  public enum State { PASS, WARN, FAIL, UNKNOWN, NA;
   public String label(){return switch(this){case PASS->"충족";case WARN->"확인 필요";case FAIL->"조치 필요";case UNKNOWN->"미확인";case NA->"해당 없음";};}
  }
+ public enum Permission { CONFIRMED, DENIED, UNKNOWN }
+ public enum Remedy { PASS, ACTION, GUIDANCE }
+ public record Check(String key,String name,State state,Permission permission,String evidence,String preview,String guidance,String href,String action) {
+  public Remedy remedy(){return state==State.PASS?Remedy.PASS:permission==Permission.CONFIRMED?Remedy.ACTION:Remedy.GUIDANCE;}
+  public String label(){return state==State.PASS?"통과":permission==Permission.CONFIRMED?"조치 가능":permission==Permission.DENIED?"권한 없음":"확인 필요";}
+ }
+ public static Check armBuilders(int count){return new Check("arm","ARM 빌더",count>0?State.PASS:State.FAIL,Permission.UNKNOWN,count>0?"등록된 빌더 "+count+"개 · 실행 가능 여부는 빌드 미리보기에서 확인":"등록된 ARM 빌더 없음","","VM 빌더 또는 기존 Function 빌더를 등록하세요.","/builds/arm","빌더 등록·확인");}
  public record Item(String key,String name,String requirement,boolean needed,State state,String note,String href,String action){}
  public record Summary(List<Item> items,long required,long satisfied,long action,long unknown){}
  public static Summary summarize(List<Item> items){return new Summary(List.copyOf(items),items.stream().filter(Item::needed).count(),items.stream().filter(i->i.needed()&&i.state()==State.PASS).count(),items.stream().filter(i->i.state()==State.FAIL||i.state()==State.WARN).count(),items.stream().filter(i->i.needed()&&i.state()==State.UNKNOWN).count());}

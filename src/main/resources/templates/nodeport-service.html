@@ -1,0 +1,17 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head('NodePort Service')}"></head><body><header th:replace="~{layout :: header}"></header><main class="catalog-shell page-content app-content section-stack">
+<h1>NodePort Service</h1><div th:if="${checkFailure != null}" th:insert="~{deployment-checks :: item(${checkFailure})}"></div><p th:if="${message != null}" th:text="${message}" role="status"></p>
+<form th:action="@{/environments/oke/nodeport/service/preview}" method="post" class="card section-stack">
+<label>배포 환경<select class="ui-control" name="environment"><option th:each="e:${environments}" th:value="${e.id()}" th:text="${e.name()}" th:selected="${input != null and input.environment()==e.id()}"></option></select></label>
+<label>API 접속<select class="ui-control" name="endpoint"><option value="PRIVATE_ENDPOINT">사설 API</option><option value="PUBLIC_ENDPOINT">공개 API</option></select></label>
+<label>Namespace<input class="ui-control" name="namespace" th:value="${input != null ? input.namespace() : 'default'}" required></label>
+<label>현재 Deployment<input class="ui-control" name="deployment" th:value="${input != null ? input.deployment() : ''}" required></label>
+<label>새 Service 이름<input class="ui-control" name="service" th:value="${input != null ? input.service() : ''}" required></label>
+<label>Service 포트<input class="ui-control" name="port" type="number" min="1" max="65535" th:value="${input != null ? input.port() : 80}" required></label>
+<label>컨테이너 포트<input class="ui-control" name="targetPort" type="number" min="1" max="65535" th:value="${input != null ? input.targetPort() : 8080}" required></label>
+<label>NodePort<input class="ui-control" name="nodePort" type="number" min="30000" max="32767" th:value="${input != null ? input.nodePort() : 30080}" required></label>
+<button class="ui-button">점검·미리보기</button></form>
+<details class="card section-stack" th:if="${plan != null}"><summary>NodePort 점검 결과 · <span th:text="${plan.check().label()}"></span></summary><div th:replace="~{deployment-checks :: item(${plan.check()})}"></div>
+<details><summary>생성할 Service</summary><pre th:text="${plan.manifest()}"></pre></details>
+<form th:if="${plan.check().permission().name()=='CONFIRMED'}" th:action="@{/environments/oke/nodeport/service/create}" method="post"><input type="hidden" name="ticket" th:value="${ticket}"><label><input type="checkbox" name="confirmed" value="true" required> 표시된 새 Service를 생성합니다.</label><button class="ui-button">확인 후 생성</button></form></details>
+<p><a href="/environments/oke/nodeport">워커 보안 규칙·외부 프록시 안내</a> · <a href="/deployments/oke/configure">배포 구성</a></p>
+</main><script src="/companion-enhancements.js" defer></script></body></html>

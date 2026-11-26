@@ -15,13 +15,8 @@ import org.springframework.stereotype.Component;
 public class OciOkeRuntimeResources implements OkeRuntimeResources {
  private final OciBuildHistory clients;private final OciOkeWorkloadConnections connections;private final OkeWorkloadHealth reader;
  public OciOkeRuntimeResources(OciBuildHistory clients,OciOkeWorkloadConnections connections,OkeWorkloadHealth reader){this.clients=clients;this.connections=connections;this.reader=reader;}
- private OkeWorkloadHealth.Target environmentTarget(Connection c,String region,String compartment,String environment,String endpoint,String namespace)throws Exception {
-  try(var d=clients.client(c,region)){
-   var e=d.getDeployEnvironment(GetDeployEnvironmentRequest.builder().deployEnvironmentId(environment).build()).getDeployEnvironment();
-   if(!(e instanceof OkeClusterDeployEnvironment oke)||!compartment.equals(e.getCompartmentId())||e.getLifecycleState()!=DeployEnvironment.LifecycleState.Active)throw Errors.SCOPE.exception();
-   return connections.prepare(c,region,compartment,oke.getClusterId(),endpoint,namespace,"unused");
-  }
- }
+ private OkeWorkloadHealth.Target environmentTarget(Connection c,String region,String compartment,String environment,String endpoint,String namespace)throws Exception{return OkeEnvironmentTarget.prepare(clients,connections,c,region,compartment,environment,endpoint,namespace);}
+
  public String deployment(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String name){
   OkeWorkloadHealth.Target target=null;
   try{
