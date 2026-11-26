@@ -291,3 +291,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ### 실제 잠금 파일 변경·자동 런타임 전환 검증 완료
 
 별도 ARM Function에서 새 의존성을 추가한 커밋 `66d3725`로 검증했습니다. 최초 캐시 없는 빌드는 Function 안에서 의존성·런타임 이미지를 만들고 Companion이 런타임을 갱신한 뒤 실제 잠금 해시를 확인하여 180초에 성공했습니다. 같은 잠금 파일 재빌드는 캐시 재사용으로 144초에 성공했고 두 실행 모두 테스트 156개, 실패·오류 0입니다. 최초 ACTIVE 직후 이전 런타임 응답 문제를 발견해 실제 probe 확인을 추가했습니다. 전체 Maven 415개·Python 10개 테스트 통과, OCI opt-in 테스트 별도 통과입니다. 검증 Function·출력 저장소·검증 이미지 14개를 정리했으며 운영 Function은 유지했습니다. [시간·오류·digest·증거 화면](../function-dependency-cache-validation.md)을 참고하세요. 새 소스의 범용 초기 구성과 운영 빌더의 자동 의존성 옵션 적용은 이번 검증에 포함하지 않았습니다.
+
+## 2026-11-26 새 소스 첫 설정 — Dockerfile 단독 검증 완료
+
+기존 앱 설정이 없는 OCI 소스에서 배포 YAML·Dockerfile·앱 설정의 우선순위로 필수값을 읽고 출처를 보여 주는 경로를 추가했습니다. Dockerfile 한 개뿐인 `companion-verify-dockerfile` 소스에서 포트·프로브 자동 입력, 기존 pull Secret 선택·replica 입력, ARM 이미지 빌드(11.14초), 새 환경·파이프라인 생성·등록까지 실제 화면으로 완료했습니다. 두 Pod의 빌드 digest 일치·2/2 Ready·readyz 200·REGISTERED와 앱 재시작 후 결과 보존을 확인했습니다. 검증 리소스와 등록 정보는 모두 정리했고 운영 d523 digest와 기존 설정은 유지됐습니다. [실제 결과·오류·스크린샷·남은 한계](../service-onboarding-validation.md#dockerfile만-있는-새-소스의-첫-배포--2026-11-26-후속)를 참고하세요. 다른 Namespace 이관과 Helm 렌더링·고급 명세 전체 가져오기는 범위 밖으로 남겼습니다.

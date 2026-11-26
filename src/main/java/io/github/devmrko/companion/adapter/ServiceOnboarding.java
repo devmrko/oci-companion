@@ -54,6 +54,14 @@ public class ServiceOnboarding {
   if(!samePlan(preview(c,p.plan().selection()),p.plan()))throw Errors.BUILD_CHANGED.exception();
   return proceed(c,p);
  }
+ synchronized Progress resumePrepared(DeploymentOperations.Context c,String id){
+  var p=read(c,id);if(!p.state().equals("ENVIRONMENT_PENDING")||p.environment().isBlank()||!p.pipeline().isBlank())throw Errors.CONFLICT.exception();return proceed(c,p);
+ }
+ synchronized Progress createPrepared(DeploymentOperations.Context c,Plan approved,String token){
+  if(!token.matches("[a-f0-9-]{36}")||store.read(key(c,token)).isPresent())throw Errors.CONFLICT.exception();
+  if(!approved.iam().ready())throw Errors.SCOPE.exception();
+  var progress=new Progress(token,approved,"","","","","","CREATING","");save(c,progress);return proceed(c,progress);
+ }
  private Progress proceed(DeploymentOperations.Context c,Progress p){
   String token=p.id();var approved=p.plan();
   try(var d=clients.client(c.connection(),c.region())){
