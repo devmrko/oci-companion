@@ -54,6 +54,9 @@ final class FunctionImageBuilds {
   if(Files.size(output)>48L*1024*1024)throw Errors.SOURCE_READ.exception();
  }
  String build(Connection c,String region,String compartment,ArmBuilds.Plan plan,Path source,String username,char[] password)throws Exception {
+  return build(c,region,compartment,plan,source,username,password,"");
+ }
+ String build(Connection c,String region,String compartment,ArmBuilds.Plan plan,Path source,String username,char[] password,String runId)throws Exception {
   var target=inspect(c,region,compartment,plan.target().functionId(),plan.image());if(!target.fingerprint().equals(plan.functionFingerprint()))throw Errors.BUILD_CHANGED.exception();
   Path root=Files.createTempDirectory("companion-function-image-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
   try{
@@ -66,7 +69,7 @@ final class FunctionImageBuilds {
    authCommand(List.of(crane,"append","-f",layer.toString(),"-t",sourceTag),root);
    String digest=authCommand(List.of(crane,"digest",sourceTag),root);
    if(!digest.matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
-   var payload=new LinkedHashMap<String,Object>();payload.put("action","build");payload.put("commit",plan.input().commit());payload.put("tag",plan.input().tag());payload.put("sourceImage",target.sourceRepository()+"@"+digest);payload.put("sourceSha256",sha(archive));payload.put("registryCredentials",Map.of("username",username,"password",token));
+   var payload=new LinkedHashMap<String,Object>();payload.put("action","build");if(!runId.isBlank()){BuildReceipt.labels(runId,plan.input().commit());payload.put("buildId",runId);}payload.put("commit",plan.input().commit());payload.put("tag",plan.input().tag());payload.put("sourceImage",target.sourceRepository()+"@"+digest);payload.put("sourceSha256",sha(archive));payload.put("registryCredentials",Map.of("username",username,"password",token));
    var configuration=ClientConfiguration.builder().connectionTimeoutMillis(10000).readTimeoutMillis(330000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();
    try(var invoke=FunctionsInvokeClient.builder().configuration(configuration).endpoint(target.endpoint()).build(clients.authentication(c))){
     for(int attempt=0;attempt<2;attempt++){
@@ -91,6 +94,15 @@ final class FunctionImageBuilds {
     throw Errors.HANDOFF.exception();
    }
   }finally{try(var paths=Files.walk(root)){for(var path:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(path);}}
+ }
+ String recover(ArmBuilds.Plan plan,String runId,String username,char[] password)throws Exception {
+  Path root=Files.createTempDirectory("companion-build-recovery-",PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
+  try{
+   String host=plan.image().substring(0,plan.image().indexOf('/'));Path file=root.resolve("config.json");Files.writeString(file,json.writeValueAsString(Map.of("auths",Map.of(host,Map.of("auth",Base64.getEncoder().encodeToString((username+":"+new String(password)).getBytes(StandardCharsets.UTF_8)))))));Files.setPosixFilePermissions(file,PosixFilePermissions.fromString("rw-------"));
+   String digest=authCommand(List.of(crane,"digest",plan.image()),root);if(!digest.matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
+   String pinned=plan.image().substring(0,plan.image().lastIndexOf(':'))+"@"+digest;var config=json.readTree(authCommand(List.of(crane,"config",pinned),root));
+   if(!BuildReceipt.matches(config,runId,plan.input().commit()))throw Errors.HANDOFF.exception();return digest;
+  }finally{Arrays.fill(password,'\0');try(var paths=Files.walk(root)){for(var p:paths.sorted(Comparator.reverseOrder()).toList())Files.deleteIfExists(p);}}
  }
  static void validateRuntime(tools.jackson.databind.JsonNode result,String repository,String commit){
   String quoted=java.util.regex.Pattern.quote(repository);

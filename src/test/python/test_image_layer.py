@@ -58,6 +58,24 @@ class ImageLayerTest(unittest.TestCase):
                     self.assertTrue(image_layer.publish(*args)['image'].endswith('a' * 64))
                 self.assertFalse((root / 'registry-auth').exists())
 
+    def test_completion_receipt_requires_tests_and_binds_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); calls = []
+            request = {'tag': 'test', 'buildId': '12345678-1234-1234-1234-123456789012', 'commit': 'a' * 40,
+                       'testsPassed': True, 'registryCredentials': {'username': 'user', 'password': 'secret'}}
+            def command(args, cwd, env):
+                calls.append(args)
+                if args[1] == 'config': return '{"architecture":"arm64","os":"linux"}'
+                return 'sha256:' + 'b' * 64 if args[1] == 'digest' else ''
+            image_layer.publish(request, root, root / 'layer', command, 'python@sha256:' + 'a' * 64, 'region.ocir.io/ns/test')
+            mutate = next(x for x in calls if x[1] == 'mutate')
+            self.assertIn('--label=companion.build.id=' + request['buildId'], mutate)
+            self.assertIn('--label=companion.build.tests=passed', mutate)
+            calls.clear(); request['testsPassed'] = False
+            with self.assertRaises(ValueError):
+                image_layer.publish(request, root, root / 'layer', command, 'python@sha256:' + 'a' * 64, 'region.ocir.io/ns/test')
+            self.assertFalse(any(x[1] == 'mutate' for x in calls))
+
     def test_registry_source_rejects_wrong_repo_and_removes_auth_before_extracting(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

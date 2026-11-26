@@ -16,5 +16,8 @@ public interface ArmBuilds {
  Plan preview(Connection c,String region,String compartment,Input input);
  String start(Connection c,String region,String compartment,Plan plan,String username,char[] password);
  Run read(Connection c,String region,String compartment,String id);
+ default Run reconcile(Connection c,String region,String compartment,String id){throw new UnsupportedOperationException();}
+ default void abandon(Connection c,String region,String compartment,String id){throw new UnsupportedOperationException();}
+ default List<Run> pending(Connection c,String region,String compartment){return List.of();}
  List<String> managedImages();
 }

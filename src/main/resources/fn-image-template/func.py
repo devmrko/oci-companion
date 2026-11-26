@@ -108,6 +108,7 @@ def handler(ctx, data=None):
             archive = root / 'app-layer.tar.gz'
             result['layerBytes'] = image_layer.layer(site, archive)
             result['phase'] = 'push'
+            request['testsPassed'] = result['tests']['tests'] > 0 and result['tests']['failures'] == 0 and result['tests']['errors'] == 0
             result.update(image_layer.publish(request, root, archive, command,
                           dependency_base, os.environ['IMAGE_REPOSITORY']))
             result.update(status='SUCCEEDED', phase='complete')
