@@ -283,3 +283,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ## 2026-11-26 처음 설정 자동화 후속
 
 기존 등록 서비스의 live 설정을 읽어 새 이름의 환경·파이프라인·artifact·Deployment·ClusterIP를 만들고 실제 이미지 검증 후 등록하는 흐름을 추가했습니다. `companion-verify-onboard`에서 2/2 Ready·digest 일치·readyz 200·REGISTERED를 확인했습니다. 환경 생성 지연은 같은 환경에서 재개하도록 보강했습니다. [결과·스크린샷·남은 입력](../service-onboarding-validation.md)을 참고하세요. 설정 근거가 없는 새 소스의 범용 첫 설정과 다른 Namespace 이관은 아직 상세 입력이 필요합니다.
+
+## 2026-11-26 빌더 의존성 자동화 — 실검증 전
+
+잠금 해시별 의존성 캐시·Function 내부 런타임 이미지 조립·Companion의 자동 갱신과 재호출 코드를 작성했고 Java 413개·Python 9개 테스트를 통과했습니다. 실제 검증은 새 빌더 코드 레이어 준비의 `crane append` 300초 시간 초과로 중단되어 완료되지 않았습니다. 자동 승인 검토 시스템 오류 후 작은 명령으로 정리를 재시도해 검증 저장소 두 개와 로컬 앱은 정리했습니다. [실제 결과와 남은 검증](../function-dependency-cache-validation.md)을 참고하세요. 운영 Function 빌더에는 적용하지 않았습니다.

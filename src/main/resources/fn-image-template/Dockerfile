@@ -8,7 +8,7 @@ WORKDIR /opt/build-deps
 RUN uv sync --frozen --no-install-project
 WORKDIR /function
 COPY crane /usr/local/bin/crane
-COPY func.py image_layer.py source_bundle.py /function/
+COPY func.py image_layer.py dependency_cache.py source_bundle.py /function/
 ENV PYTHONPATH=/function
 USER 10001
 ENTRYPOINT ["/usr/local/bin/fdk", "/function/func.py", "handler"]

@@ -70,10 +70,10 @@ def publish(request, root, archive, command, base, repository):
     if not re.fullmatch(r'[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}', base):
         raise ValueError('A digest-pinned base image is required')
     image = target(request, repository)
-    config = json.loads(command(['crane', 'config', '--platform=linux/arm64', base], root, None))
-    if config.get('architecture') != 'arm64' or config.get('os') != 'linux':
-        raise ValueError('Base image must be linux/arm64')
     with registry_auth(request, root, repository) as env:
+        config = json.loads(command(['crane', 'config', '--platform=linux/arm64', base], root, env))
+        if config.get('architecture') != 'arm64' or config.get('os') != 'linux':
+            raise ValueError('Base image must be linux/arm64')
         command(['crane', 'append', '--platform=linux/arm64', '-b', base, '-f', str(archive), '-t', image], root, env)
         command(['crane', 'mutate', image, '--user=10001', '--workdir=/app',
                  '--env=PYTHONPATH=/app/site-packages', '--env=PYTHONUNBUFFERED=1',

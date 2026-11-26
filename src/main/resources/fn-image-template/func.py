@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 
 from fdk import response
 import image_layer
+import dependency_cache
 
 
 def handler(ctx, data=None):
@@ -64,25 +65,50 @@ def handler(ctx, data=None):
                       if 'sourceImage' in request else image_layer.source(request, root))
             if not (source / 'uv.lock').is_file() or not (source / 'src/sustena').is_dir():
                 raise ValueError('Sustena source with uv.lock is required')
-            if hashlib.sha256((source / 'uv.lock').read_bytes()).digest() != hashlib.sha256(Path('/opt/build-deps/uv.lock').read_bytes()).digest():
-                raise ValueError('Function dependency lock differs from source; rebuild the Function runtime')
-            result['phase'] = 'dependencies'
-            command(['uv', 'sync', '--frozen', '--no-editable'], source)
+            automatic = os.environ.get('AUTOMATIC_DEPENDENCIES') == 'true'
+            dependency_base = os.environ['IMAGE_BASE']
+            if automatic:
+                key = dependency_cache.identity(source, dependency_base, os.environ['RUNTIME_BASE_IMAGE'], os.environ['SOURCE_REPOSITORY'])
+                installed = os.environ.get('COMPANION_DEPS', '')
+                if installed != key['path'] or not (Path(installed) / 'uv.lock').is_file() or hashlib.sha256((Path(installed) / 'uv.lock').read_bytes()).hexdigest() != key['lock']:
+                    result['phase'] = 'dependency-runtime'
+                    result.update(dependency_cache.prepare(request, root, source, command, dependency_base,
+                                  os.environ['RUNTIME_BASE_IMAGE'], os.environ['SOURCE_REPOSITORY']))
+                    result['elapsedSeconds'] = round(time.monotonic() - started, 2)
+                    return reply(result)
+                dependency_base = dependency_cache.cached(request, root, command, os.environ['SOURCE_REPOSITORY'], key['app'], key['lock'])
+                if not dependency_base:
+                    raise ValueError('Prepared application dependency cache is missing')
+                result.update(lockHash=key['lock'], dependencyCacheHit=True)
+                test_python = '/usr/local/bin/python'
+                test_path = str(source / 'src') + ':' + installed + '/site-packages'
+            else:
+                if hashlib.sha256((source / 'uv.lock').read_bytes()).digest() != hashlib.sha256(Path('/opt/build-deps/uv.lock').read_bytes()).digest():
+                    raise ValueError('Function dependency lock differs from source; enable automatic dependencies')
+                result['phase'] = 'dependencies'
+                command(['uv', 'sync', '--frozen', '--no-editable'], source)
+                test_python = '/opt/build-deps/.venv/bin/python'
+                test_path = str(source / 'src')
             result['phase'] = 'test'
-            command(['/opt/build-deps/.venv/bin/python', '-m', 'pytest', '-q', '--junitxml=' + str(root / 'tests.xml')], source, {'PYTHONPATH': str(source / 'src')})
+            command([test_python, '-m', 'pytest', '-q', '--junitxml=' + str(root / 'tests.xml')], source, {'PYTHONPATH': test_path})
             tests = ET.parse(root / 'tests.xml').getroot()
             suites = [tests] if tests.tag == 'testsuite' else list(tests.iter('testsuite'))
             result['tests'] = {key: sum(int(s.get(key, '0')) for s in suites) for key in ('tests', 'failures', 'errors', 'skipped')}
             if result['tests']['tests'] == 0:
                 raise ValueError('No tests executed')
-            command(['uv', 'sync', '--frozen', '--no-dev', '--no-editable'], source)
+            if automatic:
+                site = root / 'application-site'
+                command(['uv', 'pip', 'install', '--python', '/usr/local/bin/python', '--no-deps', '--target', str(site), str(source)], source)
+            else:
+                command(['uv', 'sync', '--frozen', '--no-dev', '--no-editable'], source)
+                site = source / '.venv/lib/python3.13/site-packages'
             shutil.rmtree(root / 'cache', ignore_errors=True)
             result['phase'] = 'layer'
             archive = root / 'app-layer.tar.gz'
-            result['layerBytes'] = image_layer.layer(source / '.venv/lib/python3.13/site-packages', archive)
+            result['layerBytes'] = image_layer.layer(site, archive)
             result['phase'] = 'push'
             result.update(image_layer.publish(request, root, archive, command,
-                          os.environ['IMAGE_BASE'], os.environ['IMAGE_REPOSITORY']))
+                          dependency_base, os.environ['IMAGE_REPOSITORY']))
             result.update(status='SUCCEEDED', phase='complete')
         except Exception as error:
             result.update(status='FAILED', error=safe(error))
