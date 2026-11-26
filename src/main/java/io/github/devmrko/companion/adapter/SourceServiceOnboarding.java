@@ -20,6 +20,7 @@ public class SourceServiceOnboarding {
  public record Plan(Draft draft,OkeDeploymentSetup.Input input,Map<String,RepositoryDeploymentHints.Value> values,ArmBuilds.Plan build,PipelineIam.Check iam){}
  public record Progress(String id,Plan plan,String buildRun,String deployment,String state){}
  private final CatalogService catalog;private final SourceVersions versions;private final OperatingServices services;private final ArmBuilds builds;private final Registry registry;private final OciBuildHistory clients;private final OkeRuntimeResources resources;private final OkeWorkloadConnections connections;private final PipelineIam iam;private final OciOkeDeploymentSetup setup;private final ServiceOnboarding onboarding;private final BuildSpecDraftStore store;
+ @org.springframework.beans.factory.annotation.Autowired private RepositoryHelm helm=new RepositoryHelm("helm");
  private final JsonMapper json=JsonMapper.builder().build();
  public SourceServiceOnboarding(CatalogService catalog,SourceVersions versions,OperatingServices services,ArmBuilds builds,Registry registry,OciBuildHistory clients,OkeRuntimeResources resources,OkeWorkloadConnections connections,PipelineIam iam,OciOkeDeploymentSetup setup,ServiceOnboarding onboarding,BuildSpecDraftStore store){this.catalog=catalog;this.versions=versions;this.services=services;this.builds=builds;this.registry=registry;this.clients=clients;this.resources=resources;this.connections=connections;this.iam=iam;this.setup=setup;this.onboarding=onboarding;this.store=store;}
  public List<Source> sources(DeploymentOperations.Context c){return catalog.sources(c.connection(),c.region(),c.compartment()).stream().filter(s->s.provider().equals("OCI")).toList();}
@@ -27,18 +28,24 @@ public class SourceServiceOnboarding {
  public List<Registry.Repository> repositories(DeploymentOperations.Context c){return registry.list(c.connection(),c.region(),c.compartment(),"CONTAINER");}
  Source source(DeploymentOperations.Context c,String id){return sources(c).stream().filter(s->s.id().equals(id)).findFirst().orElseThrow(Errors.SCOPE::exception);}
  Map<String,String> files(DeploymentOperations.Context c,Source src,String commit,String dockerfile){
-  var files=new LinkedHashMap<String,String>();
+  var files=new LinkedHashMap<String,String>();var archive=new LinkedHashMap<String,byte[]>();
   try(var client=clients.client(c.connection(),c.region())){
    var repo=client.getRepository(GetRepositoryRequest.builder().repositoryId(src.resourceId()).build()).getRepository();if(!c.compartment().equals(repo.getCompartmentId()))throw Errors.SCOPE.exception();
    try(var stream=client.getRepositoryArchiveContent(GetRepositoryArchiveContentRequest.builder().repositoryId(src.resourceId()).refName(commit).format("zip").build()).getInputStream();var zip=new ZipInputStream(stream)){
     long total=0;int count=0;for(var entry=zip.getNextEntry();entry!=null;entry=zip.getNextEntry()){
      if(++count>20000)throw Errors.SOURCE_READ.exception();if(entry.isDirectory())continue;
      String path=entry.getName();if(path.startsWith("/")||Arrays.asList(path.split("/")).contains(".."))throw Errors.SOURCE_READ.exception();
-     // OCI archives may wrap all files in one repository directory.
-     boolean selected=path.equals(dockerfile)||path.endsWith("/"+dockerfile)||path.matches(".*(?:\\.ya?ml|(?:application|bootstrap)[^/]*\\.properties)$");
-     var out=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[8192];int size=0;for(int n;(n=zip.read(buffer))!=-1;){total+=n;size+=n;if(total>80L*1024*1024)throw Errors.SOURCE_READ.exception();if(selected&&size<=262144)out.write(buffer,0,n);}
-     if(selected&&size<=262144){if(files.size()>=200)throw Errors.SOURCE_READ.exception();files.put(path,out.toString(StandardCharsets.UTF_8));}
+     var out=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[8192];int size=0;for(int n;(n=zip.read(buffer))!=-1;){total+=n;size+=n;if(total>80L*1024*1024)throw Errors.SOURCE_READ.exception();if(size<=262144)out.write(buffer,0,n);}
+     archive.put(path,size<=262144?out.toByteArray():null);
     }
+   }
+   var chartRoots=RepositoryHelm.roots(archive);
+   for(var e:archive.entrySet()){
+    String path=e.getKey();boolean chart=chartRoots.stream().anyMatch(path::startsWith);
+    boolean selected=chart||path.equals(dockerfile)||path.endsWith("/"+dockerfile)||path.matches(".*(?:\\.ya?ml|(?:application|bootstrap)[^/]*\\.properties)$");
+    if(!selected)continue;if(e.getValue()==null){if(chart)throw new IllegalArgumentException("Helm 차트 파일 크기 제한(256KiB) 초과");continue;}
+    String value;try{value=StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(e.getValue())).toString();}catch(java.nio.charset.CharacterCodingException invalid){if(chart)throw new IllegalArgumentException("Helm 차트에는 텍스트 파일을 사용하세요 · 압축 의존성은 풀어서 포함하세요");continue;}
+    if(value.indexOf(0)>=0)throw new IllegalArgumentException("Helm 차트 바이너리 파일은 지원하지 않습니다");if(files.size()>=2000)throw Errors.SOURCE_READ.exception();files.put(path,value);
    }
    String dockerPath=files.keySet().stream().filter(p->p.equals(dockerfile)||p.endsWith("/"+dockerfile)).min(Comparator.comparingInt(String::length)).orElseThrow(Errors.SOURCE_READ::exception);
    String prefix=dockerPath.substring(0,dockerPath.length()-dockerfile.length());var normalized=new TreeMap<String,String>();for(var e:files.entrySet())if(e.getKey().startsWith(prefix))normalized.put(e.getKey().substring(prefix.length()),e.getValue());return normalized;
@@ -52,7 +59,7 @@ public class SourceServiceOnboarding {
   var i=context.deployment();var snapshot=resources.read(c.connection(),c.region(),c.compartment(),context.registration().environment(),i.endpoint(),i.namespace());
   var listing=snapshot.resources().get("secrets");if(listing==null||!listing.available())throw Errors.DEPLOYMENT_RUNTIME.exception();
   var secrets=listing.items().stream().filter(r->"kubernetes.io/dockerconfigjson".equals(r.type())).map(OkeRuntimeResources.Resource::name).sorted().toList();
-  var hints=RepositoryDeploymentHints.read(files(c,src,commit,dockerfile),dockerfile);ImportedDeployment.requireReferences(hints.workload(),snapshot);return new Draft(request,commit,context,hints,secrets);
+  var hints=RepositoryDeploymentHints.read(helm.render(files(c,src,commit,dockerfile),request.name(),i.namespace()),dockerfile);ImportedDeployment.requireReferences(hints.workload(),snapshot);return new Draft(request,commit,context,hints,secrets);
  }
  static boolean blank(String value){return value==null||value.isBlank();}
  static Map<String,RepositoryDeploymentHints.Value> fill(Draft draft,Map<String,String> supplied){
