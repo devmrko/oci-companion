@@ -22,6 +22,7 @@ def handler(ctx, data=None):
     request = json.loads(data.getvalue() or b'{}') if data else {}
     started = time.monotonic()
     probe = {'contract': 'sustena-layer-v1', 'arch': platform.machine(), 'uid': os.getuid(),
+             'dependencyLock': dependency_cache.installed_lock(),
              'python': platform.python_version(), 'tmpFreeBytes': shutil.disk_usage('/tmp').free,
              'tools': {name: bool(shutil.which(name)) for name in ('uv', 'crane', 'docker', 'podman')}}
     def reply(value):

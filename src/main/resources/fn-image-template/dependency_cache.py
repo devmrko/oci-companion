@@ -9,6 +9,14 @@ import tarfile
 import image_layer
 
 
+def installed_lock():
+    path = os.environ.get('COMPANION_DEPS', '')
+    if not re.fullmatch(r'/opt/companion-deps/[a-f0-9]{64}', path):
+        return ''
+    lock = Path(path) / 'uv.lock'
+    return hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else ''
+
+
 def identity(source, base, runtime_base, repository):
     for value in (base, runtime_base):
         if not re.fullmatch(r'[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}', value):

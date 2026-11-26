@@ -73,13 +73,16 @@ final class FunctionImageBuilds {
      tools.jackson.databind.JsonNode result;
      var response=invoke.invokeFunction(InvokeFunctionRequest.builder().functionId(plan.target().functionId()).fnInvokeType(InvokeFunctionRequest.FnInvokeType.Sync).invokeFunctionBody(new OciFunctionBuilds.SignedBody(json.writeValueAsBytes(payload))).build());
      try(var body=response.getInputStream()){byte[] bytes=body.readNBytes(65537);if(bytes.length>65536)throw Errors.HANDOFF.exception();result=json.readTree(bytes);}
+     System.getLogger(FunctionImageBuilds.class.getName()).log(System.Logger.Level.INFO,
+       "Function result: status={0}, phase={1}, tests={2}, failures={3}, errors={4}, dependencyCacheHit={5}, elapsedSeconds={6}",
+       result.path("status").asText(),result.path("phase").asText(),result.path("tests").path("tests").asInt(),result.path("tests").path("failures").asInt(),result.path("tests").path("errors").asInt(),result.path("dependencyCacheHit").asBoolean(),result.path("elapsedSeconds").asDouble());
      if("RUNTIME_REQUIRED".equals(result.path("status").asText())){
       if(attempt!=0||!target.automaticDependencies())throw Errors.HANDOFF.exception();
       validateRuntime(result,target.sourceRepository(),plan.input().commit());
       String runtimeDigest=authCommand(List.of(crane,"digest",result.path("runtimeTag").asText()),root);
       var runtimeConfig=json.readTree(authCommand(List.of(crane,"config",result.path("runtimeImage").asText()),root));
       if(!result.path("runtimeImage").asText().endsWith("@"+runtimeDigest)||!"arm64".equals(runtimeConfig.path("architecture").asText())||!"linux".equals(runtimeConfig.path("os").asText())||!result.path("lockHash").asText().equals(runtimeConfig.path("config").path("Labels").path("companion.lock").asText())||!"v2".equals(runtimeConfig.path("config").path("Labels").path("companion.cache").asText()))throw Errors.HANDOFF.exception();
-      updateRuntime(c,region,compartment,plan,target,result);continue;
+      updateRuntime(c,region,compartment,plan,target,result);awaitRuntime(invoke,plan.target().functionId(),result.path("lockHash").asText());continue;
      }
      if(!"SUCCEEDED".equals(result.path("status").asText()))throw new IllegalStateException("Function "+result.path("phase").asText()+": "+PipelineIamRules.safe(result.path("error").asText().replace(token,"[REDACTED]")));
      String built=result.path("digest").asText(),repository=plan.image().substring(0,plan.image().lastIndexOf(':'));
@@ -99,12 +102,30 @@ final class FunctionImageBuilds {
    management.setRegion(region);var before=management.getFunction(GetFunctionRequest.builder().functionId(plan.target().functionId()).build());
    if(!approved.etag().equals(before.getEtag()))throw Errors.BUILD_CHANGED.exception();
    String image=result.path("runtimeTag").asText(),digest=result.path("runtimeImage").asText().substring(result.path("runtimeImage").asText().indexOf('@')+1);
-   image=com.oracle.bmc.Region.fromRegionId(region).getRegionCode()+image.substring(image.indexOf('/'));
+   image=runtimeImageAddress(region,image);
    management.updateFunction(UpdateFunctionRequest.builder().functionId(plan.target().functionId()).ifMatch(before.getEtag()).updateFunctionDetails(com.oracle.bmc.functions.model.UpdateFunctionDetails.builder().image(image).imageDigest(digest).build()).build());
    long deadline=System.nanoTime()+180_000_000_000L;
    while(System.nanoTime()<deadline){var f=management.getFunction(GetFunctionRequest.builder().functionId(plan.target().functionId()).build()).getFunction();String state=f.getLifecycleState().getValue();if(state.equals("ACTIVE")&&digest.equals(f.getImageDigest()))return;if(state.equals("FAILED")||state.equals("DELETED"))throw new IllegalStateException("Function 의존성 런타임 변경 실패: "+state);Thread.sleep(2000);}
    throw new IllegalStateException("Function 의존성 런타임 준비 시간 초과 · 자동 재호출하지 않습니다. 빌더 상태를 확인하세요.");
   }
+ }
+ private void awaitRuntime(FunctionsInvokeClient invoke,String function,String lock)throws Exception {
+  long deadline=System.nanoTime()+180_000_000_000L;
+  while(System.nanoTime()<deadline){
+   var response=invoke.invokeFunction(InvokeFunctionRequest.builder().functionId(function).fnInvokeType(InvokeFunctionRequest.FnInvokeType.Sync).invokeFunctionBody(new OciFunctionBuilds.SignedBody("{\"action\":\"probe\"}".getBytes(StandardCharsets.UTF_8))).build());
+   try(var body=response.getInputStream()){
+    var value=json.readTree(body.readNBytes(65536));
+    if(runtimeReady(value,lock))return;
+   }
+   Thread.sleep(2000);
+  }
+  throw new IllegalStateException("Function 런타임 의존성 전파 시간 초과 · 빌드는 재실행하지 않았습니다.");
+ }
+ static boolean runtimeReady(tools.jackson.databind.JsonNode value,String lock){
+  return lock.matches("[a-f0-9]{64}")&&lock.equals(value.path("dependencyLock").asText())&&"aarch64".equals(value.path("arch").asText())&&"sustena-layer-v1".equals(value.path("contract").asText());
+ }
+ static String runtimeImageAddress(String region,String image){
+  return com.oracle.bmc.Region.fromRegionId(region).getRegionCode()+".ocir.io"+image.substring(image.indexOf('/'));
  }
  private String authCommand(List<String> args,Path root)throws Exception {
   // Separate helper keeps registry authentication out of all application/global environment state.

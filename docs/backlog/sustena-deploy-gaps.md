@@ -284,6 +284,10 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 
 기존 등록 서비스의 live 설정을 읽어 새 이름의 환경·파이프라인·artifact·Deployment·ClusterIP를 만들고 실제 이미지 검증 후 등록하는 흐름을 추가했습니다. `companion-verify-onboard`에서 2/2 Ready·digest 일치·readyz 200·REGISTERED를 확인했습니다. 환경 생성 지연은 같은 환경에서 재개하도록 보강했습니다. [결과·스크린샷·남은 입력](../service-onboarding-validation.md)을 참고하세요. 설정 근거가 없는 새 소스의 범용 첫 설정과 다른 Namespace 이관은 아직 상세 입력이 필요합니다.
 
-## 2026-11-26 빌더 의존성 자동화 — 실검증 전
+## 2026-11-26 빌더 의존성 자동화 — 초기 준비 실패 (후속 검증 완료)
 
 잠금 해시별 의존성 캐시·Function 내부 런타임 이미지 조립·Companion의 자동 갱신과 재호출 코드를 작성했고 Java 413개·Python 9개 테스트를 통과했습니다. 실제 검증은 새 빌더 코드 레이어 준비의 `crane append` 300초 시간 초과로 중단되어 완료되지 않았습니다. 자동 승인 검토 시스템 오류 후 작은 명령으로 정리를 재시도해 검증 저장소 두 개와 로컬 앱은 정리했습니다. [실제 결과와 남은 검증](../function-dependency-cache-validation.md)을 참고하세요. 운영 Function 빌더에는 적용하지 않았습니다.
+
+### 실제 잠금 파일 변경·자동 런타임 전환 검증 완료
+
+별도 ARM Function에서 새 의존성을 추가한 커밋 `66d3725`로 검증했습니다. 최초 캐시 없는 빌드는 Function 안에서 의존성·런타임 이미지를 만들고 Companion이 런타임을 갱신한 뒤 실제 잠금 해시를 확인하여 180초에 성공했습니다. 같은 잠금 파일 재빌드는 캐시 재사용으로 144초에 성공했고 두 실행 모두 테스트 156개, 실패·오류 0입니다. 최초 ACTIVE 직후 이전 런타임 응답 문제를 발견해 실제 probe 확인을 추가했습니다. 전체 Maven 415개·Python 10개 테스트 통과, OCI opt-in 테스트 별도 통과입니다. 검증 Function·출력 저장소·검증 이미지 14개를 정리했으며 운영 Function은 유지했습니다. [시간·오류·digest·증거 화면](../function-dependency-cache-validation.md)을 참고하세요. 새 소스의 범용 초기 구성과 운영 빌더의 자동 의존성 옵션 적용은 이번 검증에 포함하지 않았습니다.

@@ -16,6 +16,16 @@ class DependencyCacheTest(unittest.TestCase):
     runtime = repo + '@sha256:' + 'b' * 64
     request = {'registryCredentials': {'username': 'user', 'password': 'not-a-real-token'}}
 
+    def test_probe_reports_only_installed_lock_from_expected_path(self):
+        import hashlib
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); (root / 'uv.lock').write_bytes(b'lock')
+            with patch.dict(os.environ, {'COMPANION_DEPS': '/opt/companion-deps/' + 'a' * 64}), patch.object(cache, 'Path', return_value=root):
+                self.assertEqual(hashlib.sha256(b'lock').hexdigest(), cache.installed_lock())
+            with patch.dict(os.environ, {'COMPANION_DEPS': '/tmp/arbitrary'}):
+                self.assertEqual('', cache.installed_lock())
+
     def test_keys_change_with_lock_and_runtime_base(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); (root / 'uv.lock').write_text('lock1')
