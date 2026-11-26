@@ -48,3 +48,7 @@
 ## 후속 보강
 
 빌드 중복 실행과 결과 유실은 [완료 결과 복구](build-result-recovery-validation.md), 캐시 보존·정리는 [캐시 정리 검증](function-cache-maintenance-validation.md)을 참고하세요. 후속 기능은 격리 자원에서 검증했으며 운영 Function 템플릿 갱신과 운영 캐시 자동 삭제 활성화는 별도입니다.
+
+## 이후 운영 적용
+
+2026-11-26 오너 승인 후 운영 템플릿 적용과 자동 정리 활성화를 완료했습니다. [운영 적용 결과](production-builder-recovery-rollout.md)에 실제 빌드·재빌드, 설정 보존과 정리 결과를 기록했습니다. 위 본문의 적용 전 검증 기록은 당시 이력으로 유지합니다.
