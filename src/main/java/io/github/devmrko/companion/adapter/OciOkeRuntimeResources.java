@@ -83,7 +83,7 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
    var resources=new LinkedHashMap<String,Listing>();var ingresses=new ArrayList<Ingress>();var services=new ArrayList<Service>();
    try(var executor=Executors.newVirtualThreadPerTaskExecutor()){
     var work=new LinkedHashMap<String,Future<Object>>();
-    for(String kind:List.of("configmaps","secrets","serviceaccounts"))work.put(kind,executor.submit(()->metadata(t,kind)));
+    for(String kind:List.of("configmaps","secrets","serviceaccounts","persistentvolumeclaims"))work.put(kind,executor.submit(()->metadata(t,kind)));
     for(String kind:List.of("ingresses","services"))work.put(kind,executor.submit(()->reader.read(t,kind,null)));
     for(var entry:work.entrySet()){
      String kind=entry.getKey();
@@ -106,7 +106,7 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
   finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
  }
  Listing metadata(OkeWorkloadHealth.Target t,String kind)throws Exception{
-  if(!Set.of("configmaps","secrets","serviceaccounts").contains(kind))throw new IllegalArgumentException();
+  if(!Set.of("configmaps","secrets","serviceaccounts","persistentvolumeclaims").contains(kind))throw new IllegalArgumentException();
   // kubectl prints only these fields; no Secret/ConfigMap data enters the app process or files.
   String projection="jsonpath={range .items[*]}{.metadata.namespace}{'\\t'}{.metadata.name}{'\\t'}{.type}{'\\n'}{end}";
   return metadata(new String(reader.command(t,List.of("get",kind,"-o",projection),131072),StandardCharsets.UTF_8),t.namespace());

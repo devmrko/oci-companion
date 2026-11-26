@@ -22,11 +22,10 @@ final class ExistingOkeDeployment {
    var pod=(Map<String,Object>)((Map<String,Object>)spec.get("template")).get("spec");
    var containers=(List<Map<String,Object>>)pod.get("containers");
    if(containers.size()!=1||!name.equals(containers.getFirst().get("name")))throw new IllegalArgumentException();
-   // Do not carry literal environment values into a preview or stored artifact.
+   // Reject sensitive literal values; ordinary configuration and Secret references survive redeployment.
    for(String group:List.of("containers","initContainers"))
     for(var container:(List<Map<String,Object>>)pod.getOrDefault(group,List.of()))
-     for(var env:(List<Map<String,Object>>)container.getOrDefault("env",List.of()))
-      if(env.containsKey("value"))throw new IllegalArgumentException();
+     ImportedDeployment.environment(container);
    containers.getFirst().put("image",image);
    var cleanMeta=new LinkedHashMap<String,Object>();cleanMeta.put("name",name);cleanMeta.put("namespace",namespace);
    if(meta.containsKey("labels"))cleanMeta.put("labels",meta.get("labels"));

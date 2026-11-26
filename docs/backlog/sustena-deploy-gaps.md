@@ -295,3 +295,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ## 2026-11-26 새 소스 첫 설정 — Dockerfile 단독 검증 완료
 
 기존 앱 설정이 없는 OCI 소스에서 배포 YAML·Dockerfile·앱 설정의 우선순위로 필수값을 읽고 출처를 보여 주는 경로를 추가했습니다. Dockerfile 한 개뿐인 `companion-verify-dockerfile` 소스에서 포트·프로브 자동 입력, 기존 pull Secret 선택·replica 입력, ARM 이미지 빌드(11.14초), 새 환경·파이프라인 생성·등록까지 실제 화면으로 완료했습니다. 두 Pod의 빌드 digest 일치·2/2 Ready·readyz 200·REGISTERED와 앱 재시작 후 결과 보존을 확인했습니다. 검증 리소스와 등록 정보는 모두 정리했고 운영 d523 digest와 기존 설정은 유지됐습니다. [실제 결과·오류·스크린샷·남은 한계](../service-onboarding-validation.md#dockerfile만-있는-새-소스의-첫-배포--2026-11-26-후속)를 참고하세요. 다른 Namespace 이관과 Helm 렌더링·고급 명세 전체 가져오기는 범위 밖으로 남겼습니다.
+
+### 저장소 고급 Deployment 설정 가져오기 — 2026-11-26
+
+환경변수·참조, 리소스 요청/제한, 프로브, 볼륨, 보안 설정 가져오기를 추가했습니다. 별도 검증 서비스에서 명세 일치·2/2 Ready·readyz 200·실행 digest 일치를 확인했습니다. 일반 인라인 환경변수는 이미지 재배포에서도 보존하며 민감한 값은 Secret 참조를 요구합니다. 이전 기록의 인라인 환경변수 전체 거부 제한은 이 변경으로 완화됐습니다. [검증 범위와 남은 제한](../repository-deployment-import-validation.md)을 참고하세요.

@@ -52,7 +52,7 @@ public class SourceServiceOnboarding {
   var i=context.deployment();var snapshot=resources.read(c.connection(),c.region(),c.compartment(),context.registration().environment(),i.endpoint(),i.namespace());
   var listing=snapshot.resources().get("secrets");if(listing==null||!listing.available())throw Errors.DEPLOYMENT_RUNTIME.exception();
   var secrets=listing.items().stream().filter(r->"kubernetes.io/dockerconfigjson".equals(r.type())).map(OkeRuntimeResources.Resource::name).sorted().toList();
-  return new Draft(request,commit,context,RepositoryDeploymentHints.read(files(c,src,commit,dockerfile),dockerfile),secrets);
+  var hints=RepositoryDeploymentHints.read(files(c,src,commit,dockerfile),dockerfile);ImportedDeployment.requireReferences(hints.workload(),snapshot);return new Draft(request,commit,context,hints,secrets);
  }
  static boolean blank(String value){return value==null||value.isBlank();}
  static Map<String,RepositoryDeploymentHints.Value> fill(Draft draft,Map<String,String> supplied){
@@ -91,7 +91,9 @@ public class SourceServiceOnboarding {
   if(!p.state().equals("BUILDING"))throw Errors.CONFLICT.exception();var run=buildStatus(c,p);if(!run.state().equals("SUCCEEDED")||!run.repository().equals(p.plan().input().repository())||!run.digest().matches("sha256:[a-f0-9]{64}"))throw Errors.HANDOFF.exception();
   var d=p.plan().draft();if(!services.get(c,d.request().context()).equals(d.context()))throw Errors.BUILD_CHANGED.exception();vacant(c,d);
   Registry.Artifact found=null;String next="";for(int n=0;n<10;n++){var page=registry.artifacts(c.connection(),c.region(),c.compartment(),"CONTAINER",run.repository(),next);found=page.items().stream().filter(x->x.state().equals("AVAILABLE")&&x.digest().equals(run.digest())).findFirst().orElse(null);if(found!=null||page.next().isBlank())break;next=page.next();}if(found==null)throw Errors.HANDOFF.exception();
-  var preview=setup.preview(c.connection(),c.region(),c.compartment(),input(d,p.plan().values(),found.id()));if(preview.runtime()!=null&&!preview.runtime().allowed())throw Errors.DEPLOYMENT_RUNTIME.exception();if(!preview.imageUrl().endsWith("@"+run.digest()))throw Errors.HANDOFF.exception();return preview;
+  var preview=setup.preview(c.connection(),c.region(),c.compartment(),input(d,p.plan().values(),found.id()));
+  if(!d.hints().workload().isEmpty()){ImportedDeployment.requireReferences(d.hints().workload(),resources.read(c.connection(),c.region(),c.compartment(),preview.input().environment(),preview.input().endpoint(),preview.input().namespace()));String yaml=ImportedDeployment.overlay(preview.yaml(),d.hints().workload());try{String fingerprint=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest((preview.fingerprint()+yaml).getBytes(StandardCharsets.UTF_8)));preview=new OkeDeploymentSetup.Preview(preview.input(),preview.project(),preview.environmentName(),preview.imageUrl(),yaml,fingerprint,preview.runtime());}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+  if(preview.runtime()!=null&&!preview.runtime().allowed())throw Errors.DEPLOYMENT_RUNTIME.exception();if(!preview.imageUrl().endsWith("@"+run.digest()))throw Errors.HANDOFF.exception();return preview;
  }
  public synchronized ServiceOnboarding.Progress resume(DeploymentOperations.Context c,String id){
   var p=read(c,id);if(!p.state().equals("DEPLOYING")||!id.equals(p.deployment()))throw Errors.CONFLICT.exception();var d=p.plan().draft();
