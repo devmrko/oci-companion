@@ -32,7 +32,7 @@ public class KubectlPodLogs implements OkePodLogs {
    byte[] bytes=reader.command(t,args,65536);
    samePod(t,reader.read(t,"pod",pod),pod,uid,container);
    String text=new String(bytes,StandardCharsets.UTF_8).replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]","");
-   return new Result("조회 완료",text,"최근 "+lines+"줄 · 최대 64KiB · "+(previous?"직전 컨테이너 실행":"현재 컨테이너 실행")+" · 조회 시점의 로그이며 별도 저장하지 않습니다.",Instant.now().toString());
+   return new Result("조회 완료",io.github.devmrko.companion.service.PipelineIamRules.safe(text),"최근 "+lines+"줄 · 최대 64KiB · "+(previous?"직전 컨테이너 실행":"현재 컨테이너 실행")+" · 조회 시점의 로그이며 별도 저장하지 않습니다.",Instant.now().toString());
   }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();return new Result("조회 불가","","Pod 교체·컨테이너 이름·pods/log get 권한·API 연결을 확인하세요. 직전 로그는 이전 실행이 보존된 경우에만 조회됩니다.",Instant.now().toString());}
  }
 }

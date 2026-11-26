@@ -58,6 +58,14 @@ def fetch(storage, request, root):
         response.data.raw.close()
     if digest.hexdigest() != bundle['sha256']:
         raise ValueError('Source checksum mismatch')
+    return extract(archive_path, request, root)
+
+
+def extract(archive_path, request, root):
+    """Shared bounded extraction for storage and inline invocation bundles."""
+    unpacked_limit = limit('BUILD_SOURCE_MAX_UNPACKED_BYTES', 256 * 1024**2)
+    file_limit = limit('BUILD_SOURCE_MAX_ENTRIES', 10000)
+    reserve = limit('BUILD_SOURCE_RESERVE_BYTES', 16 * 1024**2)
     source = root / 'source'
     with tarfile.open(archive_path, 'r:gz') as archive:
         entries, names, unpacked = [], set(), 0

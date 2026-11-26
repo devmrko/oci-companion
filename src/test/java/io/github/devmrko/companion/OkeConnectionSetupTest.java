@@ -28,11 +28,21 @@ class OkeConnectionSetupTest {
   var svc=spy(new OciOkeWorkloadConnections(mock(OkePreparation.class),reader,registry,store,temp.toString(),"/config","oci"));
   Path kube=Files.createTempFile(temp,"kube-",".json");var t=new OkeWorkloadHealth.Target("","PROFILE","tenancy","user","region","comp","cluster",kube.toString(),"ns","app",null,null);
   doReturn(t).when(svc).prepare(c,"region","comp","cluster","PUBLIC_ENDPOINT","ns","app");when(reader.read(t,"deployment","app")).thenReturn(json.readTree("{\"kind\":\"Deployment\",\"metadata\":{\"name\":\"other\",\"namespace\":\"ns\",\"uid\":\"uid\"}}"));
-  assertThrows(IllegalArgumentException.class,()->svc.save(c,"region","comp",new OkeWorkloadConnections.Settings("","name","test","cluster","PUBLIC_ENDPOINT","ns","app",false)));verifyNoInteractions(registry);assertFalse(Files.exists(kube));
+  assertThrows(IllegalArgumentException.class,()->svc.save(c,"region","comp",new OkeWorkloadConnections.Settings("","name","test","cluster","PUBLIC_ENDPOINT","ns","app",false)));verify(registry).list(c,"region","comp");verifyNoMoreInteractions(registry);assertFalse(Files.exists(kube));
  }
  @Test void okeRegistrationNeedsNoHttpSecretAndHealthDoesNotClaimUp(){
   var registry=new AgentConnectionRegistry(temp.resolve("apps.json").toString(),temp.resolve("credentials.json").toString());
   String id=registry.registerOke(c,"region","comp","","name","test",new AgentConnectionRegistry.Dependency("OKE","cluster","ocid1.cluster.oc1.test"));
   assertEquals("HTTP health 미설정",new AgentHealth(registry).check(c,"region","comp",id).state());assertThrows(IllegalArgumentException.class,()->registry.get(c,"region","other",id));
+ }
+ @Test void repeatedRegistrationReusesConnectionAfterDisconnect()throws Exception {
+  var registry=new AgentConnectionRegistry(temp.resolve("apps.json").toString(),temp.resolve("credentials.json").toString());var reader=mock(OkeWorkloadHealth.class);var store=new OkeConnectionStore(temp.toString());
+  var svc=spy(new OciOkeWorkloadConnections(mock(OkePreparation.class),reader,registry,store,temp.toString(),"/config","oci"));
+  var kube=Files.createTempFile(temp,"kube-",".json");var t=new OkeWorkloadHealth.Target("","PROFILE","tenancy","user","region","comp","ocid1.cluster.oc1.test",kube.toString(),"ns","app",null,null);
+  doReturn(t).when(svc).prepare(c,"region","comp","ocid1.cluster.oc1.test","PUBLIC_ENDPOINT","ns","app");
+  when(reader.read(t,"deployment","app")).thenReturn(json.readTree("{\"kind\":\"Deployment\",\"metadata\":{\"name\":\"app\",\"namespace\":\"ns\",\"uid\":\"uid\"}}"));
+  var settings=new OkeWorkloadConnections.Settings("","name","test","ocid1.cluster.oc1.test","PUBLIC_ENDPOINT","ns","app",false);
+  String first=svc.save(c,"region","comp",settings);assertEquals(first,svc.save(c,"region","comp",settings));assertEquals(1,registry.list(c,"region","comp").size());
+  assertEquals("",svc.existing(c,"region","other",settings));assertEquals("",svc.existing(c,"region","comp",new OkeWorkloadConnections.Settings("","name","test","ocid1.cluster.oc1.test","PUBLIC_ENDPOINT","ns","other",false)));
  }
 }

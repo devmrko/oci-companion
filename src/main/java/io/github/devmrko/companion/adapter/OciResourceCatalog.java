@@ -1,6 +1,6 @@
 package io.github.devmrko.companion.adapter;
 import com.oracle.bmc.ClientConfiguration;
-import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
+import com.oracle.bmc.auth.AuthenticationDetailsProvider;
 import com.oracle.bmc.identity.IdentityClient;
 import com.oracle.bmc.identity.requests.*;
 import com.oracle.bmc.devops.DevopsClient;
@@ -19,8 +19,8 @@ public class OciResourceCatalog implements ResourceCatalog {
     private final String configPath;
     private static final ClientConfiguration CONFIG=ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).retryConfiguration(RetryConfiguration.NO_RETRY_CONFIGURATION).build();
     public OciResourceCatalog(@Value("${companion.oci-config}") String path) { configPath=path; }
-    private ConfigFileAuthenticationDetailsProvider auth(Connection c) throws java.io.IOException {
-        var auth=new ConfigFileAuthenticationDetailsProvider(configPath,c.profile());
+    private AuthenticationDetailsProvider auth(Connection c) throws java.io.IOException {
+        var auth=OciProfiles.load(configPath,c.profile());
         if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user())) throw Errors.SCOPE.exception();
         return auth;
     }

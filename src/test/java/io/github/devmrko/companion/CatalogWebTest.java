@@ -50,6 +50,11 @@ class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkePreparation okePreparation;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.ContainerPreparation containerPreparation;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BuildHandoff handoff;
+    @Test void pipelineSpecificationHasGitSaveAndSourcePushPageRenders()throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds").param("tab","pipelines").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("id=\"git-spec-form\""))).andExpect(content().string(containsString("id=\"git-spec-save\"")));
+        mvc.perform(get("/sources/push").session(session)).andExpect(status().isOk()).andExpect(content().string(containsString("새 브랜치")));
+    }
     @Test void deploymentHistoryAndNativeLogsRenderWithoutInjectingMarkup() throws Exception {
         var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
         var run=new io.github.devmrko.companion.port.DeploymentRuns.Run("run","release-v1","SUCCEEDED","",java.util.List.of(new io.github.devmrko.companion.port.DeploymentRuns.Step("Deploy VM","vm","Rollout deployment","SUCCEEDED")));
@@ -573,4 +578,10 @@ class CatalogWebTest {
   }
   for(String path:java.util.List.of("https://example.com","//example.com","/builds/settings?secret=untrusted","/agents/connections/../other"))mvc.perform(post("/scope").session(session).with(csrf()).param("region","us-ashburn-1").param("compartment","demo-development").param("back",path)).andExpect(redirectedUrl("/"));
  }
+    @Test void pipelineIamPageRendersWithoutCloudMutation() throws Exception {
+        var session=(MockHttpSession)mvc.perform(post("/connect").with(csrf()).param("profile","DEMO")).andReturn().getRequest().getSession(false);
+        mvc.perform(get("/builds/iam").session(session).param("pipeline","p"))
+            .andExpect(status().isOk()).andExpect(content().string(containsString("파이프라인 IAM 점검")))
+            .andExpect(content().string(containsString("실제 IAM을 조회하지 않았습니다")));
+    }
 }

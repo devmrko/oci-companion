@@ -22,7 +22,7 @@
  });
  button.addEventListener('click',async()=>{
   if(!field('namespace').value){status.textContent='Namespace를 입력하세요.';return;}
-  const version=++generation;controller?.abort();controller=new AbortController();const active=controller;const timer=setTimeout(()=>active.abort(),40000);
+  const version=++generation;controller?.abort();controller=new AbortController();const active=controller;const timer=setTimeout(()=>active.abort(),120000);
   button.disabled=true;status.textContent='조회 중…';const query=new URLSearchParams({region:form.dataset.region,compartment:form.dataset.compartment,environment:field('environment').value,namespace:field('namespace').value,endpoint:field('endpoint').value});
   try{
    const response=await fetch('/deployments/oke/resources?'+query,{headers:{Accept:'application/json'},cache:'no-store',signal:active.signal});

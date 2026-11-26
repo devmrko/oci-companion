@@ -11,5 +11,16 @@ public interface OkeRuntimeResources {
  record Ingress(String name,String controller,List<Route> routes,List<Tls> tls,List<String> addresses) {}
  record Service(String name,String type,List<String> addresses) {}
  record Snapshot(Instant observedAt,String cluster,String namespace,Map<String,Listing> resources,List<Ingress> ingresses,List<Service> services) {}
+ record PullRegistry(boolean available,List<String> hosts,String note) {}
+ default PullRegistry pullRegistry(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret){return new PullRegistry(false,List.of(),"pull Secret 레지스트리 조회 미지원");}
+ record AllocatedPort(String namespace,String service,int port){}
+ record NodePorts(boolean available,List<AllocatedPort> ports){}
+ default NodePorts nodePorts(Connection c,String region,String compartment,String environment,String endpoint,String namespace){return new NodePorts(false,List.of());}
+ default RegistryCredentials pullCredentials(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret,String host){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
+ default String deployment(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String name){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
+ default DeploymentImageVerification.Result verifyImages(Connection c,String region,String compartment,String environment,String endpoint,DeploymentImageVerification.Expected expected){return DeploymentImageVerification.Result.unknown();}
+ record Retirement(String deploymentUid,String deploymentVersion,String serviceUid,String serviceVersion){}
+ default Retirement retirement(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
+ default void retire(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app,Retirement approved){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
  Snapshot read(Connection connection,String region,String compartment,String environment,String endpoint,String namespace);
 }

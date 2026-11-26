@@ -37,8 +37,10 @@
 <p id="build-specification-status" role="status"></p><pre class="code-block" id="build-specification-preview" hidden></pre><button type="button" class="ui-button" id="build-specification-download" hidden>build_spec.yaml 다운로드</button>
 <section th:if="${specSources != null}">
 <h3>Git에 저장 · 선택</h3>
+<p th:if="${specSources.isEmpty()}">소스를 먼저 등록하세요. OCI 저장소도 Git 저장을 사용할 수 있습니다. <a href="/sources">소스 등록</a></p>
 <form th:action="@{/builds/specification/git/preview}" method="post" id="git-spec-form" class="build-field-grid">
 
+<label th:if="${tab != 'recipes'}" class="form-field">등록 소스<select name="source" class="ui-control" required><option value="">소스 선택</option><option th:each="s : ${specSources}" th:value="${s.id()}" th:text="${s.name()}" th:attr="data-branch=${s.branch()},data-url=${s.url()}"></option></select></label>
 <label class="form-field">기존 브랜치<input name="branch" class="ui-control" required maxlength="200" placeholder="main"></label>
 <label class="form-field">명세 경로<input name="path" class="ui-control" required value="build_spec.yaml" maxlength="200"></label>
 <label class="form-field">Git 사용자<input name="username" class="ui-control" required maxlength="300" placeholder="x-access-token"></label>

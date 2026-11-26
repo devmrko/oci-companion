@@ -19,6 +19,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller @Profile("!legacy")
 public class CatalogPages {
     private final CloudConnection cloud;
+    private final PipelineIam pipelineIam;
     private final ResourceCatalog catalog;
     private final CatalogService service;
     private final SecurityContextRepository contexts;
@@ -35,7 +36,8 @@ public class CatalogPages {
     private final BuildPresetStore presets;
     private final BuildTaskStore taskStore;
     private final TaskSources taskSources;
-    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup,Registry registry,BuildTaskStore taskStore,TaskSources taskSources) {
+    public CatalogPages(CloudConnection cloud,ResourceCatalog catalog,CatalogService service,SecurityContextRepository contexts,GuideCatalog guides,BuildHistory builds,SelectionStore selections,BuildControl control,BuildPresetStore presets,BuildDefinition definitions,BuildInputStore inputRules,BuildAdministration administration,BuildLogs logs,BuildSetup setup,Registry registry,BuildTaskStore taskStore,TaskSources taskSources,PipelineIam pipelineIam) {
+        this.pipelineIam=pipelineIam;
         this.taskStore=taskStore;this.taskSources=taskSources;
         this.registry=registry;this.setup=setup;this.logs=logs;this.administration=administration;this.cloud=cloud; this.catalog=catalog; this.service=service; this.contexts=contexts; this.guides=guides;this.builds=builds;this.selections=selections;this.control=control;this.presets=presets;this.definitions=definitions;this.inputRules=inputRules;
     }
@@ -170,6 +172,7 @@ public class CatalogPages {
         model.addAttribute("projectsLoaded",false);model.addAttribute("projectItems",List.of());model.addAttribute("topics",List.of());model.addAttribute("projects",Map.of());model.addAttribute("project",project);model.addAttribute("pipelines",List.of());model.addAttribute("runs",List.of());model.addAttribute("tab",tab);
         try {
             var s=selection(c,session);model.addAttribute("selection",s);
+            model.addAttribute("specSources",service.sources(c,s.region(),s.compartment()));
             if(!registeredSource.isEmpty())model.addAttribute("handoffSource",service.sources(c,s.region(),s.compartment()).stream().filter(v->v.id().equals(registeredSource)).findFirst().orElseThrow(Errors.MISSING::exception));
             if(session.getAttribute("scopeInvalid")!=null) return "builds";
             if(tab.equals("registry")) {
@@ -232,6 +235,7 @@ public class CatalogPages {
                 if(list.stream().noneMatch(p->p.id().equals(selected))) throw Errors.MISSING.exception();
                 model.addAttribute("pipelineRule","ALL {resource.type = 'devopsbuildpipeline', resource.id = '"+selected+"'}");
                 if(tab.equals("execute") || tab.equals("pipelines")) {
+                    model.addAttribute("pipelineIam",pipelineIam.inspect(c,s.region(),s.compartment(),selected));
                     var definition=definitions.read(c,s.region(),s.compartment(),selected);
                     model.addAttribute("definition",definition);
                     var specs=new LinkedHashMap<String,BuildDefinition.Specification>();
@@ -421,8 +425,8 @@ public class CatalogPages {
                 destination="/builds?tab=projects&project="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
             } else {
                 String id=administration.createPipeline(c,t.region(),t.compartment(),project,name,description,ticket);
-                flash.addFlashAttribute("message","파이프라인 생성 완료 · 빌드 단계를 등록해야 실행할 수 있습니다.");
-                destination="/builds?tab=pipelines&project="+java.net.URLEncoder.encode(project,java.nio.charset.StandardCharsets.UTF_8)+"&pipeline="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
+                flash.addFlashAttribute("message","파이프라인 생성 완료 · IAM을 점검한 뒤 빌드 단계를 등록하세요.");
+                destination="/builds/iam?pipeline="+java.net.URLEncoder.encode(id,java.nio.charset.StandardCharsets.UTF_8);
             }
         } catch(BusinessException e) { flash.addFlashAttribute("message",e.getMessage()); }
         return "redirect:"+destination;
@@ -503,6 +507,8 @@ public class CatalogPages {
                     flash.addFlashAttribute("message","OCI 기본값 저장 완료");
                 }
                 case "run" -> {
+                    var iam=pipelineIam.inspect(c,t.region(),t.compartment(),t.pipeline());
+                    if(!iam.ready()){flash.addFlashAttribute("message","실행 전에 파이프라인 IAM을 확인하세요.");return "redirect:/builds/iam?pipeline="+java.net.URLEncoder.encode(t.pipeline(),java.nio.charset.StandardCharsets.UTF_8);}
                     var current=control.settings(c,t.region(),t.compartment(),t.pipeline());
                     BuildInputs.validate(BuildInputs.fields(current.parameters(),values,inputRules.read(c,t.region(),t.compartment(),t.pipeline())));
                     var currentDefinition=definitions.read(c,t.region(),t.compartment(),t.pipeline());

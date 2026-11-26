@@ -1,7 +1,7 @@
 package io.github.devmrko.companion.adapter;
 
 import com.oracle.bmc.ClientConfiguration;
-import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider;
+import com.oracle.bmc.auth.AuthenticationDetailsProvider;
 import com.oracle.bmc.devops.DevopsClient;
 import com.oracle.bmc.devops.requests.*;
 import com.oracle.bmc.retrier.RetryConfiguration;
@@ -16,8 +16,8 @@ import org.springframework.stereotype.Component;
 public class OciBuildHistory implements BuildHistory {
     private final String path;
     public OciBuildHistory(@Value("${companion.oci-config}") String path) { this.path=path; }
-    ConfigFileAuthenticationDetailsProvider authentication(Connection c) throws java.io.IOException {
-        var auth=new ConfigFileAuthenticationDetailsProvider(path,c.profile());
+    AuthenticationDetailsProvider authentication(Connection c) throws java.io.IOException {
+        var auth=OciProfiles.load(path,c.profile());
         if (!auth.getTenantId().equals(c.tenancy()) || !auth.getUserId().equals(c.user())) throw Errors.SCOPE.exception();
         return auth;
     }
@@ -85,7 +85,7 @@ public class OciBuildHistory implements BuildHistory {
             var steps=new ArrayList<Step>();var artifacts=new ArrayList<StoredArtifact>();
             if(r.getBuildRunProgress()!=null && r.getBuildRunProgress().getBuildPipelineStageRunProgress()!=null)
                 for(var stage:r.getBuildRunProgress().getBuildPipelineStageRunProgress().values().stream().sorted(Comparator.comparing((com.oracle.bmc.devops.model.BuildPipelineStageRunProgress x)->x.getTimeStarted(),Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(x->Objects.toString(x.getBuildPipelineStageId(),""))).toList()) {
-                    steps.add(new Step(stage.getStageDisplayName(),stage.getStatus()==null?"—":stage.getStatus().getValue(),
+                    steps.add(new Step(stage.getStageDisplayName(),io.github.devmrko.companion.service.PipelineIamRules.stageStatus(r.getLifecycleState().getValue(),stage.getStatus()==null?null:stage.getStatus().getValue()),
                         stage instanceof com.oracle.bmc.devops.model.BuildStageRunProgress?"BUILD":stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress?"DELIVER":"OTHER",
                         stage.getBuildPipelineStageId(),time(stage.getTimeStarted()),time(stage.getTimeFinished())));
                     if(stage instanceof com.oracle.bmc.devops.model.DeliverArtifactStageRunProgress delivery && delivery.getDeliveredArtifacts()!=null)

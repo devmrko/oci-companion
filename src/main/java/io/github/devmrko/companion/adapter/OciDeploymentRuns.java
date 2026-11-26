@@ -12,8 +12,10 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OciDeploymentRuns implements DeploymentRuns {
-    private final OciBuildHistory clients;
-    public OciDeploymentRuns(OciBuildHistory clients){this.clients=clients;}
+    private final OciBuildHistory clients;private final OkeDeploymentEvidence evidence;
+    public OciDeploymentRuns(OciBuildHistory clients){this(clients,null);}
+    @org.springframework.beans.factory.annotation.Autowired
+    public OciDeploymentRuns(OciBuildHistory clients,OkeDeploymentEvidence evidence){this.clients=clients;this.evidence=evidence;}
     public List<Pipeline> pipelines(Connection c,String region,String compartment){
         try(var client=clients.client(c,region)){
             var result=new ArrayList<Pipeline>();
@@ -64,14 +66,14 @@ public class OciDeploymentRuns implements DeploymentRuns {
         var artifacts=new ArrayList<DeployArtifact>();
         for(var id:stage.getKubernetesManifestDeployArtifactIds())artifacts.add(client.getDeployArtifact(GetDeployArtifactRequest.builder().deployArtifactId(id).build()).getDeployArtifact());
         var checked=OkeManifests.inspectDetails(artifacts,compartment,pipeline.getProjectId(),stage.getNamespace());
-        var hash=MessageDigest.getInstance("SHA-256");
-        hash.update((pipeline.toString()+stage.toString()+env.toString()).getBytes(StandardCharsets.UTF_8));
-        for(var artifact:artifacts){
-            hash.update(artifact.toString().getBytes(StandardCharsets.UTF_8));
-            hash.update(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent());
-        }
-        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),HexFormat.of().formatHex(hash.digest()),"OKE",env.getClusterId(),stage.getNamespace(),checked.images(),checked.architectures(),checked.jobs());
+        return new Plan(pipeline.getId(),pipeline.getDisplayName(),env.getDisplayName(),List.of(),fingerprint(pipeline,stage,env,artifacts),"OKE",env.getClusterId(),stage.getNamespace(),checked.images(),checked.architectures(),checked.jobs());
     }
+    static String fingerprint(DeployPipeline pipeline,OkeDeployStage stage,OkeClusterDeployEnvironment env,List<DeployArtifact> artifacts)throws Exception {
+        var hash=MessageDigest.getInstance("SHA-256");hash.update((pipeline.toString()+stage.toString()+env.toString()).getBytes(StandardCharsets.UTF_8));
+        for(var artifact:artifacts){hash.update(artifact.toString().getBytes(StandardCharsets.UTF_8));hash.update(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent());}
+        return HexFormat.of().formatHex(hash.digest());
+    }
+
     com.oracle.bmc.containerengine.ContainerEngineClient clusters(Connection c,String region) throws java.io.IOException {
         var client=com.oracle.bmc.containerengine.ContainerEngineClient.builder().configuration(com.oracle.bmc.ClientConfiguration.builder().connectionTimeoutMillis(5000).readTimeoutMillis(30000).build()).build(clients.authentication(c));
         client.setRegion(region);return client;
@@ -104,8 +106,11 @@ public class OciDeploymentRuns implements DeploymentRuns {
     public String start(Connection c,String region,String compartment,String pipeline,String fingerprint,String token){
         if(!plan(c,region,compartment,pipeline).fingerprint().equals(fingerprint))throw Errors.BUILD_CHANGED.exception();
         try(var client=clients.client(c,region)){
-            return client.createDeployment(CreateDeploymentRequest.builder().opcRetryToken(token).createDeploymentDetails(
+            var proof=evidence==null?null:evidence.capture(c,region,compartment,pipeline,client);
+            if(!plan(c,region,compartment,pipeline).fingerprint().equals(fingerprint))throw Errors.BUILD_CHANGED.exception();
+            String id=client.createDeployment(CreateDeploymentRequest.builder().opcRetryToken(token).createDeploymentDetails(
                 CreateDeployPipelineDeploymentDetails.builder().deployPipelineId(pipeline).displayName("companion-"+token).build()).build()).getDeployment().getId();
+            if(evidence!=null)evidence.save(c,region,compartment,id,proof);return id;
         }catch(Exception e){throw Errors.CLOUD.exception();}
     }
     public History history(Connection c,String region,String compartment,String pipeline,String page){
@@ -129,7 +134,9 @@ public class OciDeploymentRuns implements DeploymentRuns {
                         if(target.getRollbackSteps()!=null)for(var step:target.getRollbackSteps())steps.add(new Step(Objects.toString(progress.getDeployStageDisplayName(),stageId),Objects.toString(target.getTargetId(),""),"복구 · "+step.getName(),step.getState()==null?"UNKNOWN":step.getState().getValue()));
                     }
                 });
-            return new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),Objects.toString(r.getLifecycleDetails(),""),List.copyOf(steps));
+            var result=new Run(r.getId(),r.getDisplayName(),r.getLifecycleState().getValue(),Objects.toString(r.getLifecycleDetails(),""),List.copyOf(steps));
+            boolean oke=r.getDeploymentExecutionProgress()!=null&&r.getDeploymentExecutionProgress().getDeployStageExecutionProgress()!=null&&r.getDeploymentExecutionProgress().getDeployStageExecutionProgress().values().stream().anyMatch(x->x instanceof OkeDeployStageExecutionProgress);
+            return evidence==null?result:evidence.verify(c,region,compartment,pipeline,result,oke);
         }catch(BusinessException e){throw e;}catch(Exception e){throw Errors.CLOUD.exception();}
     }
 }

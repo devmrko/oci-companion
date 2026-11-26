@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class OciGuides implements GuideCatalog {
     public List<Guide> all() { return List.of(
         new Guide("connect","프로파일 연결","앱이 실행되는 PC의 OCI API 키 프로파일로 연결합니다. 프로파일 선택은 공용 서버용 사용자 인증이 아닙니다.",
-            List.of("OCI 콘솔의 사용자 설정에서 API 서명 키를 등록합니다.","~/.oci/config에 사용자·tenancy·fingerprint·key_file·region을 설정합니다. 개인 키는 PC에 보관합니다.","이 앱에서 프로파일을 선택합니다. GetTenancy로 연결을 확인하며, 이후 기능 권한은 각 API 요청 시 OCI가 판단합니다.","현재 API 키 프로파일을 지원합니다. 보안 토큰·인스턴스 프린시펄은 후속 연결 어댑터 대상입니다."),
+            List.of("OCI 콘솔의 사용자 설정에서 API 서명 키를 등록합니다.","~/.oci/config에 사용자·tenancy·fingerprint·key_file·region을 설정합니다. 개인 키는 PC에 보관합니다.","이 앱에서 프로파일을 선택합니다. GetTenancy로 연결을 확인하며, 이후 기능 권한은 각 API 요청 시 OCI가 판단합니다.","API 키 프로파일과 oci session authenticate로 만든 세션(security_token) 프로파일을 지원합니다. 세션이 만료되면 oci session authenticate 또는 oci session refresh 후 다시 선택합니다. 인스턴스 프린시펄은 후속 대상입니다."),
             "oci iam tenancy get --tenancy-id <TENANCY_OCID> --profile <PROFILE>","ConfigFileAuthenticationDetailsProvider → IdentityClient.getTenancy",
             "연결 확인에 tenancy 조회 권한이 필요합니다. 연결 성공은 빌드·배포 권한 보장이 아닙니다.","https://docs.oracle.com/en-us/iaas/Content/API/Concepts/sdkconfig.htm"),
         new Guide("source","소스 연결","프로젝트의 Git URL과 브랜치는 로컬 설계 정보입니다. 실제 소스 연결은 OCI 파이프라인에서 설정합니다.",

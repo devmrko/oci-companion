@@ -10,10 +10,34 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /** Bounded target inspection, not a replacement for Kubernetes admission policies. */
 final class OkeManifests {
+    static void replacementTarget(DeployArtifact artifact,String compartment,String project,String namespace,String app){
+        inspect(List.of(artifact),compartment,project,namespace);
+        var options=new LoaderOptions();options.setAllowDuplicateKeys(false);options.setMaxAliasesForCollections(0);options.setCodePointLimit(524288);options.setNestingDepthLimit(30);
+        int deployments=0;
+        try{
+            for(var raw:new Yaml(new SafeConstructor(options)).loadAll(new String(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent(),StandardCharsets.UTF_8))){
+                var doc=map(raw);String kind=text(doc,"kind");
+                if(!Set.of("Deployment","Service","Namespace").contains(kind))throw Errors.SCOPE.exception();
+                if(kind.equals("Deployment")){deployments++;if(!app.equals(text(map(doc.get("metadata")),"name")))throw Errors.SCOPE.exception();}
+            }
+            if(deployments!=1)throw Errors.SCOPE.exception();
+        }catch(Exception e){throw Errors.SCOPE.exception();}
+    }
+    static List<io.github.devmrko.companion.port.DeploymentImageVerification.Expected> expectations(List<DeployArtifact> artifacts,String compartment,String project,String namespace){
+        inspectDetails(artifacts,compartment,project,namespace);var result=new ArrayList<io.github.devmrko.companion.port.DeploymentImageVerification.Expected>();
+        var options=new LoaderOptions();options.setAllowDuplicateKeys(false);options.setMaxAliasesForCollections(0);options.setCodePointLimit(524288);options.setNestingDepthLimit(30);
+        for(var artifact:artifacts)for(var raw:new Yaml(new SafeConstructor(options)).loadAll(new String(((InlineDeployArtifactSource)artifact.getDeployArtifactSource()).getBase64EncodedContent(),StandardCharsets.UTF_8))){
+            var doc=map(raw);if(!"Deployment".equals(doc.get("kind")))continue;var spec=map(doc.get("spec"));var pod=map(map(spec.get("template")).get("spec"));var images=new LinkedHashMap<String,String>();
+            for(String group:List.of("containers","initContainers"))if(pod.get(group) instanceof List<?> containers)for(var value:containers){var container=map(value);images.put((group.equals("initContainers")?"init/":"")+text(container,"name"),text(container,"image"));}
+            int replicas=spec.containsKey("replicas")?((Number)spec.get("replicas")).intValue():1;
+            result.add(new io.github.devmrko.companion.port.DeploymentImageVerification.Expected(namespace,text(map(doc.get("metadata")),"name"),replicas,Map.copyOf(images)));
+        }
+        return List.copyOf(result);
+    }
     record Inspection(List<String> images,Map<String,List<String>> architectures,List<Job> jobs) {}
     static List<String> inspect(List<DeployArtifact> artifacts,String compartment,String project,String namespace){return inspectDetails(artifacts,compartment,project,namespace).images();}
     static Inspection inspectDetails(List<DeployArtifact> artifacts,String compartment,String project,String namespace){
-        if(namespace==null||!namespace.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")||Set.of("default","kube-system","kube-public","kube-node-lease").contains(namespace))throw Errors.INVALID.exception();
+        if(namespace==null||!namespace.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")||Set.of("kube-system","kube-public","kube-node-lease").contains(namespace))throw Errors.INVALID.exception();
         var jobs=new ArrayList<Job>();var requirements=new LinkedHashMap<String,Set<String>>();var images=new LinkedHashSet<String>();var names=new HashSet<String>();int count=0;int bytes=0;
         for(var artifact:artifacts){
             if(!compartment.equals(artifact.getCompartmentId())||!project.equals(artifact.getProjectId()))throw Errors.SCOPE.exception();
@@ -28,7 +52,7 @@ final class OkeManifests {
                     String api=kind.equals("Deployment")?"apps/v1":kind.equals("Job")?"batch/v1":"v1";
                     if(!api.equals(doc.get("apiVersion"))||!Set.of("Namespace","ServiceAccount","PersistentVolumeClaim","Deployment","Service","Job").contains(kind)||!names.add(kind+"/"+name))throw Errors.INVALID.exception();
                     if(kind.equals("Namespace")){
-                        if(!namespace.equals(name)||meta.containsKey("namespace"))throw Errors.SCOPE.exception();
+                        if("default".equals(name)||!namespace.equals(name)||meta.containsKey("namespace"))throw Errors.SCOPE.exception();
                     } else if(!namespace.equals(meta.get("namespace")))throw Errors.SCOPE.exception();
                     if(kind.equals("Job"))jobs.add(job(name,map(doc.get("spec"))));
                     if(kind.equals("Deployment")||kind.equals("Job")){

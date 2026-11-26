@@ -21,6 +21,18 @@ class OkeManifestsTest {
         .argumentSubstitutionMode(DeployArtifact.ArgumentSubstitutionMode.None)
         .deployArtifactSource(InlineDeployArtifactSource.builder().base64EncodedContent(text.getBytes(StandardCharsets.UTF_8)).build()).build();}
     static List<String> inspect(String text){return OkeManifests.inspect(List.of(artifact(text)),"comp","project","testing");}
+    @Test void generatedWalletSecurityAndThreeHeaderProbesPassExecutionInspection(){
+        var base=new io.github.devmrko.companion.port.OkeDeploymentSetup.Input("env","repo","image","verify","description","testing","verify","arm64",2,100,512,8845,"/readyz","","ocir-pull","","",true);
+        var mapper=com.fasterxml.jackson.databind.json.JsonMapper.builder().build();var fields=mapper.convertValue(base,Map.class);
+        fields.putAll(Map.of("probeHeaders","Host=localhost","startupPath","/healthz","livenessPath","/healthz","fileVolumes","secret wallet /app/wallet true","emptyDirs","/tmp","serviceType","NodePort","nodePort",31084,"createNamespace",false,"podRunAsNonRoot",true));
+        var input=mapper.convertValue(fields,io.github.devmrko.companion.port.OkeDeploymentSetup.Input.class);String yaml=OkeDeploymentManifest.render(input,IMAGE);
+        assertFalse(yaml.contains("&id"));assertEquals(List.of(IMAGE),inspect(yaml));
+    }
+    @Test void serviceReplacementCannotRetargetAnotherDeployment(){
+        assertDoesNotThrow(()->OkeManifests.replacementTarget(artifact(YAML),"comp","project","testing","app"));
+        assertThrows(RuntimeException.class,()->OkeManifests.replacementTarget(artifact(YAML),"comp","project","testing","other"));
+        assertThrows(RuntimeException.class,()->OkeManifests.replacementTarget(artifact(YAML+"---\n"+YAML.replace("name: app","name: other")),"comp","project","testing","app"));
+    }
     @Test void fixedImageAndExplicitNamespaceAreDisplayed(){assertEquals(List.of(IMAGE),inspect(YAML));}
     @Test void mutableImagesAndMissingNamespacesAreRejected(){
         assertThrows(RuntimeException.class,()->inspect(YAML.replace(IMAGE,"app:latest")));
