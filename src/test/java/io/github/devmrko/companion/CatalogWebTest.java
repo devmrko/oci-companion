@@ -18,6 +18,7 @@ import static org.hamcrest.Matchers.*;
 class CatalogWebTest {
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkeWorkloadAccess workloadAccess;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.OkeRuntimeResources okeRuntimeResources;
+    @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.adapter.NodePortServices nodePortServices;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.BackupPolicies backupPolicies;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.VolumeBackups volumeBackups;
     @org.springframework.test.context.bean.override.mockito.MockitoBean io.github.devmrko.companion.port.DeploymentRollback rollback;

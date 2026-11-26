@@ -1,0 +1,16 @@
+package io.github.devmrko.companion.adapter;
+import io.github.devmrko.companion.service.*;
+import io.github.devmrko.companion.port.*;
+import tools.jackson.databind.json.JsonMapper;
+import org.junit.jupiter.api.Test;
+import java.util.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+class DeploymentCheckActionsTest {
+ final JsonMapper json=JsonMapper.builder().build();
+ @Test void kubectlSelectionRejectsArbitraryExecutableAndPersistsOnlyDiscoveredPath(){var store=mock(BuildSpecDraftStore.class);when(store.read(any())).thenReturn(Optional.empty());var tool=new KubectlExecutable("/missing/kubectl",store);assertEquals(Readiness.State.FAIL,tool.check().state());assertThrows(RuntimeException.class,()->tool.apply("/bin/sh"));verify(store,never()).save(any(),any());if(!tool.candidates().isEmpty()){String selected=tool.candidates().getFirst();tool.apply(selected);verify(store).save(any(),argThat(d->d.content().equals(selected)));}}
+ @Test void builderRegistrationDoesNotClaimRuntimeAuthorization(){assertEquals(Readiness.State.FAIL,Readiness.armBuilders(0).state());assertEquals(Readiness.State.PASS,Readiness.armBuilders(1).state());assertEquals(Readiness.Permission.UNKNOWN,Readiness.armBuilders(1).permission());}
+ @Test void nodePortChecksAllNamespacesAndNeverOverwritesExistingService(){var i=new NodePortServices.Input("env","PRIVATE_ENDPOINT","apps","app","new-service",80,8080,31234);var deployment=json.readTree("{\"metadata\":{\"name\":\"app\",\"namespace\":\"apps\"},\"spec\":{\"selector\":{\"matchLabels\":{\"app\":\"app\"}}}}");var empty=json.readTree("{\"items\":[]}");assertTrue(NodePortServices.manifest(i,deployment,empty).contains("31234"));var conflict=json.readTree("{\"items\":[{\"metadata\":{\"namespace\":\"other\",\"name\":\"other\"},\"spec\":{\"ports\":[{\"nodePort\":31234}]}}]}");assertThrows(IllegalArgumentException.class,()->NodePortServices.manifest(i,deployment,conflict));var name=json.readTree("{\"items\":[{\"metadata\":{\"namespace\":\"apps\",\"name\":\"new-service\"}}]}");assertThrows(IllegalArgumentException.class,()->NodePortServices.manifest(i,deployment,name));}
+ @Test void currentDeploymentImportsExplicitSecurityAndVolumeSettings(){var helper=new DeploymentSecurityDefaultsTest();var input=helper.input(Map.of("fileVolumes","secret wallet /app/wallet true 0440","emptyDirs","/tmp 128Mi","enableServiceLinks",true,"runAsUser",2000,"readinessInitialDelay",8,"readinessPeriod",12));var doc=Map.of("metadata",Map.of("name","app","namespace","apps"),"spec",Map.of("replicas",2,"template",Map.of("spec",helper.pod(input))));var result=CurrentDeploymentInput.convert(input,json.valueToTree(doc)).input();assertEquals(2000L,result.runAsUser());assertTrue(result.enableServiceLinks());assertEquals(8,result.readinessInitialDelay());assertEquals(12,result.readinessPeriod());assertEquals("secret wallet /app/wallet true 0440",result.fileVolumes());assertEquals("/tmp 128Mi",result.emptyDirs());assertFalse(result.createNamespace());}
+ @Test void conflictMessageOffersRegisteredServiceRoute(){var conflict=new ExistingDeploymentName("test-app");assertEquals("/services?selected=test-app",conflict.href());assertTrue(conflict.getMessage().contains("이미 배포된 이름"));}
+}

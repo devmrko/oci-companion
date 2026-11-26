@@ -28,8 +28,8 @@ public class ServiceOnboarding {
   var t=services.get(c,selection.template());var i=t.deployment();var r=t.registration();
   if(!r.source().equals(selection.source())||!t.cluster().equals(selection.cluster()))throw Errors.SCOPE.exception();
   OciOkeWorkloadConnections.name(selection.namespace());boolean migration=!i.namespace().equals(selection.namespace());if(migration&&!namespaces(c,selection.template(),selection.cluster()).contains(selection.namespace()))throw Errors.SCOPE.exception();
-  OciOkeWorkloadConnections.name(selection.name());if(selection.name().length()>63)throw Errors.INVALID.exception();if(services.list(c).stream().anyMatch(e->e.registration().name().equals(selection.name())))throw Errors.CONFLICT.exception();
-  var names=connections.deployments(c.connection(),c.region(),c.compartment(),t.cluster(),i.endpoint(),selection.namespace());if(names.contains(selection.name()))throw Errors.CONFLICT.exception();
+  OciOkeWorkloadConnections.name(selection.name());if(selection.name().length()>63)throw Errors.INVALID.exception();if(services.list(c).stream().anyMatch(e->e.registration().name().equals(selection.name())))throw new ExistingDeploymentName(selection.name());
+  var names=connections.deployments(c.connection(),c.region(),c.compartment(),t.cluster(),i.endpoint(),selection.namespace());if(names.contains(selection.name()))throw new ExistingDeploymentName(selection.name(),false);
   var snapshot=resources.read(c.connection(),c.region(),c.compartment(),r.environment(),i.endpoint(),selection.namespace());
   var serviceNames=snapshot.resources().get("services");if(serviceNames==null||!serviceNames.available())throw Errors.DEPLOYMENT_RUNTIME.exception();if(serviceNames.items().stream().anyMatch(s->s.name().equals(selection.name())))throw Errors.CONFLICT.exception();
   String live=resources.deployment(c.connection(),c.region(),c.compartment(),r.environment(),i.endpoint(),i.namespace(),i.app());

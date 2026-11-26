@@ -1,0 +1,9 @@
+<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><body>
+<details th:fragment="item(check)" class="section-stack">
+ <summary><span th:text="${check.name()}"></span> · <span th:text="${check.label()}"></span></summary>
+ <p th:text="${check.evidence()}"></p>
+ <p th:if="${!check.preview().isBlank() and check.remedy().name()=='ACTION'}" th:text="${check.preview()}"></p>
+ <div th:if="${check.state().name()!='PASS' and !check.guidance().isBlank()}" data-check-guidance><textarea class="ui-control" readonly rows="3" th:text="${check.guidance()}"></textarea><button type="button" class="ui-button" data-check-copy>안내 복사</button><span data-check-copy-status role="status"></span></div>
+ <a th:if="${!check.href().isBlank()}" th:href="${check.href()}" th:text="${check.action()}"></a>
+</details>
+</body></html>

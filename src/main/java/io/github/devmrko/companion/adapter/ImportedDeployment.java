@@ -10,7 +10,7 @@ import io.github.devmrko.companion.service.DeploymentVolumes;
 /** Import workload settings, never cluster objects, Secret values or allocated Service addresses. */
 final class ImportedDeployment {
  private static final Set<String> CONTAINER=Set.of("env","envFrom","resources","ports","readinessProbe","livenessProbe","startupProbe","volumeMounts","securityContext","command","args","workingDir");
- private static final Set<String> POD=Set.of("volumes","securityContext","automountServiceAccountToken","serviceAccountName","terminationGracePeriodSeconds");
+ private static final Set<String> POD=Set.of("volumes","securityContext","enableServiceLinks","automountServiceAccountToken","serviceAccountName","terminationGracePeriodSeconds");
  private static final JsonMapper JSON=JsonMapper.builder().build();
  static Map<String,Object> map(Object value){if(value==null)return Map.of();if(!(value instanceof Map<?,?>))throw new IllegalArgumentException("배포 설정 객체 형식 오류");return (Map<String,Object>)value;}
  static List<Map<String,Object>> list(Object value){if(value==null)return List.of();if(!(value instanceof List<?> items)||items.size()>100)throw new IllegalArgumentException("배포 설정 목록 한도 초과");return items.stream().map(ImportedDeployment::map).toList();}

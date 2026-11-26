@@ -47,6 +47,8 @@ public class OkeWorkloadHealth {
     private OkeApiAccess access;private OkeTokenCache tokens;
     @org.springframework.beans.factory.annotation.Autowired void access(OkeApiAccess access,OkeTokenCache tokens){this.access=access;this.tokens=tokens;}
     private final String kubectl;
+    private io.github.devmrko.companion.service.KubectlExecutable executable;
+    @org.springframework.beans.factory.annotation.Autowired void executable(io.github.devmrko.companion.service.KubectlExecutable executable){this.executable=executable;}
     private final AgentConnectionRegistry registry;
     private final OciAgentDependencies cloud;
     private final JsonMapper json=JsonMapper.builder().build();
@@ -120,6 +122,7 @@ public class OkeWorkloadHealth {
         return json.readTree(command(t,args,2_000_000));
     }
     byte[] command(Target t,List<String> command,int limit)throws Exception {
+        String kubectl=executable==null?this.kubectl:executable.current();
         if(!Path.of(kubectl).isAbsolute())throw new IllegalArgumentException();
         if(access!=null)t=access.apply(t);
         Path temporary=tokens==null?null:tokens.temporaryConfig(t);
@@ -128,15 +131,17 @@ public class OkeWorkloadHealth {
         if(t.server()!=null&&!t.server().isBlank())args.add("--server="+t.server());
         if(t.tlsServerName()!=null&&!t.tlsServerName().isBlank())args.add("--tls-server-name="+t.tlsServerName());
         args.addAll(command);
-        var process=new ProcessBuilder(args).redirectError(ProcessBuilder.Redirect.DISCARD).start();
+        var process=new ProcessBuilder(args).start();
         try(var executor=Executors.newVirtualThreadPerTaskExecutor()) {
             var output=executor.submit(()->{try(var in=process.getInputStream()){return in.readNBytes(limit+1);}});
+            var errors=executor.submit(()->{try(var in=process.getErrorStream()){return in.readNBytes(8193);}});
             try {
                 var bytes=output.get(45,TimeUnit.SECONDS);
-                if(bytes.length>limit||!process.waitFor(1,TimeUnit.SECONDS)||process.exitValue()!=0)throw new IllegalArgumentException();
+                if(bytes.length>limit||!process.waitFor(1,TimeUnit.SECONDS))throw new IllegalArgumentException("kubectl 응답 한도 또는 시간 제한 초과");
+                if(process.exitValue()!=0){String diagnostic=new String(errors.get(1,TimeUnit.SECONDS),java.nio.charset.StandardCharsets.UTF_8);throw new IllegalStateException(io.github.devmrko.companion.service.PipelineIamRules.safe(diagnostic));}
                 return bytes;
             } finally {
-                process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();output.cancel(true);
+                process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();output.cancel(true);errors.cancel(true);
             }
         }
         }finally{if(temporary!=null)Files.deleteIfExists(temporary);}

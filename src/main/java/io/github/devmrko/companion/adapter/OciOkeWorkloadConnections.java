@@ -72,14 +72,17 @@ public class OciOkeWorkloadConnections implements OkeWorkloadConnections {
  public List<String> namespaces(Connection c,String r,String comp,String cluster,String endpoint){OkeWorkloadHealth.Target t=null;try{t=prepare(c,r,comp,cluster,endpoint,"default","unused");return names(reader.read(t,"namespaces",null),"");}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new IllegalArgumentException("namespace 조회 실패 · OCI 클러스터 접근, namespaces list RBAC, OCI CLI·kubectl 설치와 API 네트워크를 확인하세요. namespace를 알고 있으면 직접 입력할 수 있습니다.");}finally{cleanup(t);}}
  public List<String> deployments(Connection c,String r,String comp,String cluster,String endpoint,String namespace){OkeWorkloadHealth.Target t=null;try{name(namespace);t=prepare(c,r,comp,cluster,endpoint,namespace,"unused");return names(reader.read(t,"deployments",null),namespace);}catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();throw new IllegalArgumentException("Deployment 조회 실패 · namespace 이름, deployments list RBAC와 API 네트워크를 확인하세요.");}finally{cleanup(t);}}
  public Settings current(Connection c,String r,String comp,String id){if(id.isBlank())return new Settings("","","","","PUBLIC_ENDPOINT","","",false);var app=registry.get(c,r,comp,id);if(!"oke-workload-v1".equals(app.adapter()))throw new IllegalArgumentException("OKE 전용 연결을 선택하세요.");var t=store.get(c,r,comp,id);if(t==null)throw new IllegalArgumentException("저장된 OKE 조회 연결이 없습니다.");return new Settings(id,app.name(),app.environment(),t.clusterId(),Objects.requireNonNullElse(t.endpoint(),"PUBLIC_ENDPOINT"),t.namespace(),t.deployment(),t.inspectNodes());}
+ static Path managedPath(Path root,String file)throws java.io.IOException {
+  var configured=root.toAbsolutePath().normalize();var path=Path.of(file).toAbsolutePath().normalize();
+  if(path.getParent()==null||!path.getFileName().toString().matches("oke-[A-Za-z0-9_-]+\\.json")||Files.isSymbolicLink(configured)||Files.isSymbolicLink(path))throw new IllegalArgumentException();
+  var realRoot=configured.toRealPath();if(!path.getParent().toRealPath().equals(realRoot))throw new IllegalArgumentException();
+  return realRoot.resolve(path.getFileName());
+ }
  public synchronized void remove(Connection c,String r,String comp,String id){
   try{
    if(c.demo()||!"oke-workload-v1".equals(registry.get(c,r,comp,id).adapter()))throw new IllegalArgumentException();
    var t=store.get(c,r,comp,id);
-   if(t!=null){var path=Path.of(t.kubeconfig()).toAbsolutePath().normalize();
-    if(!path.getParent().equals(root.normalize())||!path.getFileName().toString().matches("oke-[A-Za-z0-9_-]+\\.json")||Files.isSymbolicLink(root)||Files.isSymbolicLink(path))throw new IllegalArgumentException();
-    Files.deleteIfExists(path);
-   }
+   if(t!=null)Files.deleteIfExists(managedPath(root,t.kubeconfig()));
    store.remove(c,r,comp,id);registry.remove(c,r,comp,id);
   }catch(Exception e){throw new IllegalArgumentException("연결 해제를 완료하지 못했습니다. 로컬 파일 권한을 확인하고 다시 시도하세요. 클라우드 앱은 변경되지 않았습니다.");}
  }
@@ -102,7 +105,7 @@ public class OciOkeWorkloadConnections implements OkeWorkloadConnections {
    reader.read(t,"replicasets",null);reader.read(t,"pods",null);
    boolean isNew=id.isBlank();id=registry.registerOke(c,r,comp,id,s.name(),s.environment(),new AgentConnectionRegistry.Dependency("OKE",s.name(),s.cluster()));created=isNew;
    store.save(c,r,comp,id,new OkeWorkloadHealth.Target(id,c.profile(),c.tenancy(),c.user(),r,comp,t.clusterId(),t.kubeconfig(),t.namespace(),t.deployment(),null,null,s.inspectNodes(),s.endpoint()));
-   t=null;if(oldTarget!=null){var oldPath=Path.of(oldTarget.kubeconfig()).toAbsolutePath().normalize();if(oldPath.getParent().equals(root.normalize())&&!Files.isSymbolicLink(root)&&!Files.isSymbolicLink(oldPath))cleanup(oldTarget);}return id;
+   t=null;if(oldTarget!=null)try{Files.deleteIfExists(managedPath(root,oldTarget.kubeconfig()));}catch(Exception ignored){}return id;
   }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();if(created)registry.remove(c,r,comp,id);else if(previous!=null)registry.registerOke(c,r,comp,id,previous.name(),previous.environment(),previous.dependencies().getFirst());throw new IllegalArgumentException("연결 저장 실패 · 입력값, OCI 접근, deployments get·replicasets/pods list RBAC와 API 연결을 확인하세요.");}finally{cleanup(t);}
  }
 }
