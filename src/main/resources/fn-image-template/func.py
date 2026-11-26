@@ -80,7 +80,9 @@ def handler(ctx, data=None):
                 dependency_base = dependency_cache.cached(request, root, command, os.environ['SOURCE_REPOSITORY'], key['app'], key['lock'])
                 if not dependency_base:
                     raise ValueError('Prepared application dependency cache is missing')
-                result.update(lockHash=key['lock'], dependencyCacheHit=True)
+                result.update(lockHash=key['lock'], dependencyCacheHit=True, dependencyImage=dependency_base,
+                              dependencyTag=key['app'], runtimeTag=key['runtime'],
+                              runtimeImage=dependency_cache.cached(request, root, command, os.environ['SOURCE_REPOSITORY'], key['runtime'], key['lock']))
                 test_python = '/usr/local/bin/python'
                 test_path = str(source / 'src') + ':' + installed + '/site-packages'
             else:
@@ -108,6 +110,7 @@ def handler(ctx, data=None):
             archive = root / 'app-layer.tar.gz'
             result['layerBytes'] = image_layer.layer(site, archive)
             result['phase'] = 'push'
+            request['testsPassed'] = result['tests']['tests'] > 0 and result['tests']['failures'] == 0 and result['tests']['errors'] == 0
             result.update(image_layer.publish(request, root, archive, command,
                           dependency_base, os.environ['IMAGE_REPOSITORY']))
             result.update(status='SUCCEEDED', phase='complete')

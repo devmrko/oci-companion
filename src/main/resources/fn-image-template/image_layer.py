@@ -70,6 +70,12 @@ def publish(request, root, archive, command, base, repository):
     if not re.fullmatch(r'[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}', base):
         raise ValueError('A digest-pinned base image is required')
     image = target(request, repository)
+    receipt = []
+    if request.get('buildId'):
+        if not re.fullmatch(r'[a-f0-9-]{36}', request['buildId']) or not re.fullmatch(r'[a-f0-9]{40}', request.get('commit', '')) or request.get('testsPassed') is not True:
+            raise ValueError('Invalid build completion evidence')
+        for key, value in {'schema': '1', 'id': request['buildId'], 'commit': request['commit'], 'tests': 'passed'}.items():
+            receipt += ['--label=companion.build.' + key + '=' + value]
     with registry_auth(request, root, repository) as env:
         config = json.loads(command(['crane', 'config', '--platform=linux/arm64', base], root, env))
         if config.get('architecture') != 'arm64' or config.get('os') != 'linux':
@@ -79,7 +85,7 @@ def publish(request, root, archive, command, base, repository):
                  '--env=PYTHONPATH=/app/site-packages', '--env=PYTHONUNBUFFERED=1',
                  '--env=SUSTENA_HOST=0.0.0.0', '--env=SUSTENA_PORT=8845',
                  '--entrypoint=python,-c,from sustena.cli import main; main()',
-                 '--cmd=serve', '--tag', image], root, env)
+                 '--cmd=serve', '--tag', image] + receipt, root, env)
         digest = command(['crane', 'digest', image], root, env).strip()
         if not re.fullmatch(r'sha256:[a-f0-9]{64}', digest):
             raise ValueError('Registry did not return an image digest')

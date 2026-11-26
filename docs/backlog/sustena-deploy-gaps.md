@@ -307,3 +307,7 @@ OCI 소스의 단일 Helm 차트를 격리된 로컬 `helm template`으로 렌�
 ### 다른 Namespace 이관 — 2026-11-26
 
 대상 Namespace 참조 검사 → 새 서비스 배포·Pod digest/Ready 확인 → 별도 확인 후 원본 워크로드 정리를 구현했습니다. 검증용 서비스의 Namespace를 실제로 옮겨 MIGRATED·2/2 Ready·readyz 200과 원본 Deployment·ClusterIP·Pod 부재를 확인했습니다. 외부 DNS/Ingress/NodePort 전환·PVC 데이터 복사는 자동화하지 않으며 원본 배포 이력과 참조 자원은 보존합니다. [실제 결과·범위·운영 Function 적용안](../repository-deployment-import-validation.md)을 참고하세요.
+
+### 운영 Function 자동 의존성 캐시 활성화 — 2026-11-26
+
+오너의 작업자 터미널 직접 승인 후 운영 빌더에 캐시 코드를 적용했습니다. 별도 태그로 첫 빌드 167초·재빌드 136초, 각각 155개 테스트 통과와 캐시 재사용을 확인했으며 운영 앱은 배포하지 않았습니다. [실행 결과·백업·정리·캐시 보존 권장값](../production-function-cache-enablement.md)을 참고하세요.

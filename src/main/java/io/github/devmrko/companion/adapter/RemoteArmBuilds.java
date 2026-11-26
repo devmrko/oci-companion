@@ -16,14 +16,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class RemoteArmBuilds implements ArmBuilds {
- private final FunctionImageBuilds functionImages;
+ private final FunctionImageBuilds functionImages;private final BuildExecutionLocks locks;private final OciBuildCacheMaintenance cacheMaintenance;
  private final OciBuildHistory clients;private final OciDeploymentSetup images;private final BuildSpecDraftStore store;private final OkeRuntimeResources resources;
  private final tools.jackson.databind.json.JsonMapper json=tools.jackson.databind.json.JsonMapper.builder().build();
  private final ExecutorService executor=Executors.newVirtualThreadPerTaskExecutor();
  private final Map<String,Run> active=new ConcurrentHashMap<>();
  public RemoteArmBuilds(String config,BuildSpecDraftStore store,OkeRuntimeResources resources){this(config,store,resources,"crane");}
+ public RemoteArmBuilds(String config,BuildSpecDraftStore store,OkeRuntimeResources resources,String crane){this(config,store,resources,crane,".data/catalog");}
  @org.springframework.beans.factory.annotation.Autowired
- public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store,OkeRuntimeResources resources,@Value("${companion.crane:crane}") String crane){this.resources=resources;this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;this.functionImages=new FunctionImageBuilds(clients,crane);}
+ public RemoteArmBuilds(@Value("${companion.oci-config}") String config,BuildSpecDraftStore store,OkeRuntimeResources resources,@Value("${companion.crane:crane}") String crane,@Value("${companion.data-dir:.data/catalog}") String directory){this.locks=new BuildExecutionLocks(directory,store);this.resources=resources;this.clients=new OciBuildHistory(config);this.images=new OciDeploymentSetup(clients);this.store=store;var journal=new BuildCacheJournal(store,locks);this.cacheMaintenance=new OciBuildCacheMaintenance(clients,journal,locks);this.functionImages=new FunctionImageBuilds(clients,crane,(c,r,u)->journal.record(journal.key(c.tenancy(),r,u.repository()),u,Instant.now()));}
  @jakarta.annotation.PreDestroy public void close(){executor.shutdownNow();}
  private String key(Connection c,String region,String compartment){return String.join("\n","arm-build-v1",c.profile(),c.tenancy(),c.user(),region,compartment);}
  public List<Builder> builders(Connection c,String region,String compartment){return store.read(key(c,region,compartment)+"\nbuilders").map(d->List.of(json.readValue(d.content(),Builder[].class))).orElse(List.of());}
@@ -45,6 +46,10 @@ public class RemoteArmBuilds implements ArmBuilds {
    return new Plan(i,image,repository.getName(),builder.name(),builder,builder.kind().equals("FUNCTION")?functionImages.inspect(c,region,compartment,builder.functionId(),image).fingerprint():"");
   }catch(io.github.devmrko.companion.error.BusinessException e){throw e;}catch(Exception e){throw new IllegalStateException(OciPipelineIam.error(e));}
  }
+ private Builder cacheBuilder(Connection c,String region,String compartment,String name){return builders(c,region,compartment).stream().filter(b->b.name().equals(name)).findFirst().orElseThrow(Errors.MISSING::exception);}
+ public CachePlan cachePreview(Connection c,String region,String compartment,String builder){return cacheMaintenance.preview(c,region,compartment,cacheBuilder(c,region,compartment,builder));}
+ public void cacheApply(Connection c,String region,String compartment,CachePlan plan,boolean automatic){cacheMaintenance.apply(c,region,compartment,cacheBuilder(c,region,compartment,plan.builder()),plan,automatic);}
+ public List<Run> pending(Connection c,String region,String compartment){return locks.pending(key(c,region,compartment)).stream().filter(id->store.read(key(c,region,compartment)+"\n"+id).isPresent()).map(id->read(c,region,compartment,id)).toList();}
  public List<String> managedImages(){return Arrays.stream(com.oracle.bmc.devops.model.BuildStage.Image.values()).filter(x->x!=com.oracle.bmc.devops.model.BuildStage.Image.UnknownEnumValue).map(com.oracle.bmc.devops.model.BuildStage.Image::getValue).toList();}
  public synchronized String start(Connection c,String region,String compartment,Plan plan,String username,char[] password){
   if(active.values().stream().filter(x->x.state().equals("RUNNING")).count()>=4)throw Errors.CONFLICT.exception();
@@ -52,17 +57,40 @@ public class RemoteArmBuilds implements ArmBuilds {
   if(username==null||username.length()>512||username.chars().anyMatch(Character::isISOControl)||password.length>8192||(password.length>0&&username.isBlank()))throw Errors.INVALID.exception();
   String id=UUID.randomUUID().toString(),identity=key(c,region,compartment)+"\n"+id;var builder=builders(c,region,compartment).stream().filter(b->b.name().equals(plan.input().builder())).findFirst().orElseThrow();
   var initial=new Run(id,"RUNNING","source",plan.image(),plan.input().imageRepository(),"","",Instant.now().toString(),"");
-  char[] secret=password.clone();String login=username;
-  if(secret.length==0&&!builder.secretEnvironment().isBlank())try(var credential=resources.pullCredentials(c,region,compartment,builder.secretEnvironment(),builder.secretEndpoint(),builder.secretNamespace(),builder.secretName(),plan.image().substring(0,plan.image().indexOf('/')))){login=credential.username();secret=credential.password();}
-  final String loginUser=login;final char[] loginSecret=secret;
-  Arrays.fill(password,'\0');save(identity,initial);executor.submit(()->build(c,region,compartment,plan,builder,identity,initial,loginUser,loginSecret));return id;
+  store.save(identity+"\nplan",new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(plan),Instant.now().toString()));save(identity,initial);
+  BuildExecutionLocks.Lease lease;try{lease=locks.acquire(BuildExecutionLocks.physical(c,region,builder),identity,false);}catch(RuntimeException busy){save(identity,new Run(id,"FAILED","blocked",initial.image(),initial.repository(),"","빌더 잠금을 얻지 못해 원격 실행하지 않았습니다",initial.startedAt(),Instant.now().toString()));throw busy;}boolean submitted=false;
+  char[] secret=password.clone();
+  try{
+   String login=username;
+   if(secret.length==0&&!builder.secretEnvironment().isBlank())try(var credential=resources.pullCredentials(c,region,compartment,builder.secretEnvironment(),builder.secretEndpoint(),builder.secretNamespace(),builder.secretName(),plan.image().substring(0,plan.image().indexOf('/')))){login=credential.username();secret=credential.password();}
+   final String loginUser=login;final char[] loginSecret=secret;executor.submit(()->build(c,region,compartment,plan,builder,identity,initial,loginUser,loginSecret,lease));submitted=true;return id;
+  }finally{Arrays.fill(password,'\0');if(!submitted){Arrays.fill(secret,'\0');try{save(identity,new Run(id,"FAILED","preparation",initial.image(),initial.repository(),"","원격 실행 전 준비 실패",initial.startedAt(),Instant.now().toString()));lease.resolved();}finally{lease.close();}}}
+
  }
- private void save(String identity,Run run){active.put(identity,run);store.save(identity,new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(run),Instant.now().toString()));}
+ private void save(String identity,Run run){store.save(identity,new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(run),Instant.now().toString()));active.put(identity,run);}
  private void phase(String identity,String phase){var r=active.get(identity);save(identity,new Run(r.id(),r.state(),phase,r.image(),r.repository(),r.digest(),r.error(),r.startedAt(),r.finishedAt()));}
  public Run read(Connection c,String region,String compartment,String id){
   if(!id.matches("[a-f0-9-]{36}"))throw Errors.INVALID.exception();String identity=key(c,region,compartment)+"\n"+id;var run=active.get(identity);if(run!=null)return run;
   run=store.read(identity).map(d->json.readValue(d.content(),Run.class)).orElseThrow(Errors.MISSING::exception);
-  return run.state().equals("RUNNING")?new Run(run.id(),"UNKNOWN",run.phase(),run.image(),run.repository(),run.digest(),"앱 재시작으로 완료 여부를 확인하지 못했습니다. VM과 OCIR을 확인한 뒤 다시 실행하세요.",run.startedAt(),""):run;
+  return run.state().equals("RUNNING")?new Run(run.id(),"UNKNOWN",run.phase(),run.image(),run.repository(),run.digest(),"앱 재시작으로 완료 여부를 확인하지 못했습니다. OCIR 완료 증거를 재확인하세요. 원격 종료 확인 전 새 실행은 차단합니다.",run.startedAt(),""):run;
+ }
+ public synchronized Run reconcile(Connection c,String region,String compartment,String id){
+  var run=read(c,region,compartment,id);if(!run.state().equals("UNKNOWN"))return run;String identity=key(c,region,compartment)+"\n"+id;
+  var plan=store.read(identity+"\nplan").map(d->json.readValue(d.content(),Plan.class)).orElseThrow(()->new IllegalStateException("이전 버전 실행에는 복구 증거가 없습니다 · 원격 실행을 직접 확인하세요"));
+  try(var lease=locks.acquire(BuildExecutionLocks.physical(c,region,plan.target()),identity,true)){
+   var b=plan.target();if(b.secretEnvironment().isBlank())throw new IllegalStateException("등록된 인증 참조가 없어 결과를 재확인할 수 없습니다");
+   try(var auth=resources.pullCredentials(c,region,compartment,b.secretEnvironment(),b.secretEndpoint(),b.secretNamespace(),b.secretName(),plan.image().substring(0,plan.image().indexOf('/')))){
+    String digest=functionImages.recover(plan,id,auth.username(),auth.password());
+    var restored=new Run(id,"SUCCEEDED","recovered",run.image(),run.repository(),digest,"OCIR의 실행 ID·커밋·테스트 성공·ARM64 증거로 확인했습니다",run.startedAt(),Instant.now().toString());locks.uncertainCacheUse();save(identity,restored);lease.resolved();return restored;
+   }catch(Exception e){throw new IllegalStateException("완료 증거를 확인하지 못했습니다 · 빌드를 재실행하지 않았고 잠금을 유지합니다");}
+  }
+ }
+ public synchronized void abandon(Connection c,String region,String compartment,String id){
+  var run=read(c,region,compartment,id);if(!run.state().equals("UNKNOWN"))throw Errors.CONFLICT.exception();String identity=key(c,region,compartment)+"\n"+id;
+  var plan=store.read(identity+"\nplan").map(d->json.readValue(d.content(),Plan.class)).orElseThrow(Errors.MISSING::exception);
+  try(var lease=locks.acquire(BuildExecutionLocks.physical(c,region,plan.target()),identity,true)){
+   locks.uncertainCacheUse();save(identity,new Run(id,"ABANDONED",run.phase(),run.image(),run.repository(),run.digest(),"사용자가 원격 실행 종료 확인 후 포기했습니다 · 원격 중지나 성공 판정이 아닙니다",run.startedAt(),Instant.now().toString()));lease.resolved();
+  }
  }
  static List<String> ssh(Builder b,String command){validate(b);return List.of("/usr/bin/ssh","-T","-o","BatchMode=yes","-o","StrictHostKeyChecking=yes","-o","ConnectTimeout=10","-i",b.keyPath(),b.user()+"@"+b.host(),command);}
  static String quote(String s){return "'"+s.replace("'","'\"'\"'")+"'";}
@@ -75,7 +103,9 @@ public class RemoteArmBuilds implements ArmBuilds {
    finally{process.descendants().forEach(ProcessHandle::destroyForcibly);process.destroyForcibly();writer.cancel(true);reader.cancel(true);}
   }
  }
- static String script(Plan plan,String work,String username,char[] password){
+ static String script(Plan plan,String work,String username,char[] password){return script(plan,work,username,password,"");}
+ static String script(Plan plan,String work,String username,char[] password,String runId){
+  String receipt=runId.isBlank()?"":BuildReceipt.labels(runId,plan.input().commit()).entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e->" --label "+quote(e.getKey()+"="+e.getValue())).collect(java.util.stream.Collectors.joining());
   String auth=password.length==0?"": "printf '%s' "+quote(new String(password))+" | podman login --authfile \"$work/auth.json\" --username "+quote(username)+" --password-stdin "+quote(plan.image().substring(0,plan.image().indexOf('/')))+"\nauth=(--authfile \"$work/auth.json\")\n";
   return """
 set -euo pipefail
@@ -112,7 +142,7 @@ auth=()
 stage test
 bash -o pipefail -c %s
 stage build
-podman build "${auth[@]}" --platform linux/arm64 --file "$dockerfile" --tag %s .
+podman build "${auth[@]}" --platform linux/arm64%s --file "$dockerfile" --tag %s .
 stage push
 if ! podman push "${auth[@]}" --digestfile "$work/digest" %s 2>"$work/push-error"; then
  printf 'COMPANION_PUSH_ERROR=' >&3
@@ -124,17 +154,18 @@ fi
 digest=$(cat "$work/digest")
 [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
 printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
-""".formatted(quote(work),quote(plan.input().dockerfile()),auth,quote(plan.input().testCommand()),quote(plan.image()),quote(plan.image()));
+""".formatted(quote(work),quote(plan.input().dockerfile()),auth,quote(plan.input().testCommand()),receipt,quote(plan.image()),quote(plan.image()));
  }
- private void build(Connection c,String region,String compartment,Plan plan,Builder builder,String identity,Run initial,String username,char[] password){
-  Path source=null;String work="/tmp/companion-arm-"+initial.id();var digest=new java.util.concurrent.atomic.AtomicReference<String>("");var remoteError=new java.util.concurrent.atomic.AtomicReference<String>("");
+ private void build(Connection c,String region,String compartment,Plan plan,Builder builder,String identity,Run initial,String username,char[] password,BuildExecutionLocks.Lease lease){
+  boolean remoteStarted=false;Path source=null;String work="/tmp/companion-arm-"+initial.id();var digest=new java.util.concurrent.atomic.AtomicReference<String>("");var remoteError=new java.util.concurrent.atomic.AtomicReference<String>("");
   try{
    source=Files.createTempFile("companion-arm-source-",".tar");
    try(var client=clients.client(c,region);var in=client.getRepositoryArchiveContent(GetRepositoryArchiveContentRequest.builder().repositoryId(plan.input().sourceRepository()).refName(plan.input().commit()).format("zip").build()).getInputStream()){ArmBuildSource.tar(in,source);}
-   if(builder.kind().equals("FUNCTION")){phase(identity,"function");digest.set(functionImages.build(c,region,compartment,plan,source,username,password));}
+   remoteStarted=true;
+   if(builder.kind().equals("FUNCTION")){phase(identity,"function");digest.set(functionImages.build(c,region,compartment,plan,source,username,password,initial.id()));}
    else {
    phase(identity,"transfer");command(builder,"umask 077; mkdir "+quote(work)+" && cat > "+quote(work+"/source.tar"),Files.newInputStream(source),120,x->{});
-   String script=script(plan,work,username,password);Arrays.fill(password,'\0');
+   String script=script(plan,work,username,password,initial.id());Arrays.fill(password,'\0');
    command(builder,"bash -s",new ByteArrayInputStream(script.getBytes(java.nio.charset.StandardCharsets.UTF_8)),1800,line->{
     if(line.startsWith("COMPANION_PHASE=")){String step=line.substring(16);if(Set.of("architecture","source","test","build","push").contains(step))phase(identity,step);}
     if(line.startsWith("COMPANION_PUSH_ERROR="))try{remoteError.set(PipelineIamRules.safe(new String(Base64.getDecoder().decode(line.substring(21)),java.nio.charset.StandardCharsets.UTF_8)));}catch(IllegalArgumentException ignored){}
@@ -154,7 +185,7 @@ printf 'COMPANION_DIGEST=%%s\\n' "$digest" >&3
    }
    if(!found)throw new IllegalStateException("push 후 OCIR에서 digest를 아직 확인하지 못했습니다. 이미지 목록을 다시 조회하세요.");
    save(identity,new Run(initial.id(),"SUCCEEDED","complete",plan.image(),initial.repository(),digest.get(),"",initial.startedAt(),Instant.now().toString()));
-  }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var current=active.getOrDefault(identity,initial);save(identity,new Run(initial.id(),"FAILED",current.phase(),initial.image(),initial.repository(),digest.get(),PipelineIamRules.safe(e.getMessage())+(remoteError.get().isEmpty()?"":" · "+remoteError.get()),initial.startedAt(),Instant.now().toString()));}
-  finally{Arrays.fill(password,'\0');if(source!=null)try{Files.deleteIfExists(source);}catch(Exception ignored){}try{if(builder.kind().equals("VM"))command(builder,"rm -rf -- "+quote(work),new ByteArrayInputStream(new byte[0]),15,x->{});}catch(Exception ignored){}}
+  }catch(Exception e){if(e instanceof InterruptedException)Thread.currentThread().interrupt();var current=active.getOrDefault(identity,initial);save(identity,new Run(initial.id(),remoteStarted?"UNKNOWN":"FAILED",current.phase(),initial.image(),initial.repository(),digest.get(),PipelineIamRules.safe(e.getMessage())+(remoteError.get().isEmpty()?"":" · "+remoteError.get()),initial.startedAt(),Instant.now().toString()));}
+  finally{Arrays.fill(password,'\0');if(source!=null)try{Files.deleteIfExists(source);}catch(Exception ignored){}try{if(!active.get(identity).state().equals("UNKNOWN")&&builder.kind().equals("VM"))command(builder,"rm -rf -- "+quote(work),new ByteArrayInputStream(new byte[0]),15,x->{});}catch(Exception ignored){}try{if(Set.of("SUCCEEDED","FAILED").contains(active.get(identity).state()))lease.resolved();}finally{lease.close();}if(active.get(identity).state().equals("SUCCEEDED"))cacheMaintenance.afterSuccess(c,region,compartment,builder);}
  }
 }

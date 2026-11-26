@@ -43,7 +43,7 @@ class DependencyCacheTest(unittest.TestCase):
             with patch.object(cache, 'cached', return_value=self.repo + '@sha256:' + 'c' * 64):
                 def no_install(*args): raise AssertionError('No command expected on cache hit')
                 result = cache.prepare(self.request, root, root, no_install, self.base, self.runtime, self.repo)
-                self.assertTrue(result['cacheHit']); self.assertEqual('RUNTIME_REQUIRED', result['status'])
+                self.assertTrue(result['cacheHit']); self.assertEqual('RUNTIME_REQUIRED', result['status']); self.assertEqual([], result['createdImages'])
             for message, missing in [('MANIFEST_UNKNOWN', True), ('UNAUTHORIZED', False), ('network timeout', False)]:
                 def error(*args): raise RuntimeError(message)
                 if missing: self.assertIsNone(cache.cached(self.request, root, error, self.repo, self.repo + ':tag', 'lock'))
@@ -60,7 +60,7 @@ class DependencyCacheTest(unittest.TestCase):
                 (site / 'module.so').write_bytes(b'wheel-bytes'); calls.append(args)
             with patch.object(cache, 'cached', return_value=None), patch.object(cache, 'publish', return_value=self.repo + '@sha256:' + 'c' * 64) as publish:
                 result = cache.prepare(self.request, root, root, command, self.base, self.runtime, self.repo)
-                self.assertFalse(result['cacheHit']); self.assertEqual(2, publish.call_count)
+                self.assertFalse(result['cacheHit']); self.assertEqual(2, publish.call_count); self.assertEqual(2, len(result['createdImages']))
                 self.assertEqual(2, len(calls)); self.assertIn('--no-dev', calls[1])
 
     def test_runtime_layer_uses_hash_directory_and_rejects_symlinks(self):
