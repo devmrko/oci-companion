@@ -19,5 +19,8 @@ public interface OkeRuntimeResources {
  default RegistryCredentials pullCredentials(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String secret,String host){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
  default String deployment(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String name){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
  default DeploymentImageVerification.Result verifyImages(Connection c,String region,String compartment,String environment,String endpoint,DeploymentImageVerification.Expected expected){return DeploymentImageVerification.Result.unknown();}
+ record Retirement(String deploymentUid,String deploymentVersion,String serviceUid,String serviceVersion){}
+ default Retirement retirement(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
+ default void retire(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app,Retirement approved){throw io.github.devmrko.companion.service.Errors.DEPLOYMENT_RUNTIME.exception();}
  Snapshot read(Connection connection,String region,String compartment,String environment,String endpoint,String namespace);
 }

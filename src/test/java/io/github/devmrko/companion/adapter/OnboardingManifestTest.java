@@ -12,6 +12,10 @@ class OnboardingManifestTest {
   var pod=d.path("spec").path("template").path("spec");assertEquals("wallet",pod.path("volumes").get(0).path("secret").path("secretName").asText());assertEquals("pull",pod.path("imagePullSecrets").get(0).path("name").asText());assertEquals(5,pod.path("containers").get(0).path("readinessProbe").path("timeoutSeconds").asInt());assertFalse(pod.path("automountServiceAccountToken").asBoolean());
   assertEquals("ClusterIP",s.path("spec").path("type").asText());assertFalse(s.path("spec").path("ports").get(0).has("nodePort"));assertFalse(d.path("metadata").has("resourceVersion"));assertEquals(2,result.replicas());
  }
+ @Test void migrationChangesOnlyIdentityAndKeepsNamespaceReferences(){
+  var result=OnboardingManifest.cloneTo(LIVE,"apps","original","target","moved");var parts=result.yaml().split("\n---\n");var json=JsonMapper.builder().build();var d=json.readTree(parts[0]);var service=json.readTree(parts[1]);
+  assertEquals("target",d.path("metadata").path("namespace").asText());assertEquals("target",service.path("metadata").path("namespace").asText());assertEquals("wallet",d.path("spec").path("template").path("spec").path("volumes").get(0).path("secret").path("secretName").asText());assertFalse(result.yaml().contains("kind: Namespace"));
+ }
  @Test void rejectsSourceMutationUnpinnedImageAndLiteralEnvironment(){
   assertThrows(RuntimeException.class,()->OnboardingManifest.clone(LIVE,"apps","original","original"));
   assertThrows(RuntimeException.class,()->OnboardingManifest.clone(LIVE.replace("@sha256:"+"a".repeat(64),":latest"),"apps","original","new-app"));

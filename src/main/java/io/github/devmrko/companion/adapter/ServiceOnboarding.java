@@ -20,24 +20,30 @@ public class ServiceOnboarding {
  public ServiceOnboarding(OperatingServices services,OkeWorkloadConnections connections,OkeRuntimeResources resources,OciBuildHistory clients,OciOkeDeploymentSetup setup,PipelineIam iam,OkeDeploymentInputs inputs,DeploymentOperations deployments,BuildSpecDraftStore store){this.services=services;this.connections=connections;this.resources=resources;this.clients=clients;this.setup=setup;this.iam=iam;this.inputs=inputs;this.deployments=deployments;this.store=store;}
  public List<OperatingServices.Entry> templates(DeploymentOperations.Context c){return services.list(c);}
  public List<OkeWorkloadConnections.Cluster> clusters(DeploymentOperations.Context c){return connections.clusters(c.connection(),c.region(),c.compartment());}
- public List<String> namespaces(DeploymentOperations.Context c,String template,String cluster){var t=services.get(c,template);if(!t.cluster().equals(cluster))throw Errors.SCOPE.exception();return connections.namespaces(c.connection(),c.region(),c.compartment(),cluster,t.deployment().endpoint()).stream().filter(t.deployment().namespace()::equals).toList();}
+ public List<String> namespaces(DeploymentOperations.Context c,String template,String cluster){var t=services.get(c,template);if(!t.cluster().equals(cluster))throw Errors.SCOPE.exception();return connections.namespaces(c.connection(),c.region(),c.compartment(),cluster,t.deployment().endpoint());}
  String key(DeploymentOperations.Context c,String id){if(c.connection().demo()||!id.matches("[a-f0-9-]{36}"))throw Errors.SCOPE.exception();return String.join("\n","service-onboarding-v1",c.connection().profile(),c.connection().tenancy(),c.connection().user(),c.region(),c.compartment(),id);}
  void save(DeploymentOperations.Context c,Progress p){store.save(key(c,p.id()),new BuildSpecDraftStore.Draft("v1",json.writeValueAsString(p),Instant.now().toString()));}
  public Progress read(DeploymentOperations.Context c,String id){var p=store.read(key(c,id)).map(d->json.readValue(d.content(),Progress.class)).orElseThrow(Errors.MISSING::exception);if(p.state().equals("NEEDS_ATTENTION")&&!p.environment().isBlank()&&p.pipeline().isBlank()&&p.error().startsWith("OCI 변경 작업 완료 대기 시간 초과"))return new Progress(p.id(),p.plan(),p.environment(),p.pipeline(),p.artifact(),p.stage(),p.run(),"ENVIRONMENT_PENDING",p.error());return p;}
  public Plan preview(DeploymentOperations.Context c,Selection selection){
   var t=services.get(c,selection.template());var i=t.deployment();var r=t.registration();
-  if(!r.source().equals(selection.source())||!t.cluster().equals(selection.cluster())||!i.namespace().equals(selection.namespace()))throw Errors.SCOPE.exception();
+  if(!r.source().equals(selection.source())||!t.cluster().equals(selection.cluster()))throw Errors.SCOPE.exception();
+  OciOkeWorkloadConnections.name(selection.namespace());boolean migration=!i.namespace().equals(selection.namespace());if(migration&&!namespaces(c,selection.template(),selection.cluster()).contains(selection.namespace()))throw Errors.SCOPE.exception();
   OciOkeWorkloadConnections.name(selection.name());if(selection.name().length()>63)throw Errors.INVALID.exception();if(services.list(c).stream().anyMatch(e->e.registration().name().equals(selection.name())))throw Errors.CONFLICT.exception();
-  var names=connections.deployments(c.connection(),c.region(),c.compartment(),t.cluster(),i.endpoint(),i.namespace());if(names.contains(selection.name()))throw Errors.CONFLICT.exception();
-  var snapshot=resources.read(c.connection(),c.region(),c.compartment(),r.environment(),i.endpoint(),i.namespace());
+  var names=connections.deployments(c.connection(),c.region(),c.compartment(),t.cluster(),i.endpoint(),selection.namespace());if(names.contains(selection.name()))throw Errors.CONFLICT.exception();
+  var snapshot=resources.read(c.connection(),c.region(),c.compartment(),r.environment(),i.endpoint(),selection.namespace());
   var serviceNames=snapshot.resources().get("services");if(serviceNames==null||!serviceNames.available())throw Errors.DEPLOYMENT_RUNTIME.exception();if(serviceNames.items().stream().anyMatch(s->s.name().equals(selection.name())))throw Errors.CONFLICT.exception();
   String live=resources.deployment(c.connection(),c.region(),c.compartment(),r.environment(),i.endpoint(),i.namespace(),i.app());
-  var cloned=OnboardingManifest.clone(live,i.namespace(),i.app(),selection.name());
+  if(migration){
+   var workload=ImportedDeployment.extract(json.readValue(live,Map.class));ImportedDeployment.requireReferences(workload,snapshot);
+   var pod=json.readTree(live).path("spec").path("template").path("spec");var secrets=snapshot.resources().get("secrets");
+   for(var pull:pod.path("imagePullSecrets"))if(secrets==null||!secrets.available()||secrets.items().stream().noneMatch(x->x.name().equals(pull.path("name").asText())))throw new IllegalArgumentException("대상 Namespace에 pull Secret이 없습니다");
+  }
+  var cloned=OnboardingManifest.cloneTo(live,i.namespace(),i.app(),selection.namespace(),selection.name());
   var check=iam.inspect(c.connection(),c.region(),c.compartment(),r.pipeline());
   return new Plan(selection,t,cloned.yaml(),cloned.image(),ExistingOkeDeployment.version(live),check);
  }
  private OkeDeploymentSetup.Input input(Plan p,String environment){
-  var v=(ObjectNode)json.valueToTree(p.template().deployment());v.put("environment",environment);v.put("name",p.selection().name());v.put("app",p.selection().name());v.put("serviceName",p.selection().name());v.put("serviceType","ExistingDeployment");v.put("createNamespace",false);v.put("nodePort",0);return json.treeToValue(v,OkeDeploymentSetup.Input.class);
+  var v=(ObjectNode)json.valueToTree(p.template().deployment());v.put("namespace",p.selection().namespace());v.put("environment",environment);v.put("name",p.selection().name());v.put("app",p.selection().name());v.put("serviceName",p.selection().name());v.put("serviceType","ExistingDeployment");v.put("createNamespace",false);v.put("nodePort",0);return json.treeToValue(v,OkeDeploymentSetup.Input.class);
  }
  static boolean samePlan(Plan a,Plan b){
   if(!a.selection().equals(b.selection())||!a.template().equals(b.template())||!a.image().equals(b.image())||!a.version().equals(b.version())||!a.iam().equals(b.iam()))return false;
@@ -83,6 +89,29 @@ public class ServiceOnboarding {
    var prepared=deployments.prepare(c,new DeploymentOperations.Target(p.pipeline(),"",""));if(prepared.id().isBlank())throw Errors.DEPLOYMENT_RUNTIME.exception();
    var started=deployments.execute(c,prepared.id());p=new Progress(token,approved,p.environment(),p.pipeline(),p.artifact(),p.stage(),started.id(),"DEPLOYING","");save(c,p);return p;
   }catch(Exception e){p=new Progress(token,approved,p.environment(),p.pipeline(),p.artifact(),p.stage(),p.run(),(!p.environment().isBlank()&&p.pipeline().isBlank()&&(p.state().equals("ENVIRONMENT_PENDING")||Objects.toString(e.getMessage(),"").contains("완료 대기 시간 초과")))?"ENVIRONMENT_PENDING":"NEEDS_ATTENTION",PipelineIamRules.safe(e.getMessage()));save(c,p);return p;}
+ }
+ public record RetirementPlan(String run,OkeRuntimeResources.Retirement resources){}
+ private Progress migrationReady(DeploymentOperations.Context c,String id){
+  var p=read(c,id);if(!p.state().equals("REGISTERED")||p.plan().selection().namespace().equals(p.plan().template().deployment().namespace()))throw Errors.CONFLICT.exception();
+  if(!services.get(c,p.plan().template().registration().name()).equals(p.plan().template()))throw Errors.BUILD_CHANGED.exception();
+  var result=status(c,p);if(result==null||!result.state().equals("SUCCEEDED"))throw new IllegalArgumentException("대상 Pod digest·Ready 재확인 후 원본을 정리할 수 있습니다");
+  var docs=new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions())).loadAll(p.plan().yaml());int replicas=0;
+  for(Object doc:docs){var map=ImportedDeployment.map(doc);if("Deployment".equals(map.get("kind")))replicas=((Number)ImportedDeployment.map(map.get("spec")).getOrDefault("replicas",1)).intValue();}
+  var expected=new DeploymentImageVerification.Expected(p.plan().selection().namespace(),p.plan().selection().name(),replicas,Map.of(p.plan().selection().name(),p.plan().image()));
+  var actual=resources.verifyImages(c.connection(),c.region(),c.compartment(),p.environment(),p.plan().template().deployment().endpoint(),expected);
+  if(actual==null||!actual.state().equals("SUCCEEDED"))throw new IllegalArgumentException("대상 Pod digest·Ready 재확인 실패 · 원본을 유지합니다");return p;
+ }
+ public RetirementPlan retirementPreview(DeploymentOperations.Context c,String id){
+  var p=migrationReady(c,id);var t=p.plan().template();var i=t.deployment();
+  String live=resources.deployment(c.connection(),c.region(),c.compartment(),i.environment(),i.endpoint(),i.namespace(),i.app());if(!ExistingOkeDeployment.version(live).equals(p.plan().version()))throw Errors.BUILD_CHANGED.exception();
+  return new RetirementPlan(id,resources.retirement(c.connection(),c.region(),c.compartment(),i.environment(),i.endpoint(),i.namespace(),i.app()));
+ }
+ public synchronized void retire(DeploymentOperations.Context c,RetirementPlan approved){
+  var fresh=retirementPreview(c,approved.run());if(!fresh.equals(approved))throw Errors.BUILD_CHANGED.exception();var p=read(c,approved.run());var t=p.plan().template();var i=t.deployment();
+  save(c,new Progress(p.id(),p.plan(),p.environment(),p.pipeline(),p.artifact(),p.stage(),p.run(),"RETIRING",""));
+  try{resources.retire(c.connection(),c.region(),c.compartment(),i.environment(),i.endpoint(),i.namespace(),i.app(),approved.resources());services.remove(c,t.registration().name());
+   save(c,new Progress(p.id(),p.plan(),p.environment(),p.pipeline(),p.artifact(),p.stage(),p.run(),"MIGRATED",""));
+  }catch(Exception e){save(c,new Progress(p.id(),p.plan(),p.environment(),p.pipeline(),p.artifact(),p.stage(),p.run(),"RETIREMENT_ATTENTION","원본 정리 결과 확인 필요 · 자동 재시도하지 않습니다"));throw e;}
  }
  public DeploymentRuns.Run status(DeploymentOperations.Context c,Progress p){return p.run().isBlank()?null:deployments.status(c,p.pipeline(),p.run());}
  public synchronized Progress finish(DeploymentOperations.Context c,String id){

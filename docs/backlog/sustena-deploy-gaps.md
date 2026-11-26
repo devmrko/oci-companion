@@ -303,3 +303,7 @@ Function에서 Sustena a829ff9의 테스트 155개, ARM64 레이어 생성, OCIR
 ### Helm 기본값 렌더링 — 2026-11-26
 
 OCI 소스의 단일 Helm 차트를 격리된 로컬 `helm template`으로 렌더링해 배포 힌트와 고급 설정으로 읽습니다. 실제 차트 커밋으로 화면의 출처·값을 확인했고, 누락 의존성의 실제 오류도 기록했습니다. [지원 범위·실제 명령·제한](../repository-deployment-import-validation.md#helm-렌더링--2026-11-26)을 참고하세요.
+
+### 다른 Namespace 이관 — 2026-11-26
+
+대상 Namespace 참조 검사 → 새 서비스 배포·Pod digest/Ready 확인 → 별도 확인 후 원본 워크로드 정리를 구현했습니다. 검증용 서비스의 Namespace를 실제로 옮겨 MIGRATED·2/2 Ready·readyz 200과 원본 Deployment·ClusterIP·Pod 부재를 확인했습니다. 외부 DNS/Ingress/NodePort 전환·PVC 데이터 복사는 자동화하지 않으며 원본 배포 이력과 참조 자원은 보존합니다. [실제 결과·범위·운영 Function 적용안](../repository-deployment-import-validation.md)을 참고하세요.

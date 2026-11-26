@@ -40,6 +40,47 @@ public class OciOkeRuntimeResources implements OkeRuntimeResources {
   }catch(Exception e){return io.github.devmrko.companion.port.DeploymentImageVerification.Result.unknown();}
   finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
  }
+ public Retirement retirement(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app){
+  OkeWorkloadHealth.Target target=null;
+  try{OciOkeWorkloadConnections.name(namespace);OciOkeWorkloadConnections.name(app);target=environmentTarget(c,region,compartment,environment,endpoint,namespace);
+   return retirement(reader.read(target,"deployment",app),reader.read(target,"services",null),reader.read(target,"ingresses",null),namespace,app);
+  }catch(RuntimeException e){throw e;}catch(Exception e){throw Errors.DEPLOYMENT_RUNTIME.exception();}finally{if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
+ static Retirement retirement(JsonNode deployment,JsonNode services,JsonNode ingresses,String namespace,String app){
+  var meta=deployment.path("metadata");if(!app.equals(meta.path("name").asText())||!namespace.equals(meta.path("namespace").asText())||meta.has("deletionTimestamp"))throw Errors.CONFLICT.exception();
+  var labels=deployment.path("spec").path("template").path("metadata").path("labels");JsonNode chosen=null;
+  if(!services.path("items").isArray()||!ingresses.path("items").isArray())throw Errors.DEPLOYMENT_RUNTIME.exception();
+  for(var service:services.path("items")){
+   var selector=service.path("spec").path("selector");boolean matches=selector.isObject()&&!selector.isEmpty();
+   for(String key:selector.propertyNames())if(!selector.path(key).equals(labels.path(key)))matches=false;
+   if(!matches)continue;
+   if(chosen!=null||!app.equals(service.path("metadata").path("name").asText())||!namespace.equals(service.path("metadata").path("namespace").asText())||!"ClusterIP".equals(service.path("spec").path("type").asText())||service.path("spec").has("externalIPs"))throw new IllegalArgumentException("이관 정리는 앱과 같은 이름의 단일 ClusterIP만 지원합니다 · 외부 노출을 먼저 확인하세요");chosen=service;
+  }
+  if(chosen==null)throw new IllegalArgumentException("원본 ClusterIP Service를 확인할 수 없습니다");
+  for(var ingress:ingresses.path("items"))if(ingress(ingress).routes().stream().anyMatch(r->r.service().equals(app)))throw new IllegalArgumentException("Ingress가 원본 서비스를 참조합니다 · 외부 경로 전환 후 정리하세요");
+  var sm=chosen.path("metadata");var result=new Retirement(meta.path("uid").asText(),meta.path("resourceVersion").asText(),sm.path("uid").asText(),sm.path("resourceVersion").asText());
+  if(result.deploymentUid().isBlank()||result.deploymentVersion().isBlank()||result.serviceUid().isBlank()||result.serviceVersion().isBlank())throw Errors.CONFLICT.exception();return result;
+ }
+ public void retire(Connection c,String region,String compartment,String environment,String endpoint,String namespace,String app,Retirement approved){
+  if(!retirement(c,region,compartment,environment,endpoint,namespace,app).equals(approved))throw Errors.BUILD_CHANGED.exception();
+  OkeWorkloadHealth.Target target=null;Path options=null;
+  try{target=environmentTarget(c,region,compartment,environment,endpoint,namespace);options=Files.createTempFile("companion-retire-",".json");
+   var json=tools.jackson.databind.json.JsonMapper.builder().build();
+   // API-side UID and resourceVersion preconditions prevent deleting a replacement or concurrent change.
+   for(String kind:List.of("deployments","services")){
+    boolean deployment=kind.equals("deployments");Files.writeString(options,json.writeValueAsString(Map.of("apiVersion","v1","kind","DeleteOptions","propagationPolicy","Foreground","preconditions",Map.of("uid",deployment?approved.deploymentUid():approved.serviceUid(),"resourceVersion",deployment?approved.deploymentVersion():approved.serviceVersion()))));
+    String uri=(deployment?"/apis/apps/v1":"/api/v1")+"/namespaces/"+namespace+"/"+kind+"/"+app;
+    reader.command(target,List.of("delete","--raw",uri,"-f",options.toString()),524288);
+   }
+   long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);boolean absent=false;
+   while(System.nanoTime()<deadline){
+    String remaining=new String(reader.command(target,List.of("get","deployment,service",app,"--ignore-not-found","-o","name"),8192),StandardCharsets.UTF_8);
+    if(remaining.isBlank()){absent=true;break;}Thread.sleep(1000);
+   }
+   if(!absent)throw new IllegalStateException("원본 삭제 완료 대기 시간 초과");
+  }catch(Exception e){throw new IllegalStateException("원본 정리 완료를 확인하지 못했습니다 · 부분 삭제 여부를 조회하세요. 자동 재시도하지 않습니다.");}
+  finally{if(options!=null)try{Files.deleteIfExists(options);}catch(Exception ignored){}if(target!=null)try{Files.deleteIfExists(Path.of(target.kubeconfig()));}catch(Exception ignored){}}
+ }
  public NodePorts nodePorts(Connection c,String region,String compartment,String environment,String endpoint,String namespace){
   OkeWorkloadHealth.Target target=null;
   try{
